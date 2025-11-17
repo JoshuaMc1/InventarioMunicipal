@@ -2,34 +2,24 @@ package com.joshuamc1.inventariomunicipal.models;
 
 import org.javalite.activejdbc.Model;
 import org.javalite.activejdbc.annotations.Table;
+import org.mindrot.jbcrypt.BCrypt;
 
-import java.util.List;
-
-@Table("usuarios")
+@Table("users")
 public class User extends Model {
-
-    static {
-        validatePresenceOf("username", "password_hash");
-        validateEmailOf("email");
+    public boolean validatePassword(String password) {
+        return BCrypt.checkpw(password, getString("password"));
     }
 
-    public void setPasswordHash(String hash) {
-        set("password_hash", hash);
+    public void setPassword(String password) {
+        String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+        set("password", hashedPassword);
     }
 
-    public String getPasswordHash() {
-        return getString("password_hash");
+    public boolean isAdmin() {
+        return "admin".equals(getString("role"));
     }
 
-    public List<Role> getRoles() {
-        return getAll(Role.class);
-    }
-
-    public void assignRole(Role role) {
-        add(role);
-    }
-
-    public boolean hasRole(String roleName) {
-        return getRoles().stream().anyMatch(r -> r.getString("nombre").equalsIgnoreCase(roleName));
+    public boolean isOperator() {
+        return "operator".equals(getString("role"));
     }
 }

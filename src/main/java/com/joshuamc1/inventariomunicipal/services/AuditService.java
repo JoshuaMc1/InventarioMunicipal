@@ -1,18 +1,43 @@
 package com.joshuamc1.inventariomunicipal.services;
 
+import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
+import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.models.Audit;
-import com.joshuamc1.inventariomunicipal.models.User;
+import com.joshuamc1.inventariomunicipal.models.dto.AuditDTO;
+import com.joshuamc1.inventariomunicipal.repositories.AuditRepository;
 
 import java.util.List;
 
 public class AuditService {
-    // Log a custom action
-    public void logAction(User user, String action, String table, Integer recordId, String details) {
-        Audit.logAction(user, action, table, recordId, details);
+    private final AuditRepository repo = new AuditRepository();
+
+    public void logAction(Integer userId, String action, String table, Integer recordId, String details) {
+        DatabaseManager.runInConnection(() -> {
+            Audit audit = new Audit();
+            audit.set("usuario_id", userId);
+            audit.set("accion", action);
+            audit.set("tabla_afectada", table);
+            audit.set("registro_afectado_id", recordId);
+            audit.set("detalles", details);
+            repo.save(audit);
+        });
+
+        Logs.info(getClass(), "Logged action: " + action + " on table: " + table + " for record ID: " + recordId);
     }
 
-    // Get all audit entries
-    public List<Audit> getAllAudit() {
-        return Audit.findAll();
+    public List<Audit> getAll() {
+        return DatabaseManager.callInConnection(repo::findAll);
+    }
+
+    public List<AuditDTO> getAllWithUser() {
+        return DatabaseManager.callInConnection(repo::findAllWithUser);
+    }
+
+    public List<AuditDTO> getPageWithUser(int offset, int limit, String search) {
+        return DatabaseManager.callInConnection(() -> repo.findPageWithUser(offset, limit, search));
+    }
+
+    public int countWithFilter(String search) {
+        return DatabaseManager.callInConnection(() -> repo.countWithFilter(search));
     }
 }

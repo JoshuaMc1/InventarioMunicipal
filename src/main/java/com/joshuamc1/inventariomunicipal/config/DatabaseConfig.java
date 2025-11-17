@@ -1,6 +1,7 @@
 package com.joshuamc1.inventariomunicipal.config;
 
 import org.javalite.activejdbc.Base;
+import com.joshuamc1.inventariomunicipal.core.Logs;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,18 +28,27 @@ public class DatabaseConfig {
             String prefix = ENVIRONMENT + ".";
             String driver = properties.getProperty(prefix + "driver");
             String url = properties.getProperty(prefix + "url");
-            String user = properties.getProperty(prefix + "username");
+            String user = properties.getProperty(prefix + "username", properties.getProperty(prefix + "user"));
             String password = properties.getProperty(prefix + "password");
 
-            Base.open(driver, url, user, password);
-            System.out.println("🔗 Conexión abierta a la base de datos (" + ENVIRONMENT + ")");
+            if (driver == null || driver.trim().isEmpty() || url == null || url.trim().isEmpty()) {
+                throw new RuntimeException("Configuración incompleta para el entorno '" + ENVIRONMENT + "'. Se requieren las propiedades '" + prefix + "driver' y '" + prefix + "url'.");
+            }
+
+            try {
+                Base.open(driver, url, user, password);
+                Logs.info(DatabaseConfig.class, "Conexión abierta a la base de datos ({})", ENVIRONMENT);
+            } catch (Exception e) {
+                Logs.error(DatabaseConfig.class, "Error abriendo la conexión a la base de datos: {}", e.getMessage());
+                throw new RuntimeException("Error abriendo la conexión a la base de datos: " + e.getMessage(), e);
+            }
         }
     }
 
     public static void closeConnection() {
         if (Base.hasConnection()) {
             Base.close();
-            System.out.println("❌ Conexión cerrada (" + ENVIRONMENT + ")");
+            Logs.info(DatabaseConfig.class, "Conexión cerrada ({})", ENVIRONMENT);
         }
     }
 }

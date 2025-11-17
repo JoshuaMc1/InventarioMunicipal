@@ -8,20 +8,51 @@
 <?import javafx.scene.image.Image?>
 <?import javafx.scene.image.ImageView?>
 <?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
 
-<VBox alignment="CENTER" prefHeight="271.0" prefWidth="439.0" spacing="10" xmlns:fx="http://javafx.com/fxml/1" xmlns="http://javafx.com/javafx/25" fx:controller="com.joshuamc1.inventariomunicipal.controllers.LoginController">
+<VBox alignment="CENTER" prefHeight="362.0" prefWidth="522.0" spacing="10" style="-fx-background-color: #E5E5E5;" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.joshuamc1.inventariomunicipal.controllers.LoginController">
     <padding>
         <Insets bottom="20" left="20" right="20" top="20" />
     </padding>
-   <ImageView fitHeight="65.0" fitWidth="65.0" pickOnBounds="true" preserveRatio="true">
-      <image>
-         <Image url="@../images/logo.png" />
-      </image>
-   </ImageView>
 
-    <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Inventario Municipal" />
-   <Label style="-fx-font-size: 16px; -fx-font-weight: bold;" text="Iniciar sesión" />
-    <TextField fx:id="txtUsername" promptText="Usuario" />
-    <PasswordField fx:id="txtPassword" promptText="Contraseña" />
-    <Button onAction="#handleLogin" text="Iniciar sesión" />
+    <ImageView fitHeight="65.0" fitWidth="65.0" pickOnBounds="true" preserveRatio="true">
+        <Image url="@../images/logo.png" />
+    </ImageView>
+
+    <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Inventario Municipal">
+    </Label>
+   <Label style="-fx-font-size: 18px; -fx-font-weight: bold;" text="Iniciar sesión">
+      <VBox.margin>
+         <Insets bottom="15.0" />
+      </VBox.margin>
+   </Label>
+   <Label nodeOrientation="LEFT_TO_RIGHT" prefHeight="35.0" prefWidth="482.0" text="Usuario:">
+      <font>
+         <Font name="System Bold" size="24.0" />
+      </font>
+   </Label>
+    <TextField fx:id="txtUsername" prefHeight="110.0" prefWidth="399.0" promptText="Ingrese su usuario" text="admin">
+      <font>
+         <Font size="18.0" />
+      </font>
+      <VBox.margin>
+         <Insets bottom="10.0" />
+      </VBox.margin></TextField>
+   <Label prefHeight="35.0" prefWidth="487.0" text="Contraseña:">
+      <font>
+         <Font name="System Bold" size="24.0" />
+      </font>
+   </Label>
+
+    <PasswordField fx:id="txtPassword" prefHeight="110.0" promptText="Ingrese su contraseña" text="password">
+      <font>
+         <Font size="18.0" />
+      </font>
+      <VBox.margin>
+         <Insets bottom="10.0" />
+      </VBox.margin></PasswordField>
+    <Button onAction="#handleLogin" style="-fx-background-color: #07393C;" text="Iniciar sesión" textFill="WHITE">
+      <font>
+         <Font name="System Bold" size="18.0" />
+      </font></Button>
 </VBox>

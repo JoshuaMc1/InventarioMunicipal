@@ -1,53 +1,112 @@
 package com.joshuamc1.inventariomunicipal.services;
 
-import com.joshuamc1.inventariomunicipal.models.Role;
+import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
+import com.joshuamc1.inventariomunicipal.core.Logs;
+import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.models.User;
-import org.jetbrains.annotations.NotNull;
+import com.joshuamc1.inventariomunicipal.repositories.UserRepository;
 
 import java.util.List;
 
 public class UserService {
-    AuditService auditService = new AuditService();
+    private final UserRepository repo = new UserRepository();
+    private final AuditService auditService = new AuditService();
 
-    // Authenticate user by username and password hash
-    public User login(String username, String passwordHash) {
-        User user = User.findFirst("username = ? AND password_hash = ?", username, passwordHash);
+    public User login(String username, String password) {
+        return DatabaseManager.callInConnection(() -> {
+            User user = repo.findByUsername(username);
 
-        if(user != null && user.getBoolean("activo")) {
-            auditService.logAction(user, "Login successful", "usuarios", (Integer) user.getId(), null);
+            if (user != null && user.validatePassword(password)) {
+                auditService.logAction(
+                        user.getInteger("id"),
+                        "login",
+                        "users",
+                        user.getInteger("id"),
+                        String.format("user_id=%d,username=%s", user.getInteger("id"), username)
+                );
+                return user;
+            }
+
+            return null;
+        });
+    }
+
+    public User createUser(String username, String password, String role) {
+        return DatabaseManager.callInConnection(() -> {
+            // password en texto plano: el modelo User.setPassword hará el hash
+            User user = repo.create(username, password, role);
+
+            auditService.logAction(
+                    Session.getCurrentUserId(),
+                    "create_user",
+                    "users",
+                    user.getInteger("id"),
+                    String.format("user_id=%d,username=%s,role=%s", user.getInteger("id"), username, role)
+            );
+
             return user;
-        }
-        return null;
+        });
     }
 
-    // Create a new user
-    public User createUser(String username, String passwordHash, String name, String email, User currentUser) {
-        User user = new User();
-        user.set("username", username);
-        user.set("password_hash", passwordHash);
-        user.set("nombre", name);
-        user.set("email", email);
-        user.saveIt();
+    public User createUserFull(String name, String username, String password, String role) {
+        return DatabaseManager.callInConnection(() -> {
+            // password en texto plano: el modelo User.setPassword hará el hash
+            User user = repo.createFull(name, username, password, role);
 
-        auditService.logAction(currentUser, "Created user", "usuarios", (Integer) user.getId(), null);
-        return user;
+            auditService.logAction(
+                    Session.getCurrentUserId(),
+                    "create_user",
+                    "users",
+                    user.getInteger("id"),
+                    String.format("user_id=%d,name=%s,username=%s,role=%s", user.getInteger("id"), name, username, role)
+            );
+
+            return user;
+        });
     }
 
-    // Assign role to a user
-    public void assignRole(@NotNull User user, Role role, User currentUser) {
-        user.assignRole(role);
-        auditService.logAction(currentUser, "Assigned role " + role.getString("nombre"), "usuario_roles", null, null);
+    public boolean updateUser(Integer id, String name, String username, String role, String newPassword) {
+        return DatabaseManager.callInConnection(() -> {
+            boolean ok = repo.update(id, name, username, role, newPassword);
+            if (ok) {
+                auditService.logAction(
+                    Session.getCurrentUserId(),
+                    "update_user",
+                    "users",
+                    id,
+                    String.format("user_id=%d,username=%s,role=%s", id, username, role)
+                );
+            }
+            return ok;
+        });
     }
 
-    // Change password
-    public void changePassword(@NotNull User user, String newPasswordHash, User currentUser) {
-        user.set("password_hash", newPasswordHash);
-        user.saveIt();
-        auditService.logAction(currentUser, "Changed password", "usuarios", (Integer) user.getId(), null);
+    public boolean deleteUser(Integer id) {
+        return DatabaseManager.callInConnection(() -> {
+            boolean ok = repo.delete(id);
+
+            if (ok) {
+                auditService.logAction(
+                        Session.getCurrentUserId(),
+                        "delete_user",
+                        "users",
+                        id,
+                        "user_id=" + id
+                );
+            }
+            return ok;
+        });
     }
 
-    // Get all users
-    public List<User> getAllUsers() {
-        return User.findAll();
+    public User findById(Integer id) {
+        return DatabaseManager.callInConnection(() -> repo.findById(id));
+    }
+
+    public long countUsers() {
+        return DatabaseManager.callInConnection(repo::countUsers);
+    }
+
+    public List<User> listPaged(int offset, int limit, String search) {
+        return DatabaseManager.callInConnection(() -> repo.listPaged(offset, limit, search));
     }
 }

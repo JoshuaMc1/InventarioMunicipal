@@ -1,0 +1,187 @@
+package com.joshuamc1.inventariomunicipal.core;
+
+import javafx.scene.control.Alert;
+import javafx.stage.Stage;
+import org.jetbrains.annotations.NotNull;
+import org.mindrot.jbcrypt.BCrypt;
+
+import java.security.SecureRandom;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
+public class Utils {
+    private static final SecureRandom RANDOM = new SecureRandom();
+    private static final String DEFAULT_PASSWORD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%&*()-_=+";
+
+    /**
+     * Concatenar cadenas con espacios (ignora null y cadenas vacías)
+     * */
+    public static @NotNull String concatWithSpaces(@NotNull String @NotNull ... strings) {
+        if (strings.length == 0) return "";
+        return Arrays.stream(strings)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.joining(" "));
+    }
+
+    /**
+     * Concatenar cadenas con un símbolo específico (ignora null y cadenas vacías)
+     * */
+    public static @NotNull String concatWithSymbol(String symbol, @NotNull String... strings) {
+        if (symbol == null) symbol = "";
+        if (strings.length == 0) return "";
+        return Arrays.stream(strings)
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.joining(symbol));
+    }
+
+    /**
+     * Verificar si una cadena es null o está vacía (después de trim)
+     * */
+    public static boolean isNullOrEmpty(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
+    /**
+     * Obtener fecha actual en formato ISO (YYYY-MM-DD)
+     * */
+    public static @NotNull String getCurrentDate() {
+        return LocalDate.now().toString();
+    }
+
+    /**
+     * Obtener fecha con formato personalizado
+     * */
+    public static @NotNull String getCurrentDate(@NotNull String pattern) {
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern(pattern);
+        return LocalDate.now().format(fmt);
+    }
+
+    /**
+     * Obtener hora actual en formato ISO (HH:MM:SS)
+     * */
+    public static @NotNull String getCurrentTime() {
+        return LocalTime.now().withNano(0).toString();
+    }
+
+    /**
+     * Obtener hora con formato personalizado
+     * */
+    public static @NotNull String getCurrentTime(@NotNull String pattern) {
+        DateTimeFormatter fmt = DateTimeFormatter.ofPattern(pattern);
+        return LocalTime.now().withNano(0).format(fmt);
+    }
+
+    /**
+     * Obtener fecha y hora actual en formato ISO (YYYY-MM-DDTHH:MM:SS)
+     * */
+    public static @NotNull String getCurrentDateTime() {
+        return LocalDateTime.now().withNano(0).toString();
+    }
+
+    /**
+     * Obtener fecha y hora con formato personalizado
+     * */
+    public static @NotNull String bcrypt(@NotNull String password) {
+        Objects.requireNonNull(password, "password no puede ser null");
+        return BCrypt.hashpw(password, BCrypt.gensalt());
+    }
+
+    /**
+     * Obtener hash BCrypt con número de rondas personalizado
+     * */
+    public static @NotNull String bcrypt(@NotNull String password, int logRounds) {
+        Objects.requireNonNull(password, "password no puede ser null");
+        if (logRounds < 4 || logRounds > 31) logRounds = 5; // Valor por defecto si está fuera de rango
+        return BCrypt.hashpw(password, BCrypt.gensalt(logRounds));
+    }
+
+    /**
+     * Verificar si una contraseña coincide con un hash BCrypt
+     * */
+    public static boolean verifyBcrypt(String plainPassword, String hashed) {
+        if (plainPassword == null || hashed == null) return false;
+        try {
+            return BCrypt.checkpw(plainPassword, hashed);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Generar una contraseña segura usando el conjunto de caracteres predeterminado
+     * (mayúsculas, minúsculas, dígitos y símbolos especiales)
+     * */
+    public static @NotNull String generateRandomPassword(int length) {
+        if (length <= 0) throw new IllegalArgumentException("length debe ser mayor que 0");
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int idx = RANDOM.nextInt(DEFAULT_PASSWORD_CHARS.length());
+            sb.append(DEFAULT_PASSWORD_CHARS.charAt(idx));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Generar una contraseña segura usando un conjunto de caracteres personalizado
+     * */
+    public static @NotNull String generateRandomPassword(int length, @NotNull String charset) {
+        if (length <= 0) throw new IllegalArgumentException("length debe ser mayor que 0");
+        if (isNullOrEmpty(charset)) throw new IllegalArgumentException("charset no puede ser null o vacío");
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int idx = RANDOM.nextInt(charset.length());
+            sb.append(charset.charAt(idx));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Mostrar una alerta de información con título y mensaje personalizados
+     * */
+    public static void showAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        // El dialogo aún no tiene Scene/Window hasta que se muestra; añadir icono solo si ya existe
+        try {
+            if (alert.getDialogPane().getScene() != null && alert.getDialogPane().getScene().getWindow() instanceof Stage) {
+                Stage alertStage = (Stage) alert.getDialogPane().getScene().getWindow();
+                alertStage.getIcons().add(new javafx.scene.image.Image(Objects.requireNonNull(Utils.class.getResourceAsStream("/images/logo.png"))));
+            }
+        } catch (Exception ignored) {
+            // Si algo falla, seguimos sin icono para evitar bloquear la UI
+        }
+        alert.showAndWait();
+    }
+
+    /**
+     * Mostrar una alerta de confirmación con dos botones: OK y Cancel
+     * Devuelve true si el usuario confirma (OK), false si cancela.
+     */
+    public static boolean confirmAction(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        try {
+            if (alert.getDialogPane().getScene() != null && alert.getDialogPane().getScene().getWindow() instanceof Stage) {
+                Stage alertStage = (Stage) alert.getDialogPane().getScene().getWindow();
+                alertStage.getIcons().add(new javafx.scene.image.Image(Objects.requireNonNull(Utils.class.getResourceAsStream("/images/logo.png"))));
+            }
+        } catch (Exception ignored) {
+            // ignore, avoid breaking confirmation
+        }
+
+        return alert.showAndWait().filter(response -> response == javafx.scene.control.ButtonType.OK).isPresent();
+    }
+}

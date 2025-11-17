@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.*?>
+
+<?import javafx.scene.image.ImageView?>
+<BorderPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.MainController">
+
+    <top>
+        <HBox fx:id="topBar" styleClass="topbar" spacing="20"
+              alignment="CENTER_LEFT" prefHeight="70">
+
+            <HBox alignment="CENTER_LEFT" spacing="15">
+                <ImageView fx:id="imgLogo"
+                           fitHeight="50"
+                           fitWidth="50"
+                           preserveRatio="true"
+                           pickOnBounds="true"/>
+
+                <Label text="Municipalidad de Olanchito"
+                       styleClass="topbar-org-name"/>
+            </HBox>
+
+            <Region HBox.hgrow="ALWAYS"/>
+
+            <VBox alignment="CENTER_RIGHT">
+
+                <Label fx:id="lblCurrentUser"
+                       text="Nombre Usuario"
+                       styleClass="topbar-user"/>
+
+                <Label fx:id="lblCurrentRole"
+                       text="Rol"
+                       styleClass="topbar-role"/>
+            </VBox>
+
+            <Button fx:id="btnLogout"
+                    text="Cerrar sesión"
+                    styleClass="topbar-logout"/>
+
+        </HBox>
+    </top>
+
+    <left>
+        <VBox fx:id="sidebar" styleClass="sidebar" spacing="10" prefWidth="220">
+            <padding>
+                <Insets top="20" left="20" bottom="20" right="20"/>
+            </padding>
+
+            <Label text="Menú"
+                   style="-fx-text-fill: white; -fx-font-size: 18px;"/>
+
+            <Button fx:id="btnDashboard" text="Dashboard" maxWidth="Infinity" styleClass="sidebar-btn"/>
+            <Button fx:id="btnInventory" text="Inventario" maxWidth="Infinity" styleClass="sidebar-btn"/>
+            <Button fx:id="btnAudit" text="Auditoría" maxWidth="Infinity" styleClass="sidebar-btn"/>
+            <Button fx:id="btnReports" text="Reportes" maxWidth="Infinity" styleClass="sidebar-btn"/>
+            <Button fx:id="btnUsers" text="Usuarios" maxWidth="Infinity" styleClass="sidebar-btn"/>
+
+        </VBox>
+    </left>
+
+    <center>
+        <StackPane fx:id="contentArea" styleClass="content-bg"/>
+    </center>
+
+</BorderPane>

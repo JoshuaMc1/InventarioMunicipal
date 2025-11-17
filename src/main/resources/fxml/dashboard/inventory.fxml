@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<?import javafx.geometry.Insets?>
+
+<BorderPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.InventoryController">
+
+    <top>
+        <HBox spacing="10" style="-fx-padding: 10;">
+            <Label text="Módulo Inventario" style="-fx-font-size: 20px; -fx-font-weight: bold;" />
+            <Pane HBox.hgrow="ALWAYS" />
+            <Button fx:id="btnRefresh" text="Refrescar" />
+            <Button fx:id="btnNew" text="Nuevo" />
+            <Button fx:id="btnEdit" text="Editar" />
+            <Button fx:id="btnDelete" text="Eliminar" />
+        </HBox>
+    </top>
+
+    <center>
+        <TableView fx:id="tblProducts">
+            <columns>
+                <TableColumn fx:id="colId" text="ID" prefWidth="60" />
+                <TableColumn fx:id="colName" text="Nombre" prefWidth="200" />
+                <TableColumn fx:id="colUnit" text="Unidad" prefWidth="100" />
+                <TableColumn fx:id="colStock" text="Stock" prefWidth="100" />
+                <TableColumn fx:id="colMinStock" text="Stock Mínimo" prefWidth="120" />
+            </columns>
+        </TableView>
+    </center>
+
+    <padding>
+        <Insets top="10" right="10" bottom="10" left="10" />
+    </padding>
+</BorderPane>

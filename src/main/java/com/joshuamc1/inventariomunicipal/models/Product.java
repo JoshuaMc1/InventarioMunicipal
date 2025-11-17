@@ -3,26 +3,17 @@ package com.joshuamc1.inventariomunicipal.models;
 import org.javalite.activejdbc.Model;
 import org.javalite.activejdbc.annotations.Table;
 
-@Table("productos")
+@Table("products")
 public class Product extends Model {
-    static {
-        validatePresenceOf("name", "product_code", "quantity");
-        validateNumericalityOf("quantity");
+
+    public boolean isLowStock() {
+        Double currentStock = getDouble("current_stock");
+        Double minimumStock = getDouble("minimum_stock");
+        return currentStock != null && minimumStock != null && currentStock <= minimumStock;
     }
 
-    public void increaseQuantity(int amount) {
-        set("cantidad", getInteger("cantidad") + amount);
-        saveIt();
-    }
-
-    public void decreaseQuantity(int amount) {
-        int current = getInteger("cantidad");
-        if(current < amount) throw new IllegalArgumentException("Insufficient stock");
-        set("cantidad", current - amount);
-        saveIt();
-    }
-
-    public int getQuantity() {
-        return getInteger("cantidad");
+    public void updateStock(double quantity) {
+        Double currentStock = getDouble("current_stock");
+        set("current_stock", currentStock + quantity);
     }
 }
