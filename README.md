@@ -1,6 +1,14 @@
 # 🏛️ Sistema de Inventario Municipal
 
+[![GitHub](https://img.shields.io/badge/GitHub-JoshuaMc1-blue?logo=github)](https://github.com/JoshuaMc1/InventarioMunicipal)
+[![Java](https://img.shields.io/badge/Java-14+-orange?logo=java)](https://www.oracle.com/java/)
+[![JavaFX](https://img.shields.io/badge/JavaFX-25.0.1-brightgreen)](https://openjfx.io/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-blue?logo=mysql)](https://www.mysql.com/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
+
 Sistema de gestión de inventario desarrollado en JavaFX con base de datos MySQL para municipalidades.
+
+**🔗 Repositorio**: [https://github.com/JoshuaMc1/InventarioMunicipal](https://github.com/JoshuaMc1/InventarioMunicipal)
 
 ## 🚀 Características Principales
 
@@ -30,7 +38,7 @@ Sistema de gestión de inventario desarrollado en JavaFX con base de datos MySQL
 
 ### 1. Clonar el Repositorio
 ```bash
-git clone [URL_DEL_REPOSITORIO]
+git clone https://github.com/JoshuaMc1/InventarioMunicipal.git
 cd InventarioMunicipal
 ```
 
@@ -174,12 +182,17 @@ Para actualizar a una nueva versión:
 ## 📞 Soporte
 
 Para soporte técnico o reportar problemas:
-- Email: [TU_EMAIL]
-- Issues: [URL_GITHUB_ISSUES]
+- **Email**: joshua15mclean@gmail.com
+- **GitHub**: https://github.com/JoshuaMc1/InventarioMunicipal
+- **Issues**: https://github.com/JoshuaMc1/InventarioMunicipal/issues
+- **Releases**: https://github.com/JoshuaMc1/InventarioMunicipal/releases
 
 ## 📄 Licencia
 
-[Especificar licencia]
+Este proyecto está bajo la Licencia MIT. Ver el archivo [LICENSE.txt](LICENSE.txt) para más detalles.
+
+Copyright (c) 2025 Joshua MC
+
 
 ## 👨‍💻 Desarrollado por
 
