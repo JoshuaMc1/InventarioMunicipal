@@ -27,7 +27,7 @@ public class MySQLConfigManager {
     private static final Properties props = new Properties();
 
     static {
-        Path dir = Paths.get(System.getProperty("user.home"), AppConfig.getSecureDirName());
+        Path dir = AppConfig.getSecureFolderPath();
         try {
             if (!Files.exists(dir)) {
                 Files.createDirectories(dir);
@@ -159,4 +159,3 @@ public class MySQLConfigManager {
         return new String(decrypted);
     }
 }
-

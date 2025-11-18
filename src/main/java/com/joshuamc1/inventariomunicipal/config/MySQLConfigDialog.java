@@ -189,6 +189,7 @@ public class MySQLConfigDialog {
                                 statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
                                 migrationsExecuted = true;
                                 saveButton.setDisable(false);
+                                AppState.setMigrationsApplied(true);
                             } else {
                                 statusLabel.setText("❌ Error ejecutando migraciones. Revise los logs para más información.");
                                 statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
@@ -277,7 +278,7 @@ public class MySQLConfigDialog {
             return true;
         } catch (Exception e) {
             Logs.error(MySQLConfigDialog.class, "Error ejecutando migraciones: {}", e.getMessage());
-            e.printStackTrace();
+            Logs.error(MySQLConfigDialog.class, "Stack: ", e);
             return false;
         }
     }
@@ -286,4 +287,3 @@ public class MySQLConfigDialog {
         return MySQLConfigManager.hasConfig() && AppState.isDatabaseConfigured();
     }
 }
-

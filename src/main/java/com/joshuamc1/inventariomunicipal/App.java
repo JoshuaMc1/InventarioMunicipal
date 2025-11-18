@@ -10,11 +10,15 @@ import javafx.application.Application;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
+import javafx.scene.control.Alert;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ButtonBar;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.util.Objects;
+import java.util.Optional;
 
 public class App extends Application {
 
@@ -36,8 +40,47 @@ public class App extends Application {
             }
         }
 
-        // Abrir conexión a la base de datos
-        DatabaseConfig.openConnection();
+        // Intentar abrir conexión a la base de datos con manejo controlado de errores
+        boolean connected = false;
+        while (!connected) {
+            try {
+                DatabaseConfig.openConnection();
+                connected = true;
+            } catch (RuntimeException e) {
+                Logs.error(App.class, "Error abriendo la conexión a la base de datos: {}", e.getMessage());
+
+                Alert alert = new Alert(Alert.AlertType.ERROR);
+                alert.setTitle("Error de conexión a la base de datos");
+                alert.setHeaderText("No se pudo conectar al servidor de base de datos");
+                alert.setContentText("Hubo un problema conectando con la base de datos:\n" + e.getMessage() + "\n\nPuede reconfigurar la conexión, reintentar o salir. Si el problema persiste, contacte al soporte técnico.");
+
+                ButtonType reconfig = new ButtonType("Reconfigurar");
+                ButtonType retry = new ButtonType("Reintentar");
+                ButtonType exit = new ButtonType("Salir", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+                alert.getButtonTypes().setAll(reconfig, retry, exit);
+
+                Optional<ButtonType> result = alert.showAndWait();
+                if (result.isPresent() && result.get() == reconfig) {
+                    boolean conf = MySQLConfigDialog.showConfigDialog();
+                    if (!conf) {
+                        Logs.info(App.class, "Reconfiguración cancelada por el usuario. Cerrando aplicación.");
+                        DatabaseConfig.closeConnection();
+                        System.exit(0);
+                        return;
+                    }
+                    // si reconfiguró, el bucle intentará conectar de nuevo
+                } else if (result.isPresent() && result.get() == retry) {
+                    // intentar de nuevo
+                    Logs.info(App.class, "Usuario eligió reintentar la conexión");
+                } else {
+                    Logs.info(App.class, "Usuario eligió salir tras fallo de conexión. Cerrando aplicación.");
+                    DatabaseConfig.closeConnection();
+                    System.exit(0);
+                    return;
+                }
+            }
+        }
 
         // Asegurar esquema mínimo (idempotente) antes de proceder
         try {

@@ -1,7 +1,7 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
 import com.joshuamc1.inventariomunicipal.core.Utils;
-import com.joshuamc1.inventariomunicipal.core.Units;
+import com.joshuamc1.inventariomunicipal.core.enums.Units;
 import com.joshuamc1.inventariomunicipal.models.Product;
 import com.joshuamc1.inventariomunicipal.services.ProductService;
 import javafx.beans.property.SimpleDoubleProperty;
@@ -22,6 +22,7 @@ public class InventoryController {
     @FXML private TableView<Product> tblProducts;
     @FXML private TableColumn<Product, Integer> colId;
     @FXML private TableColumn<Product, String> colName;
+    @FXML private TableColumn<Product, String> colDescription;
     @FXML private TableColumn<Product, String> colUnit;
     @FXML private TableColumn<Product, Double> colStock;
     @FXML private TableColumn<Product, Double> colMinStock;
@@ -30,6 +31,10 @@ public class InventoryController {
     @FXML private Button btnNew;
     @FXML private Button btnEdit;
     @FXML private Button btnDelete;
+    @FXML private TextField txtSearch;
+    @FXML private Button btnClearSearch;
+
+    private List<Product> allProducts = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
@@ -40,6 +45,13 @@ public class InventoryController {
         btnNew.setOnAction(e -> openCreateDialog());
         btnEdit.setOnAction(e -> openEditDialog());
         btnDelete.setOnAction(e -> deleteSelected());
+
+        // Búsqueda en tiempo real
+        txtSearch.textProperty().addListener((obs, oldVal, newVal) -> filterProducts(newVal));
+        btnClearSearch.setOnAction(e -> {
+            txtSearch.clear();
+            filterProducts("");
+        });
     }
 
     private void setupTable() {
@@ -49,6 +61,7 @@ public class InventoryController {
         });
 
         colName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("name")));
+        colDescription.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("description")));
         colUnit.setCellValueFactory(c -> new SimpleStringProperty(Units.fromDbValue(c.getValue().getString("unit")).getDisplayName()));
         colStock.setCellValueFactory(c -> {
             Double v = c.getValue().getDouble("current_stock");
@@ -58,6 +71,12 @@ public class InventoryController {
             Double v = c.getValue().getDouble("minimum_stock");
             return new SimpleDoubleProperty(v == null ? 0.0 : v).asObject();
         });
+
+        colName.setStyle("-fx-font-size: 17;");
+        colDescription.setStyle("-fx-font-size: 17;");
+        colUnit.setStyle("-fx-font-size: 17;");
+        colStock.setStyle("-fx-font-size: 17;");
+        colMinStock.setStyle("-fx-font-size: 17;");
 
         tblProducts.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
     }
@@ -70,7 +89,10 @@ public class InventoryController {
             }
         };
 
-        task.setOnSucceeded(evt -> tblProducts.setItems(FXCollections.observableArrayList(task.getValue())));
+        task.setOnSucceeded(evt -> {
+            allProducts = task.getValue();
+            filterProducts(txtSearch.getText());
+        });
         task.setOnFailed(evt -> {
             Throwable t = task.getException();
             Utils.showAlert("Error", "No se pudieron cargar los productos: " + (t == null ? "unknown" : t.getMessage()));
@@ -79,6 +101,26 @@ public class InventoryController {
         Thread th = new Thread(task, "inventory-loader");
         th.setDaemon(true);
         th.start();
+    }
+
+    private void filterProducts(String searchText) {
+        if (searchText == null || searchText.trim().isEmpty()) {
+            tblProducts.setItems(FXCollections.observableArrayList(allProducts));
+            return;
+        }
+
+        String search = searchText.trim().toLowerCase();
+        List<Product> filtered = allProducts.stream()
+                .filter(p -> {
+                    String name = p.getString("name");
+                    String id = String.valueOf(p.getInteger("id"));
+
+                    return (name != null && name.toLowerCase().contains(search)) ||
+                           (id.contains(search));
+                })
+                .collect(java.util.stream.Collectors.toList());
+
+        tblProducts.setItems(FXCollections.observableArrayList(filtered));
     }
 
     private void openCreateDialog() {
@@ -97,18 +139,37 @@ public class InventoryController {
 
         txtDesc.setPrefRowCount(3);
 
+        // Agregar estilos a los labels ["-fx-font-weight: bold; -fx-font-size: 17;"] y campos de entrada ["-fx-font-weight: semibold; -fx-font-size: 17;"]
+        txtName.setStyle("-fx-font-size: 17;");
+        txtDesc.setStyle("-fx-font-size: 17;");
+        cbUnit.setStyle("-fx-font-size: 17;");
+        txtCurrentStock.setStyle("-fx-font-size: 17;");
+        txtMinStock.setStyle("-fx-font-size: 17;");
+
+        Label lblName = new Label("Nombre:");
+        Label lblDescription = new Label("Descripción:");
+        Label lblUnit = new Label("Unidad:");
+        Label lblCurrentStock = new Label("Stock actual:");
+        Label lblMinStock = new Label("Stock mínimo:");
+
+        lblName.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        lblDescription.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        lblUnit.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        lblCurrentStock.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        lblMinStock.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
-        grid.add(new Label("Nombre:"), 0, 0);
+        grid.add(lblName, 0, 0);
         grid.add(txtName, 1, 0);
-        grid.add(new Label("Descripción:"), 0, 1);
+        grid.add(lblDescription, 0, 1);
         grid.add(txtDesc, 1, 1);
-        grid.add(new Label("Unidad:"), 0, 2);
+        grid.add(lblUnit, 0, 2);
         grid.add(cbUnit, 1, 2);
-        grid.add(new Label("Stock actual:"), 0, 3);
+        grid.add(lblCurrentStock, 0, 3);
         grid.add(txtCurrentStock, 1, 3);
-        grid.add(new Label("Stock mínimo:"), 0, 4);
+        grid.add(lblMinStock, 0, 4);
         grid.add(txtMinStock, 1, 4);
 
         dialog.getDialogPane().setContent(grid);
@@ -140,7 +201,11 @@ public class InventoryController {
         });
 
         Optional<Product> result = dialog.showAndWait();
-        result.ifPresent(p -> loadProducts());
+        result.ifPresent(p -> {
+            Utils.showAlert("Éxito", "Producto creado correctamente");
+
+            loadProducts();
+        });
     }
 
     private void openEditDialog() {
@@ -163,18 +228,36 @@ public class InventoryController {
         TextField txtCurrentStock = new TextField(String.valueOf(sel.getDouble("current_stock") == null ? 0.0 : sel.getDouble("current_stock")));
         TextField txtMinStock = new TextField(String.valueOf(sel.getDouble("minimum_stock")));
 
+        txtName.setStyle("-fx-font-size: 17;");
+        txtDesc.setStyle("-fx-font-size: 17;");
+        cbUnit.setStyle("-fx-font-size: 17;");
+        txtCurrentStock.setStyle("-fx-font-size: 17;");
+        txtMinStock.setStyle("-fx-font-size: 17;");
+
+        Label lblName = new Label("Nombre:");
+        Label lblDescription = new Label("Descripción:");
+        Label lblUnit = new Label("Unidad:");
+        Label lblCurrentStock = new Label("Stock actual:");
+        Label lblMinStock = new Label("Stock mínimo:");
+
+        lblName.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        lblDescription.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        lblUnit.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        lblCurrentStock.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        lblMinStock.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
-        grid.add(new Label("Nombre:"), 0, 0);
+        grid.add(lblName, 0, 0);
         grid.add(txtName, 1, 0);
-        grid.add(new Label("Descripción:"), 0, 1);
+        grid.add(lblDescription, 0, 1);
         grid.add(txtDesc, 1, 1);
-        grid.add(new Label("Unidad:"), 0, 2);
+        grid.add(lblUnit, 0, 2);
         grid.add(cbUnit, 1, 2);
-        grid.add(new Label("Stock actual:"), 0, 3);
+        grid.add(lblCurrentStock, 0, 3);
         grid.add(txtCurrentStock, 1, 3);
-        grid.add(new Label("Stock mínimo:"), 0, 4);
+        grid.add(lblMinStock, 0, 4);
         grid.add(txtMinStock, 1, 4);
 
         dialog.getDialogPane().setContent(grid);

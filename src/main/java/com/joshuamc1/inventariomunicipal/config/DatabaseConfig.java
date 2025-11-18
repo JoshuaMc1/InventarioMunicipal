@@ -26,6 +26,19 @@ public class DatabaseConfig {
         }
     }
 
+    /**
+     * Intenta abrir la conexión y devuelve true si fue exitosa o false si falló.
+     */
+    public static boolean tryOpenConnection() {
+        try {
+            openConnection();
+            return true;
+        } catch (RuntimeException e) {
+            // ya fue loggeado en openConnection
+            return false;
+        }
+    }
+
     public static void closeConnection() {
         if (Base.hasConnection()) {
             Base.close();

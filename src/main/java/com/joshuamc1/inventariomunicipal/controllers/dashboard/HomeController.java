@@ -130,11 +130,15 @@ public class HomeController implements AsyncLoadable {
 
                         colFecha.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("created_at")));
                         colProducto.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().parent(Product.class).getString("name")));
-                        colTipo.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("type")));
+                        colTipo.setCellValueFactory(c -> new SimpleStringProperty(com.joshuamc1.inventariomunicipal.core.enums.Transaction.fromDbValue(c.getValue().getString("type")).toString()));
                         colCantidad.setCellValueFactory(c -> new SimpleDoubleProperty(c.getValue().getDouble("quantity")));
 
-                        tblTransacciones.setItems(FXCollections.observableArrayList(latestTransactions));
+                        colFecha.setStyle("-fx-font-weight: semibold; -fx-font-size: 17;");
+                        colProducto.setStyle("-fx-font-weight: semibold; -fx-font-size: 17;");
+                        colTipo.setStyle("-fx-font-weight: semibold; -fx-font-size: 17;");
+                        colCantidad.setStyle("-fx-font-weight: semibold; -fx-font-size: 17;");
 
+                        tblTransacciones.setItems(FXCollections.observableArrayList(latestTransactions));
                     } finally {
                         loading.set(false);
                         notifyLoaded();

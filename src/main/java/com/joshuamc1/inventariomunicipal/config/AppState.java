@@ -7,7 +7,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Properties;
 
 /**
@@ -20,7 +19,7 @@ public class AppState {
     private static final Path statePath;
 
     static {
-        Path dir = Paths.get(System.getProperty("user.home"), AppConfig.getSecureDirName());
+        Path dir = AppConfig.getSecureFolderPath();
         try {
             if (!Files.exists(dir)) {
                 Files.createDirectories(dir);
@@ -83,4 +82,3 @@ public class AppState {
         save();
     }
 }
-

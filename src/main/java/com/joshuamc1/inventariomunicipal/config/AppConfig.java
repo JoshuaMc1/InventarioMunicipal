@@ -1,88 +1,61 @@
 package com.joshuamc1.inventariomunicipal.config;
 
-import com.joshuamc1.inventariomunicipal.core.Logs;
-import org.jetbrains.annotations.NotNull;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Properties;
+import java.util.Locale;
 
 /**
- * Clase de configuración de la aplicación.
- * Centraliza variables que pueden cambiar por entorno, por ejemplo la carpeta segura y el nombre
- * del archivo de base de datos en producción.
+ * Clase centralizada para parámetros configurables de la aplicación.
+ * Incluye detección de entorno y rutas por defecto.
  */
-public class AppConfig {
-    private static final String ENVIRONMENT = System.getProperty("env", "production");
-    private static final Properties properties = new Properties();
+public final class AppConfig {
+    private AppConfig() {}
 
-    static {
-        try (InputStream input = AppConfig.class.getClassLoader().getResourceAsStream("database.properties")) {
-            if (input != null) {
-                properties.load(input);
-            }
-        } catch (IOException e) {
-            // Registrar el error en lugar de imprimir la traza
-            Logs.error(AppConfig.class, "Error cargando database.properties: {}", e.getMessage());
-        }
+    // Entorno: "production" ó "development". Por defecto development.
+    private static final String ENV = System.getProperty("app.env", System.getenv().getOrDefault("APP_ENV", "development"));
+
+    // Nombre de la base de datos (para SQLite en modo production)
+    private static final String DEFAULT_DB_NAME = System.getProperty("app.db.name", System.getenv().getOrDefault("APP_DB_NAME", "database.db"));
+
+    // Carpeta segura en Windows (perfil del usuario)
+    private static final String DEFAULT_SECURE_DIR = System.getProperty("app.secure.dir", System.getenv().getOrDefault("APP_SECURE_DIR",
+            Paths.get(System.getProperty("user.home"), ".inventario_municipal").toString()));
+
+    public static boolean isProduction() {
+        return ENV != null && ENV.toLowerCase(Locale.ROOT).startsWith("prod");
+    }
+
+    public static boolean isDevelopment() {
+        return !isProduction();
+    }
+
+    public static String getEnv() {
+        return ENV;
+    }
+
+    public static String getDatabaseFileName() {
+        return DEFAULT_DB_NAME;
+    }
+
+    public static Path getSecureFolderPath() {
+        return Paths.get(DEFAULT_SECURE_DIR);
     }
 
     /**
-     * Devuelve el entorno actual (development|production...) según la propiedad del sistema.
-     */
-    public static String getEnvironment() {
-        return ENVIRONMENT;
-    }
-
-    /**
-     * Nombre de la carpeta segura dentro del home del usuario. Se puede sobrescribir con la propiedad
-     * del sistema `app.secureDirName` o con `app.secureDirName` en database.properties.
+     * Nombre del directorio seguro (ej: ".inventario_municipal") — método compatible con código existente.
      */
     public static String getSecureDirName() {
-        return System.getProperty("app.secureDirName",
-                properties.getProperty("app.secureDirName", ".inventario_municipal"));
+        Path p = getSecureFolderPath();
+        Path fileName = p.getFileName();
+        return fileName != null ? fileName.toString() : ".inventario_municipal";
     }
 
     /**
-     * Nombre del archivo de base de datos en producción. Se puede sobrescribir con la propiedad
-     * del sistema `app.productionDbName` o con `app.productionDbName` en database.properties.
+     * Ruta completa hacia la base de datos SQLite dentro de la carpeta segura.
      */
-    public static String getProductionDbFileName() {
-        return System.getProperty("app.productionDbName",
-                properties.getProperty("app.productionDbName", "database.db"));
-    }
-
-    /**
-     * Construye y devuelve la URL JDBC para la base de datos en producción. Crea la carpeta segura
-     * dentro de `user.home` si no existe.
-     */
-    public static @NotNull String getProductionJdbcUrl() {
-        String userHome = System.getProperty("user.home");
-        String secureDir = getSecureDirName();
-        Path dirPath = Paths.get(userHome, secureDir);
-        try {
-            if (!Files.exists(dirPath)) {
-                Files.createDirectories(dirPath);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("No se pudo crear la carpeta segura: " + dirPath, e);
-        }
-
-        Path dbPath = dirPath.resolve(getProductionDbFileName());
-        return "jdbc:sqlite:" + dbPath;
-    }
-
-    /**
-     * Obtiene la URL JDBC efectiva para el entorno solicitado. Para producción construye la ruta
-     * segura; para otros entornos lee la propiedad `env.url` del archivo database.properties.
-     */
-    public static String getJdbcUrlForEnvironment(String env) {
-        if ("production".equalsIgnoreCase(env)) {
-            return getProductionJdbcUrl();
-        }
-        return properties.getProperty(env + ".url");
+    public static Path getSecureDatabasePath() {
+        Path dir = getSecureFolderPath();
+        // asegurar existencia del directorio (no crear aquí, solo devolver path)
+        return dir.resolve(getDatabaseFileName()).toAbsolutePath();
     }
 }

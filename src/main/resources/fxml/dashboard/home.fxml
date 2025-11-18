@@ -1,75 +1,84 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<?import javafx.scene.control.Label?>
-<?import javafx.scene.control.ScrollPane?>
-<?import javafx.scene.layout.VBox?>
-<?import javafx.scene.layout.HBox?>
+
+<?import javafx.geometry.Insets?>
 <?import javafx.scene.chart.BarChart?>
 <?import javafx.scene.chart.CategoryAxis?>
 <?import javafx.scene.chart.NumberAxis?>
 <?import javafx.scene.chart.PieChart?>
-<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.ScrollPane?>
 <?import javafx.scene.control.TableColumn?>
-<?import javafx.geometry.Insets?>
-<ScrollPane fx:id="scrollContainer"
-            xmlns="http://javafx.com/javafx"
-            xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.HomeController"
-            fitToWidth="true">
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<ScrollPane fx:id="scrollContainer" fitToWidth="true" xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.HomeController">
 
     <VBox spacing="20">
         <padding>
-            <Insets top="20" right="20" bottom="20" left="20"/>
+            <Insets bottom="20" left="20" right="20" top="20" />
         </padding>
 
         <!-- KPIs -->
         <HBox spacing="20">
             <VBox styleClass="kpi-card">
-                <Label text="Productos Totales"/>
-                <Label fx:id="lblTotalProductos" styleClass="kpi-number"/>
+                <Label text="Productos Totales">
+               <font>
+                  <Font size="18.0" />
+               </font></Label>
+                <Label fx:id="lblTotalProductos" styleClass="kpi-number" />
             </VBox>
 
             <VBox styleClass="kpi-card">
-                <Label text="Bajo Stock"/>
-                <Label fx:id="lblBajoStock" styleClass="kpi-number"/>
+                <Label text="Bajo Stock">
+               <font>
+                  <Font size="18.0" />
+               </font></Label>
+                <Label fx:id="lblBajoStock" styleClass="kpi-number" />
             </VBox>
 
             <VBox styleClass="kpi-card">
-                <Label text="Movimientos Hoy"/>
-                <Label fx:id="lblMovimientosHoy" styleClass="kpi-number"/>
+                <Label text="Movimientos Hoy">
+               <font>
+                  <Font size="18.0" />
+               </font></Label>
+                <Label fx:id="lblMovimientosHoy" styleClass="kpi-number" />
             </VBox>
 
             <VBox styleClass="kpi-card">
-                <Label text="Usuarios Registrados"/>
-                <Label fx:id="lblUsuarios" styleClass="kpi-number"/>
+                <Label text="Usuarios Registrados">
+               <font>
+                  <Font size="18.0" />
+               </font></Label>
+                <Label fx:id="lblUsuarios" styleClass="kpi-number" />
             </VBox>
         </HBox>
 
         <!-- Gráficos -->
         <HBox spacing="20">
-            <BarChart fx:id="barStock"
-                      prefWidth="600"
-                      title="Stock de Productos">
+            <BarChart fx:id="barStock" prefWidth="600" title="Stock de Productos">
                 <xAxis>
-                    <CategoryAxis label="Producto"/>
+                    <CategoryAxis label="Producto" />
                 </xAxis>
                 <yAxis>
-                    <NumberAxis label="Stock"/>
+                    <NumberAxis label="Stock" />
                 </yAxis>
             </BarChart>
 
-            <PieChart fx:id="pieStock" title="Stock Crítico vs Normal"/>
+            <PieChart fx:id="pieStock" title="Stock Crítico vs Normal" />
         </HBox>
 
         <!-- Últimas transacciones -->
         <VBox>
-            <Label text="Últimos Movimientos" styleClass="section-title"/>
+            <Label styleClass="section-title" text="Últimos Movimientos" />
 
             <TableView fx:id="tblTransacciones" prefHeight="300">
                 <columns>
-                    <TableColumn text="Fecha" fx:id="colFecha"/>
-                    <TableColumn text="Producto" fx:id="colProducto"/>
-                    <TableColumn text="Tipo" fx:id="colTipo"/>
-                    <TableColumn text="Cantidad" fx:id="colCantidad"/>
+                    <TableColumn fx:id="colFecha" text="Fecha" />
+                    <TableColumn fx:id="colProducto" text="Producto" />
+                    <TableColumn fx:id="colTipo" text="Tipo" />
+                    <TableColumn fx:id="colCantidad" text="Cantidad" />
                 </columns>
             </TableView>
         </VBox>
