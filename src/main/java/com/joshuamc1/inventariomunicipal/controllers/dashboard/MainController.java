@@ -32,12 +32,17 @@ public class MainController {
     @FXML public ImageView imgLogo;
     @FXML private Button btnDashboard;
     @FXML private Button btnInventory;
+    @FXML private Button btnIncomes;
+    @FXML private Button btnOutcomes;
+    @FXML private Button btnLoans;
+    @FXML private Button btnPeople;
     @FXML private Button btnAudit;
     @FXML private Button btnReports;
     @FXML private Button btnUsers;
 
     @FXML private StackPane contentArea;
     @FXML private Label lblCurrentUser;
+    @FXML private Button btnProfile;
     @FXML private Button btnLogout;
 
     private final AtomicBoolean loading = new AtomicBoolean(false);
@@ -76,6 +81,38 @@ public class MainController {
             loadView("/fxml/dashboard/inventory.fxml");
         });
 
+        btnIncomes.setOnAction(e -> {
+            if (loading.get()) {
+                Logs.info(this.getClass(), "Skipped loadView: already loading");
+                return;
+            }
+            loadView("/fxml/dashboard/incomes.fxml");
+        });
+
+        btnOutcomes.setOnAction(e -> {
+            if (loading.get()) {
+                Logs.info(this.getClass(), "Skipped loadView: already loading");
+                return;
+            }
+            loadView("/fxml/dashboard/outcomes.fxml");
+        });
+
+        btnLoans.setOnAction(e -> {
+            if (loading.get()) {
+                Logs.info(this.getClass(), "Skipped loadView: already loading");
+                return;
+            }
+            loadView("/fxml/dashboard/loans.fxml");
+        });
+
+        btnPeople.setOnAction(e -> {
+            if (loading.get()) {
+                Logs.info(this.getClass(), "Skipped loadView: already loading");
+                return;
+            }
+            loadView("/fxml/dashboard/people.fxml");
+        });
+
         btnAudit.setOnAction(e -> {
             if (loading.get()) {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
@@ -98,6 +135,14 @@ public class MainController {
                 return;
             }
             loadView("/fxml/dashboard/users.fxml");
+        });
+
+        btnProfile.setOnAction(e -> {
+            if (loading.get()) {
+                Logs.info(this.getClass(), "Skipped loadView: already loading");
+                return;
+            }
+            loadView("/fxml/dashboard/profile.fxml");
         });
 
         btnLogout.setOnAction(e -> logout());

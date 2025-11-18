@@ -19,6 +19,8 @@ public class UserRepository {
         user.set("username", username);
         user.setPassword(password);
         user.set("role", role);
+        // Forzar cambio de contraseña al primer acceso
+        user.set("must_change_password", 1);
         user.saveIt();
 
         return user;
@@ -30,6 +32,8 @@ public class UserRepository {
         user.set("username", username);
         user.setPassword(password);
         user.set("role", role);
+        // Forzar cambio de contraseña al primer acceso
+        user.set("must_change_password", 1);
         user.saveIt();
         return user;
     }
@@ -42,7 +46,17 @@ public class UserRepository {
         u.set("role", role);
         if (newPassword != null && !newPassword.isBlank()) {
             u.setPassword(newPassword);
+            // Si se cambia la contraseña desde el propio usuario, quitar el flag
+            u.set("must_change_password", 0);
         }
+        return u.saveIt();
+    }
+
+    public boolean resetPassword(Integer id, String newPassword, boolean mustChange) {
+        User u = User.findById(id);
+        if (u == null) return false;
+        u.setPassword(newPassword);
+        u.set("must_change_password", mustChange ? 1 : 0);
         return u.saveIt();
     }
 
@@ -54,13 +68,17 @@ public class UserRepository {
 
     public long countUsers() {
         Long c = User.count();
-        return c == null ? 0L : c.longValue();
+        return c == null ? 0 : c;
+    }
+
+    public long countAdmins() {
+        Long c = User.count("role = ?", "admin");
+        return c == null ? 0 : c;
     }
 
     public List<User> listPaged(int offset, int limit, String search) {
         if (search != null && !search.isBlank()) {
-            LazyList<User> list = User.where("name LIKE ? OR username LIKE ?", "%"+search+"%", "%"+search+"%").orderBy("created_at DESC").offset(offset).limit(limit);
-            return list;
+            return User.where("name LIKE ? OR username LIKE ?", "%"+search+"%", "%"+search+"%").orderBy("created_at DESC").offset(offset).limit(limit);
         } else {
             return User.findAll().orderBy("created_at DESC").offset(offset).limit(limit);
         }

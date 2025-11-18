@@ -10,6 +10,7 @@ public class Roles {
     @Contract(pure = true)
     public static @NotNull String getRoleFullName(@NotNull String role) {
         return switch (role) {
+            case "root" -> "Root (Acceso Total)";
             case "admin" -> "Administrador";
             case "guest" -> "Invitado";
             case "operator" -> "Operador";

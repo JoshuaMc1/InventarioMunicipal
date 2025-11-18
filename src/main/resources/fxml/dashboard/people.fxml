@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.PeopleController">
+    <top>
+        <HBox spacing="10">
+            <padding>
+                <Insets top="10" right="10" bottom="10" left="10"/>
+            </padding>
+            <Label text="Personas" style="-fx-font-size: 18px; -fx-font-weight: bold;" />
+            <Region HBox.hgrow="ALWAYS"/>
+            <TextField fx:id="txtSearch" promptText="Buscar por DNI, nombre o código" prefWidth="250"/>
+            <Button text="Buscar" onAction="#onSearch" />
+            <Button text="Nuevo" onAction="#onNew" />
+            <Button text="Editar" onAction="#onEdit" />
+            <Button text="Eliminar" onAction="#onDelete" />
+        </HBox>
+    </top>
+
+    <center>
+        <TableView fx:id="tblPeople">
+            <columns>
+                <TableColumn fx:id="colId" text="ID" prefWidth="60" />
+                <TableColumn fx:id="colDni" text="DNI" prefWidth="140" />
+                <TableColumn fx:id="colFirstName" text="Nombre" prefWidth="150" />
+                <TableColumn fx:id="colLastName" text="Apellido" prefWidth="150" />
+                <TableColumn fx:id="colPhone" text="Teléfono" prefWidth="120" />
+                <TableColumn fx:id="colInternalCode" text="Código Interno" prefWidth="140" />
+            </columns>
+        </TableView>
+    </center>
+
+    <bottom>
+        <HBox spacing="10">
+            <padding>
+                <Insets top="10" right="10" bottom="10" left="10"/>
+            </padding>
+            <Label text="Paginación:" />
+            <Button text="Anterior" onAction="#onPrev" />
+            <Button text="Siguiente" onAction="#onNext" />
+        </HBox>
+    </bottom>
+</BorderPane>
+

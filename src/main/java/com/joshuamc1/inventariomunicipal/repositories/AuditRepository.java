@@ -24,13 +24,13 @@ public class AuditRepository {
     }
 
     public List<AuditDTO> findPageWithUser(int offset, int limit, String search) {
-        String base = "FROM auditoria a LEFT JOIN users u ON u.id = a.usuario_id";
+        String base = "FROM audit a LEFT JOIN users u ON u.id = a.user_id";
         String where = "";
         if (search != null && !search.trim().isEmpty()) {
-            where = " WHERE (lower(u.name) LIKE ? OR lower(a.accion) LIKE ? OR lower(a.tabla_afectada) LIKE ? OR lower(a.detalles) LIKE ?)";
+            where = " WHERE (lower(u.name) LIKE ? OR lower(a.action) LIKE ? OR lower(a.table_name) LIKE ? OR lower(a.details) LIKE ?)";
         }
-        String sql = "SELECT a.id, a.usuario_id, u.name as usuario_name, a.accion, a.tabla_afectada, a.registro_afectado_id, a.detalles, a.fecha " +
-                base + where + " ORDER BY a.fecha DESC LIMIT ? OFFSET ?";
+        String sql = "SELECT a.id, a.user_id AS usuario_id, u.name as usuario_name, a.action AS accion, a.table_name AS tabla_afectada, a.record_id AS registro_afectado_id, a.details AS detalles, a.created_at AS fecha " +
+                base + where + " ORDER BY a.created_at DESC LIMIT ? OFFSET ?";
 
         List<AuditDTO> result = new ArrayList<>();
         PreparedStatement ps = null;
@@ -70,10 +70,10 @@ public class AuditRepository {
     }
 
     public int countWithFilter(String search) {
-        String base = "FROM auditoria a LEFT JOIN users u ON u.id = a.usuario_id";
+        String base = "FROM audit a LEFT JOIN users u ON u.id = a.user_id";
         String where = "";
         if (search != null && !search.trim().isEmpty()) {
-            where = " WHERE (lower(u.name) LIKE ? OR lower(a.accion) LIKE ? OR lower(a.tabla_afectada) LIKE ? OR lower(a.detalles) LIKE ?)";
+            where = " WHERE (lower(u.name) LIKE ? OR lower(a.action) LIKE ? OR lower(a.table_name) LIKE ? OR lower(a.details) LIKE ?)";
         }
         String sql = "SELECT COUNT(1) as total " + base + where;
 

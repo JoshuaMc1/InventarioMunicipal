@@ -1,9 +1,9 @@
-CREATE TABLE products (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
-    unit VARCHAR(50),                            -- e.g., meters, kg, units, etc.
+    unit VARCHAR(50),
     current_stock DECIMAL(10,2) DEFAULT 0,
     minimum_stock DECIMAL(10,2) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

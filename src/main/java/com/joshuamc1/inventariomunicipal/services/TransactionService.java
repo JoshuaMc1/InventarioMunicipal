@@ -60,6 +60,53 @@ public class TransactionService {
         });
     }
 
+    // Sobrecarga para permitir fecha personalizada
+    public Transaction createTransaction(Integer productId, String type,
+                                         double quantity, String date,
+                                         Integer personId, String notes) {
+
+        return DatabaseManager.callInConnection(() -> {
+
+            Base.openTransaction();
+
+            Product product = productRepo.findById(productId);
+
+            if (product == null)
+                throw new IllegalArgumentException("Product not found");
+
+            if ("in".equals(type)) {
+                product.updateStock(quantity);
+            } else {
+                product.updateStock(-quantity);
+            }
+
+            productRepo.save(product);
+
+            Transaction t = new Transaction();
+            t.set("product_id", productId);
+            t.set("type", type);
+            t.set("quantity", quantity);
+            t.set("date", date);
+            t.set("user_id", Session.getCurrentUserId());
+            t.set("person_id", personId);
+            t.set("notes", notes);
+
+            repo.create(t);
+
+            auditService.logAction(
+                    Session.getCurrentUserId(),
+                    "create_transaction",
+                    "transactions",
+                    t.getInteger("id"),
+                    String.format("product_id=%d,type=%s,quantity=%.2f,date=%s,person_id=%s,notes=%s",
+                            productId, type, quantity, date, personId, notes)
+            );
+
+            Base.commitTransaction();
+            return t;
+        });
+    }
+
     public List<Transaction> findByProduct(Integer productId) {
         return DatabaseManager.callInConnection(() ->
                 repo.findByProduct(productId)

@@ -77,6 +77,17 @@
     -fx-font-size: 13px;
 }
 
+.topbar-profile {
+    -fx-background-color: #3498db;
+    -fx-text-fill: white;
+    -fx-background-radius: 3;
+    -fx-padding: 6 12 6 12;
+}
+
+.topbar-profile:hover {
+    -fx-background-color: #2980b9;
+}
+
 .topbar-logout {
     -fx-background-color: #e74c3c;
     -fx-text-fill: white;

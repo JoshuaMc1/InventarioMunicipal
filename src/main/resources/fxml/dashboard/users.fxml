@@ -16,6 +16,7 @@
             <Button text="Buscar" onAction="#onSearch" />
             <Button text="Nuevo" onAction="#onNew" />
             <Button text="Editar" onAction="#onEdit" />
+            <Button text="Restablecer contraseña" onAction="#onResetPassword" />
             <Button text="Eliminar" onAction="#onDelete" />
         </HBox>
     </top>

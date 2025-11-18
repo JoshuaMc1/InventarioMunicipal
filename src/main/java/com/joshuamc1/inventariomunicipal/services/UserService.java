@@ -81,6 +81,22 @@ public class UserService {
         });
     }
 
+    public boolean resetPassword(Integer id, String newPassword, boolean mustChange) {
+        return DatabaseManager.callInConnection(() -> {
+            boolean ok = repo.resetPassword(id, newPassword, mustChange);
+            if (ok) {
+                auditService.logAction(
+                    Session.getCurrentUserId(),
+                    "reset_password",
+                    "users",
+                    id,
+                    String.format("user_id=%d,must_change=%b", id, mustChange)
+                );
+            }
+            return ok;
+        });
+    }
+
     public boolean deleteUser(Integer id) {
         return DatabaseManager.callInConnection(() -> {
             boolean ok = repo.delete(id);

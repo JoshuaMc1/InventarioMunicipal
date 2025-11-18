@@ -2,6 +2,7 @@ package com.joshuamc1.inventariomunicipal.controllers;
 
 import com.joshuamc1.inventariomunicipal.controllers.dashboard.MainController;
 import com.joshuamc1.inventariomunicipal.core.Logs;
+import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.services.UserService;
@@ -43,12 +44,106 @@ public class LoginController {
                 return;
             }
 
+            // Establecer sesión antes de cualquier auditoría (p.ej., cambio de contraseña forzado)
+            Session.setCurrentUser(user);
+
+            // Leer must_change_password de forma robusta (MySQL puede devolver boolean o tinyint)
+            boolean mustChange = false;
+            try {
+                Object mcp = user.get("must_change_password");
+                if (mcp instanceof Number) {
+                    mustChange = ((Number) mcp).intValue() != 0;
+                } else if (mcp instanceof Boolean) {
+                    mustChange = (Boolean) mcp;
+                } else if (mcp != null) {
+                    String s = mcp.toString().trim().toLowerCase();
+                    mustChange = s.equals("1") || s.equals("true") || s.equals("t") || s.equals("yes");
+                }
+            } catch (Exception ignore) {
+                mustChange = false;
+            }
+
+            // Si el usuario debe cambiar la contraseña, forzar el cambio antes de abrir el dashboard
+            if (mustChange) {
+                boolean changed = forceChangePassword(user);
+                if (!changed) {
+                    Utils.showAlert("Aviso", "Debe cambiar la contraseña para continuar");
+                    // Limpiar sesión si no completó el cambio
+                    Session.setCurrentUser(null);
+                    return;
+                }
+            }
+
             Utils.showAlert("Success", "Bienvenido " + user.getString("name") + "!");
             openMainWindow(user);
         } catch (Exception e) {
             Logs.error(this.getClass(), "Error during login: {}", e.getMessage());
+            e.printStackTrace();
             Utils.showAlert("Error", "Ocurrió un error durante el inicio de sesión");
         }
+    }
+
+    private boolean forceChangePassword(User user) {
+        // Mostrar un diálogo simple pidiendo nueva contraseña y confirmación
+        javafx.scene.control.Dialog<String> d = new javafx.scene.control.Dialog<>();
+        d.setTitle("Cambiar contraseña");
+        d.setHeaderText("Debe cambiar su contraseña antes de continuar");
+        d.getDialogPane().getButtonTypes().addAll(javafx.scene.control.ButtonType.OK, javafx.scene.control.ButtonType.CANCEL);
+
+        PasswordField pf1 = new PasswordField();
+        pf1.setPromptText("Nueva contraseña");
+        PasswordField pf2 = new PasswordField();
+        pf2.setPromptText("Confirmar contraseña");
+
+        javafx.scene.layout.GridPane gp = new javafx.scene.layout.GridPane();
+        gp.setHgap(10);
+        gp.setVgap(10);
+        gp.setPadding(new javafx.geometry.Insets(10));
+        gp.addRow(0, new javafx.scene.control.Label("Nueva contraseña"), pf1);
+        gp.addRow(1, new javafx.scene.control.Label("Confirmar contraseña"), pf2);
+
+        javafx.scene.Node okButton = d.getDialogPane().lookupButton(javafx.scene.control.ButtonType.OK);
+        okButton.setDisable(true);
+
+        javafx.beans.binding.BooleanBinding invalid = pf1.textProperty().isEmpty().or(pf2.textProperty().isEmpty()).or(new javafx.beans.binding.BooleanBinding() {
+            {
+                bind(pf1.textProperty(), pf2.textProperty());
+            }
+
+            @Override
+            protected boolean computeValue() {
+                return !pf1.getText().equals(pf2.getText());
+            }
+        });
+        okButton.disableProperty().bind(invalid);
+
+        d.getDialogPane().setContent(gp);
+
+        java.util.concurrent.atomic.AtomicBoolean result = new java.util.concurrent.atomic.AtomicBoolean(false);
+        d.setResultConverter(bt -> {
+            if (bt == javafx.scene.control.ButtonType.OK) {
+                return pf1.getText();
+            }
+            return null;
+        });
+
+        java.util.Optional<String> res = d.showAndWait();
+        if (res.isPresent()) {
+            String newPwd = res.get();
+            try {
+                boolean ok = userService.updateUser(user.getInteger("id"), user.getString("name"), user.getString("username"), user.getString("role"), newPwd);
+                if (ok) {
+                    result.set(true);
+                } else {
+                    Utils.showAlert("Error", "No se pudo actualizar la contraseña");
+                }
+            } catch (Exception e) {
+                Logs.error(this.getClass(), "Error cambiando contraseña forzada: {}", e.getMessage());
+                Utils.showAlert("Error", "Ocurrió un error al cambiar la contraseña: " + e.getMessage());
+            }
+        }
+
+        return result.get();
     }
 
     private void openMainWindow(User user) {

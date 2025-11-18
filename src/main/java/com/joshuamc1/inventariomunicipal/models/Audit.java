@@ -4,12 +4,12 @@ import org.javalite.activejdbc.Model;
 import org.javalite.activejdbc.annotations.BelongsTo;
 import org.javalite.activejdbc.annotations.Table;
 
-@Table("auditoria")
-@BelongsTo(parent = User.class, foreignKeyName = "usuario_id")
+@Table("audit")
+@BelongsTo(parent = User.class, foreignKeyName = "user_id")
 public class Audit extends Model {
     static {
         // validar campos con nombres reales de la tabla
-        validatePresenceOf("usuario_id", "accion");
+        validatePresenceOf("user_id", "action");
     }
 
     public User getUser() {
@@ -19,12 +19,12 @@ public class Audit extends Model {
     public static void logAction(User user, String action, String tableName, Integer recordId, String details) {
         Audit audit = new Audit();
         if (user != null) {
-            audit.set("usuario_id", user.getId());
+            audit.set("user_id", user.getId());
         }
-        audit.set("accion", action);
-        audit.set("tabla_afectada", tableName);
-        audit.set("registro_afectado_id", recordId);
-        audit.set("detalles", details);
+        audit.set("action", action);
+        audit.set("table_name", tableName);
+        audit.set("record_id", recordId);
+        audit.set("details", details);
         audit.saveIt();
     }
 }

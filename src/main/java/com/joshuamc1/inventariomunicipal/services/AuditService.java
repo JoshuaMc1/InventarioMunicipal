@@ -14,11 +14,11 @@ public class AuditService {
     public void logAction(Integer userId, String action, String table, Integer recordId, String details) {
         DatabaseManager.runInConnection(() -> {
             Audit audit = new Audit();
-            audit.set("usuario_id", userId);
-            audit.set("accion", action);
-            audit.set("tabla_afectada", table);
-            audit.set("registro_afectado_id", recordId);
-            audit.set("detalles", details);
+            audit.set("user_id", userId);
+            audit.set("action", action);
+            audit.set("table_name", table);
+            audit.set("record_id", recordId);
+            audit.set("details", details);
             repo.save(audit);
         });
 

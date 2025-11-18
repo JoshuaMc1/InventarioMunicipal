@@ -1,6 +1,9 @@
 package com.joshuamc1.inventariomunicipal;
 
 import com.joshuamc1.inventariomunicipal.config.DatabaseConfig;
+import com.joshuamc1.inventariomunicipal.config.InitialSetupDialog;
+import com.joshuamc1.inventariomunicipal.config.MigrationRunner;
+import com.joshuamc1.inventariomunicipal.config.MySQLConfigDialog;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import javafx.application.Application;
@@ -21,7 +24,36 @@ public class App extends Application {
             Utils.showAlert("Error inesperado", "Se produjo un error inesperado: " + e.getMessage());
         });
 
+        // Verificar si la base de datos MySQL está configurada
+        if (!MySQLConfigDialog.isConfigured()) {
+            Logs.info(App.class, "Base de datos no configurada. Mostrando diálogo de configuración MySQL...");
+            boolean configured = MySQLConfigDialog.showConfigDialog();
+
+            if (!configured) {
+                Logs.info(App.class, "Configuración de MySQL cancelada por el usuario. Cerrando aplicación.");
+                System.exit(0);
+                return;
+            }
+        }
+
+        // Abrir conexión a la base de datos
         DatabaseConfig.openConnection();
+
+        // Asegurar esquema mínimo (idempotente) antes de proceder
+        try {
+            MigrationRunner.runMigrations();
+        } catch (Exception ex) {
+            Logs.error(App.class, "Error ejecutando migraciones en inicio: {}", ex.getMessage());
+        }
+
+        // Verificar si es necesario mostrar el diálogo de configuración inicial para crear usuario root
+        if (!InitialSetupDialog.checkAndShowIfNeeded()) {
+            // Si el usuario canceló la configuración inicial, cerrar la aplicación
+            Logs.info(App.class, "Configuración inicial cancelada por el usuario. Cerrando aplicación.");
+            DatabaseConfig.closeConnection();
+            System.exit(0);
+            return;
+        }
 
         try {
             FXMLLoader loader = new FXMLLoader(getClass().getResource("/fxml/login.fxml"));

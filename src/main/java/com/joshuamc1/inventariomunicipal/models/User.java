@@ -19,6 +19,10 @@ public class User extends Model {
         return "admin".equals(getString("role"));
     }
 
+    public boolean isRoot() {
+        return "root".equals(getString("role"));
+    }
+
     public boolean isOperator() {
         return "operator".equals(getString("role"));
     }
