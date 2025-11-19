@@ -101,6 +101,14 @@ public class AuditController implements AsyncLoadable {
             }
         });
 
+        colId.setStyle("-fx-font-size: 17;");
+        colUser.setStyle("-fx-font-size: 17;");
+        colAction.setStyle("-fx-font-size: 17;");
+        colTable.setStyle("-fx-font-size: 17;");
+        colRecordId.setStyle("-fx-font-size: 17;");
+        colDetails.setStyle("-fx-font-size: 17;");
+        colCreatedAt.setStyle("-fx-font-size: 17;");
+
         tblAudit.setItems(data);
 
         // pagination UI

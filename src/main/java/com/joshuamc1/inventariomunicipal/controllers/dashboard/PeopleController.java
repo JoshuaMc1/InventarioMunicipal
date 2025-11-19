@@ -1,17 +1,14 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
 import com.joshuamc1.inventariomunicipal.core.Logs;
+import com.joshuamc1.inventariomunicipal.core.PersonDialogHelper;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.Person;
 import com.joshuamc1.inventariomunicipal.services.PersonService;
 import javafx.application.Platform;
-import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.fxml.FXML;
-import javafx.scene.Node;
 import javafx.scene.control.*;
-import javafx.scene.layout.GridPane;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
@@ -47,6 +44,13 @@ public class PeopleController {
         colPhone.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getString("phone")));
         colInternalCode.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getString("internal_code")));
 
+        colId.setStyle("-fx-font-size: 17;");
+        colDni.setStyle("-fx-font-size: 17;");
+        colFirstName.setStyle("-fx-font-size: 17;");
+        colLastName.setStyle("-fx-font-size: 17;");
+        colPhone.setStyle("-fx-font-size: 17;");
+        colInternalCode.setStyle("-fx-font-size: 17;");
+
         loadPage();
     }
 
@@ -72,23 +76,10 @@ public class PeopleController {
 
     @FXML
     public void onNew() {
-        Dialog<Person> dialog = personDialog(null);
-        dialog.showAndWait().ifPresent(p -> {
-            try {
-                personService.create(
-                    p.getString("dni"),
-                    p.getString("first_name"),
-                    p.getString("last_name"),
-                    p.getString("phone"),
-                    p.getString("internal_code")
-                );
-                loadPage();
-                Utils.showAlert("Éxito", "Persona registrada exitosamente");
-            } catch (Exception e) {
-                Logs.error(getClass(), "Error creando persona: {}", e.getMessage());
-                Utils.showAlert("Error", "No se pudo registrar la persona: " + e.getMessage());
-            }
-        });
+        Person created = PersonDialogHelper.showCreatePersonDialog();
+        if (created != null) {
+            loadPage();
+        }
     }
 
     @FXML
@@ -98,7 +89,7 @@ public class PeopleController {
             Utils.showAlert("Aviso", "Seleccione una persona");
             return;
         }
-        Dialog<Person> dialog = personDialog(selected);
+        Dialog<Person> dialog = PersonDialogHelper.createPersonDialog(selected);
         dialog.showAndWait().ifPresent(p -> {
             try {
                 personService.update(
@@ -153,75 +144,6 @@ public class PeopleController {
                 Platform.runLater(() -> Utils.showAlert("Error", "No se pudo cargar personas: " + t.getMessage()));
             }
         }).start();
-    }
-
-    private @NotNull Dialog<Person> personDialog(Person base) {
-        Dialog<Person> d = new Dialog<>();
-        d.setResizable(true);
-        d.getDialogPane().setPrefSize(500, 350);
-        d.setTitle(base == null ? "Nueva Persona" : "Editar Persona");
-
-        ButtonType save = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
-        d.getDialogPane().getButtonTypes().addAll(save, ButtonType.CANCEL);
-
-        TextField txtDni = new TextField();
-        txtDni.setPromptText("0000-0000-00000");
-        TextField txtFirstName = new TextField();
-        txtFirstName.setPromptText("Nombre");
-        TextField txtLastName = new TextField();
-        txtLastName.setPromptText("Apellido");
-        TextField txtPhone = new TextField();
-        txtPhone.setPromptText("Teléfono");
-        TextField txtInternalCode = new TextField();
-        txtInternalCode.setPromptText("Código Interno (opcional)");
-
-        if (base != null) {
-            txtDni.setText(base.getString("dni"));
-            txtFirstName.setText(base.getString("first_name"));
-            txtLastName.setText(base.getString("last_name"));
-            txtPhone.setText(base.getString("phone"));
-            txtInternalCode.setText(base.getString("internal_code"));
-        }
-
-        GridPane gp = new GridPane();
-        gp.setHgap(10);
-        gp.setVgap(10);
-        gp.setPadding(new javafx.geometry.Insets(10));
-        gp.addRow(0, new Label("DNI"), txtDni);
-        gp.addRow(1, new Label("Nombre"), txtFirstName);
-        gp.addRow(2, new Label("Apellido"), txtLastName);
-        gp.addRow(3, new Label("Teléfono"), txtPhone);
-        gp.addRow(4, new Label("Código Interno"), txtInternalCode);
-
-        gp.setPrefWidth(460);
-        GridPane.setHgrow(txtDni, javafx.scene.layout.Priority.ALWAYS);
-        GridPane.setHgrow(txtFirstName, javafx.scene.layout.Priority.ALWAYS);
-        GridPane.setHgrow(txtLastName, javafx.scene.layout.Priority.ALWAYS);
-        GridPane.setHgrow(txtPhone, javafx.scene.layout.Priority.ALWAYS);
-        GridPane.setHgrow(txtInternalCode, javafx.scene.layout.Priority.ALWAYS);
-
-        d.getDialogPane().setContent(gp);
-
-        Node btnSave = d.getDialogPane().lookupButton(save);
-        BooleanBinding invalid = txtDni.textProperty().isEmpty()
-                .or(txtFirstName.textProperty().isEmpty())
-                .or(txtLastName.textProperty().isEmpty());
-        btnSave.disableProperty().bind(invalid);
-
-        d.setResultConverter(bt -> {
-            if (bt == save) {
-                Person p = new Person();
-                p.set("dni", txtDni.getText());
-                p.set("first_name", txtFirstName.getText());
-                p.set("last_name", txtLastName.getText());
-                p.set("phone", txtPhone.getText());
-                p.set("internal_code", txtInternalCode.getText());
-                return p;
-            }
-            return null;
-        });
-
-        return d;
     }
 }
 

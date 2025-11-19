@@ -46,6 +46,12 @@ public class UsersController {
         colRole.setCellValueFactory(data -> new SimpleStringProperty(Roles.getRoleFullName(data.getValue().getString("role"))));
         colCreated.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().get("created_at"))));
 
+        colId.setStyle("-fx-font-size: 17;");
+        colName.setStyle("-fx-font-size: 17;");
+        colUsername.setStyle("-fx-font-size: 17;");
+        colRole.setStyle("-fx-font-size: 17;");
+        colCreated.setStyle("-fx-font-size: 17;");
+
         loadPage();
     }
 
@@ -170,6 +176,8 @@ public class UsersController {
 
     private @NotNull Dialog<User> userDialog(User base) {
         Dialog<User> d = new Dialog<>();
+        String lblStyle = "-fx-font-weight: bold; -fx-font-size: 17;";
+        String inputStyle = "-fx-font-size: 17;";
 
         // Hacer el diálogo redimensionable y darle un tamaño inicial un poco mayor
         d.setResizable(true);
@@ -183,24 +191,56 @@ public class UsersController {
         txtName.setPromptText("Nombre");
         TextField txtUsername = new TextField();
         txtUsername.setPromptText("Usuario");
-        ComboBox<String> cmbRole = new ComboBox<>();
-        cmbRole.getItems().addAll("root", "admin", "operator", "auditor", "guest");
+
+        // ComboBox con los roles asignables (excluyendo ROOT)
+        ComboBox<Roles.Role> cmbRole = new ComboBox<>();
+        cmbRole.getItems().addAll(Roles.getAssignableRoles());
+
+        // Configurar cómo se muestra cada rol
+        cmbRole.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
+            @Override
+            protected void updateItem(Roles.Role role, boolean empty) {
+                super.updateItem(role, empty);
+                setText(empty || role == null ? null : role.getDisplayName());
+            }
+        });
+        cmbRole.setButtonCell(new javafx.scene.control.ListCell<>() {
+            @Override
+            protected void updateItem(Roles.Role role, boolean empty) {
+                super.updateItem(role, empty);
+                setText(empty || role == null ? null : role.getDisplayName());
+            }
+        });
+
+        txtName.setStyle(inputStyle);
+        txtUsername.setStyle(inputStyle);
+        cmbRole.setStyle(inputStyle);
 
         if (base != null) {
             txtName.setText(base.getString("name"));
             txtUsername.setText(base.getString("username"));
-            cmbRole.getSelectionModel().select(base.getString("role"));
+            // Seleccionar el rol actual
+            Roles.Role currentRole = Roles.Role.fromCode(base.getString("role"));
+            cmbRole.getSelectionModel().select(currentRole);
         } else {
-            cmbRole.getSelectionModel().select("operator");
+            // Por defecto seleccionar OPERATOR
+            cmbRole.getSelectionModel().select(Roles.Role.OPERATOR);
         }
+
+        Label lblName = new Label("Nombre");
+        lblName.setStyle(lblStyle);
+        Label lblUsername = new Label("Usuario");
+        lblUsername.setStyle(lblStyle);
+        Label lblRole = new Label("Rol");
+        lblRole.setStyle(lblStyle);
 
         GridPane gp = new GridPane();
         gp.setHgap(10);
         gp.setVgap(10);
         gp.setPadding(new javafx.geometry.Insets(10));
-        gp.addRow(0, new Label("Nombre"), txtName);
-        gp.addRow(1, new Label("Usuario"), txtUsername);
-        gp.addRow(2, new Label("Rol"), cmbRole);
+        gp.addRow(0, lblName, txtName);
+        gp.addRow(1, lblUsername, txtUsername);
+        gp.addRow(2, lblRole, cmbRole);
 
         // Permitir que los controles ocupen el espacio horizontal disponible
         gp.setPrefWidth(440);
@@ -221,7 +261,7 @@ public class UsersController {
                 User u = new User();
                 u.set("name", txtName.getText());
                 u.set("username", txtUsername.getText());
-                u.set("role", cmbRole.getValue());
+                u.set("role", cmbRole.getValue().getCode());
                 return u;
             }
             return null;

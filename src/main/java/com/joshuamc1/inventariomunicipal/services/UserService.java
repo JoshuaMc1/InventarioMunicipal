@@ -1,7 +1,6 @@
 package com.joshuamc1.inventariomunicipal.services;
 
 import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
-import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.repositories.UserRepository;
@@ -50,6 +49,11 @@ public class UserService {
 
     public User createUserFull(String name, String username, String password, String role) {
         return DatabaseManager.callInConnection(() -> {
+            // Seguridad: No permitir crear usuarios con rol root
+            if ("root".equals(role)) {
+                throw new IllegalArgumentException("No se permite crear usuarios con rol root por seguridad");
+            }
+
             // password en texto plano: el modelo User.setPassword hará el hash
             User user = repo.createFull(name, username, password, role);
 
@@ -67,6 +71,16 @@ public class UserService {
 
     public boolean updateUser(Integer id, String name, String username, String role, String newPassword) {
         return DatabaseManager.callInConnection(() -> {
+            // Seguridad: No permitir editar usuarios root
+            if (repo.isRootUser(id)) {
+                throw new IllegalArgumentException("No se permite editar usuarios con rol root por seguridad");
+            }
+
+            // Seguridad: No permitir cambiar a rol root
+            if ("root".equals(role)) {
+                throw new IllegalArgumentException("No se permite asignar el rol root por seguridad");
+            }
+
             boolean ok = repo.update(id, name, username, role, newPassword);
             if (ok) {
                 auditService.logAction(
@@ -83,6 +97,11 @@ public class UserService {
 
     public boolean resetPassword(Integer id, String newPassword, boolean mustChange) {
         return DatabaseManager.callInConnection(() -> {
+            // Seguridad: No permitir resetear contraseña de usuarios root
+            if (repo.isRootUser(id)) {
+                throw new IllegalArgumentException("No se permite resetear la contraseña de usuarios root por seguridad");
+            }
+
             boolean ok = repo.resetPassword(id, newPassword, mustChange);
             if (ok) {
                 auditService.logAction(
@@ -99,6 +118,11 @@ public class UserService {
 
     public boolean deleteUser(Integer id) {
         return DatabaseManager.callInConnection(() -> {
+            // Seguridad: No permitir eliminar usuarios root
+            if (repo.isRootUser(id)) {
+                throw new IllegalArgumentException("No se permite eliminar usuarios root por seguridad");
+            }
+
             boolean ok = repo.delete(id);
 
             if (ok) {

@@ -1,34 +1,56 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<?import javafx.geometry.Insets?>
-<?import javafx.scene.control.*?>
-<?import javafx.scene.layout.*?>
 
-<BorderPane xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-            fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.PeopleController">
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.Region?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.PeopleController">
     <top>
         <HBox spacing="10">
             <padding>
-                <Insets top="10" right="10" bottom="10" left="10"/>
+                <Insets bottom="10" left="10" right="10" top="10" />
             </padding>
-            <Label text="Personas" style="-fx-font-size: 18px; -fx-font-weight: bold;" />
-            <Region HBox.hgrow="ALWAYS"/>
-            <TextField fx:id="txtSearch" promptText="Buscar por DNI, nombre o código" prefWidth="250"/>
-            <Button text="Buscar" onAction="#onSearch" />
-            <Button text="Nuevo" onAction="#onNew" />
-            <Button text="Editar" onAction="#onEdit" />
-            <Button text="Eliminar" onAction="#onDelete" />
+            <Label style="-fx-font-size: 24px; -fx-font-weight: bold;" text="Personas" />
+            <Region HBox.hgrow="ALWAYS" />
+            <TextField fx:id="txtSearch" prefWidth="250" promptText="Buscar por DNI, nombre o código">
+            <font>
+               <Font size="14.0" />
+            </font></TextField>
+            <Button onAction="#onSearch" text="Buscar">
+            <font>
+               <Font name="System Bold" size="14.0" />
+            </font></Button>
+            <Button onAction="#onNew" text="Nuevo">
+            <font>
+               <Font name="System Bold" size="14.0" />
+            </font></Button>
+            <Button onAction="#onEdit" text="Editar">
+            <font>
+               <Font name="System Bold" size="14.0" />
+            </font></Button>
+            <Button onAction="#onDelete" text="Eliminar">
+            <font>
+               <Font name="System Bold" size="14.0" />
+            </font></Button>
         </HBox>
     </top>
 
     <center>
         <TableView fx:id="tblPeople">
             <columns>
-                <TableColumn fx:id="colId" text="ID" prefWidth="60" />
-                <TableColumn fx:id="colDni" text="DNI" prefWidth="140" />
-                <TableColumn fx:id="colFirstName" text="Nombre" prefWidth="150" />
-                <TableColumn fx:id="colLastName" text="Apellido" prefWidth="150" />
-                <TableColumn fx:id="colPhone" text="Teléfono" prefWidth="120" />
-                <TableColumn fx:id="colInternalCode" text="Código Interno" prefWidth="140" />
+                <TableColumn fx:id="colId" prefWidth="60" text="ID" />
+                <TableColumn fx:id="colDni" prefWidth="240" text="DNI" />
+                <TableColumn fx:id="colFirstName" prefWidth="200" text="Nombre" />
+                <TableColumn fx:id="colLastName" prefWidth="200" text="Apellido" />
+                <TableColumn fx:id="colPhone" prefWidth="180" text="Teléfono" />
+                <TableColumn fx:id="colInternalCode" prefWidth="180" text="Código Interno" />
             </columns>
         </TableView>
     </center>
@@ -36,12 +58,20 @@
     <bottom>
         <HBox spacing="10">
             <padding>
-                <Insets top="10" right="10" bottom="10" left="10"/>
+                <Insets bottom="10" left="10" right="10" top="10" />
             </padding>
-            <Label text="Paginación:" />
-            <Button text="Anterior" onAction="#onPrev" />
-            <Button text="Siguiente" onAction="#onNext" />
+            <Label text="Paginación:">
+            <font>
+               <Font size="14.0" />
+            </font></Label>
+            <Button onAction="#onPrev" text="Anterior">
+            <font>
+               <Font name="System Bold" size="14.0" />
+            </font></Button>
+            <Button onAction="#onNext" text="Siguiente">
+            <font>
+               <Font name="System Bold" size="14.0" />
+            </font></Button>
         </HBox>
     </bottom>
 </BorderPane>
-

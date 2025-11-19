@@ -1,7 +1,6 @@
 package com.joshuamc1.inventariomunicipal.repositories;
 
 import com.joshuamc1.inventariomunicipal.models.User;
-import org.javalite.activejdbc.LazyList;
 
 import java.util.List;
 
@@ -77,10 +76,34 @@ public class UserRepository {
     }
 
     public List<User> listPaged(int offset, int limit, String search) {
+        // Excluir usuarios con rol root por seguridad
         if (search != null && !search.isBlank()) {
-            return User.where("name LIKE ? OR username LIKE ?", "%"+search+"%", "%"+search+"%").orderBy("created_at DESC").offset(offset).limit(limit);
+            return User.where("(name LIKE ? OR username LIKE ?) AND role != ?",
+                "%"+search+"%", "%"+search+"%", "root")
+                .orderBy("created_at DESC")
+                .offset(offset)
+                .limit(limit);
         } else {
-            return User.findAll().orderBy("created_at DESC").offset(offset).limit(limit);
+            return User.where("role != ?", "root")
+                .orderBy("created_at DESC")
+                .offset(offset)
+                .limit(limit);
         }
+    }
+
+    /**
+     * Verifica si un usuario es root
+     */
+    public boolean isRootUser(Integer id) {
+        User u = User.findById(id);
+        return u != null && "root".equals(u.getString("role"));
+    }
+
+    /**
+     * Cuenta cuántos usuarios root existen
+     */
+    public long countRootUsers() {
+        Long c = User.count("role = ?", "root");
+        return c == null ? 0 : c;
     }
 }

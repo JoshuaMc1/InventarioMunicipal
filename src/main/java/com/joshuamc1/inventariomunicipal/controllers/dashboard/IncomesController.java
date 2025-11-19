@@ -1,6 +1,7 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
 import com.joshuamc1.inventariomunicipal.core.Logs;
+import com.joshuamc1.inventariomunicipal.core.PersonDialogHelper;
 import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.Person;
@@ -28,9 +29,7 @@ import javafx.util.Duration;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 public class IncomesController {
     @FXML
@@ -233,6 +232,24 @@ public class IncomesController {
         Label lblSearchPerson = new Label("Filtrar Persona:"); lblSearchPerson.setStyle(lblStyle);
         Label lblNotes = new Label("Notas:"); lblNotes.setStyle(lblStyle);
 
+        // Botón para crear nueva persona
+        Button btnNewPerson = new Button("+");
+        btnNewPerson.setStyle("-fx-font-size: 17; -fx-font-weight: bold; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-cursor: hand;");
+        btnNewPerson.setTooltip(new Tooltip("Crear nueva persona"));
+        btnNewPerson.setOnAction(e -> {
+            Person newPerson = PersonDialogHelper.showCreatePersonDialog();
+            if (newPerson != null) {
+                // Agregar a la lista maestra
+                masterPeople.add(newPerson);
+                // Seleccionar automáticamente
+                cmbPerson.getSelectionModel().select(newPerson);
+            }
+        });
+
+        // HBox para ComboBox de persona + botón
+        HBox personBox = new HBox(5, cmbPerson, btnNewPerson);
+        HBox.setHgrow(cmbPerson, Priority.ALWAYS);
+
         GridPane gp = new GridPane();
         gp.setHgap(12); gp.setVgap(12); gp.setPadding(new Insets(14));
         // Fila 0 producto
@@ -243,14 +260,14 @@ public class IncomesController {
         gp.add(lblQuantity,0,2); gp.add(txtQuantity,1,2);
         // Fila 3 fecha
         gp.add(lblDate,0,3); gp.add(dpDate,1,3);
-        // Fila 4 persona
-        gp.add(lblPerson,0,4); gp.add(cmbPerson,1,4); gp.add(lblSearchPerson,2,4); gp.add(txtSearchPerson,3,4);
+        // Fila 4 persona con botón
+        gp.add(lblPerson,0,4); gp.add(personBox,1,4); gp.add(lblSearchPerson,2,4); gp.add(txtSearchPerson,3,4);
         // Fila 5 notas
         gp.add(lblNotes,0,5); gp.add(txtNotes,1,5,3,1);
 
         GridPane.setHgrow(cmbProduct, Priority.ALWAYS);
         GridPane.setHgrow(txtSearchProduct, Priority.ALWAYS);
-        GridPane.setHgrow(cmbPerson, Priority.ALWAYS);
+        GridPane.setHgrow(personBox, Priority.ALWAYS);
         GridPane.setHgrow(txtSearchPerson, Priority.ALWAYS);
         GridPane.setHgrow(txtQuantity, Priority.ALWAYS);
         GridPane.setHgrow(dpDate, Priority.ALWAYS);
