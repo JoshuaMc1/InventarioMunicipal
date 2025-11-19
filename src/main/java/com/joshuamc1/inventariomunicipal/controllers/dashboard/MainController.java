@@ -121,14 +121,6 @@ public class MainController {
             loadView("/fxml/dashboard/audit.fxml");
         });
 
-        btnReports.setOnAction(e -> {
-            if (loading.get()) {
-                Logs.info(this.getClass(), "Skipped loadView: already loading");
-                return;
-            }
-            loadView("/fxml/dashboard/reports.fxml");
-        });
-
         btnUsers.setOnAction(e -> {
             if (loading.get()) {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");

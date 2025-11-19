@@ -22,7 +22,7 @@
 
         <!-- KPIs -->
         <HBox spacing="20">
-            <VBox styleClass="kpi-card">
+            <VBox styleClass="kpi-card" HBox.hgrow="ALWAYS" maxWidth="Infinity" alignment="CENTER">
                 <Label text="Productos Totales">
                <font>
                   <Font size="18.0" />
@@ -30,7 +30,7 @@
                 <Label fx:id="lblTotalProductos" styleClass="kpi-number" />
             </VBox>
 
-            <VBox styleClass="kpi-card">
+            <VBox styleClass="kpi-card" HBox.hgrow="ALWAYS" maxWidth="Infinity" alignment="CENTER">
                 <Label text="Bajo Stock">
                <font>
                   <Font size="18.0" />
@@ -38,7 +38,7 @@
                 <Label fx:id="lblBajoStock" styleClass="kpi-number" />
             </VBox>
 
-            <VBox styleClass="kpi-card">
+            <VBox styleClass="kpi-card" HBox.hgrow="ALWAYS" maxWidth="Infinity" alignment="CENTER">
                 <Label text="Movimientos Hoy">
                <font>
                   <Font size="18.0" />
@@ -46,7 +46,7 @@
                 <Label fx:id="lblMovimientosHoy" styleClass="kpi-number" />
             </VBox>
 
-            <VBox styleClass="kpi-card">
+            <VBox styleClass="kpi-card" HBox.hgrow="ALWAYS" maxWidth="Infinity" alignment="CENTER">
                 <Label text="Usuarios Registrados">
                <font>
                   <Font size="18.0" />
