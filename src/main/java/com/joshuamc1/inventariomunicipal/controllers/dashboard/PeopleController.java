@@ -1,7 +1,7 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
 import com.joshuamc1.inventariomunicipal.core.Logs;
-import com.joshuamc1.inventariomunicipal.core.PersonDialogHelper;
+import com.joshuamc1.inventariomunicipal.core.dialog.PersonDialogHelper;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.Person;
 import com.joshuamc1.inventariomunicipal.services.PersonService;

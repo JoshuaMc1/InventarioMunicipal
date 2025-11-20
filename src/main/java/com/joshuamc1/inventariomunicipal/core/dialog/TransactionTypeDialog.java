@@ -1,4 +1,4 @@
-package com.joshuamc1.inventariomunicipal.core;
+package com.joshuamc1.inventariomunicipal.core.dialog;
 
 import javafx.geometry.Insets;
 import javafx.scene.control.*;

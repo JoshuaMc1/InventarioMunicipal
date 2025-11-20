@@ -1,4 +1,4 @@
-package com.joshuamc1.inventariomunicipal.core;
+package com.joshuamc1.inventariomunicipal.core.dialog;
 
 import com.joshuamc1.inventariomunicipal.models.Person;
 import com.joshuamc1.inventariomunicipal.services.PersonService;

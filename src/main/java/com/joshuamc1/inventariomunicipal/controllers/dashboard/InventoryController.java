@@ -8,6 +8,7 @@ import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -33,8 +34,20 @@ public class InventoryController {
     @FXML private Button btnDelete;
     @FXML private TextField txtSearch;
     @FXML private Button btnClearSearch;
+    // Controles de paginación
+    @FXML private Button btnPrev;
+    @FXML private Button btnNext;
+    @FXML private Label lblPage;
+    @FXML private ChoiceBox<Integer> choicePageSize;
+
+    // Estado de paginación
+    private int currentPage = 1; // 1-based
+    private int pageSize = 25;
+    private int totalItems = 0;
+    private int totalPages = 1;
 
     private List<Product> allProducts = FXCollections.observableArrayList();
+    private ObservableList<Product> currentPageItems = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
@@ -47,10 +60,37 @@ public class InventoryController {
         btnDelete.setOnAction(e -> deleteSelected());
 
         // Búsqueda en tiempo real
-        txtSearch.textProperty().addListener((obs, oldVal, newVal) -> filterProducts(newVal));
+        txtSearch.textProperty().addListener((obs, oldVal, newVal) -> {
+            currentPage = 1;
+            applyFiltersAndPagination();
+        });
         btnClearSearch.setOnAction(e -> {
             txtSearch.clear();
-            filterProducts("");
+            currentPage = 1;
+            applyFiltersAndPagination();
+        });
+
+        // Inicializar paginación
+        choicePageSize.setItems(FXCollections.observableArrayList(10,25,50,100));
+        choicePageSize.setValue(pageSize);
+        choicePageSize.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null) {
+                pageSize = newV;
+                currentPage = 1;
+                applyFiltersAndPagination();
+            }
+        });
+        btnPrev.setOnAction(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                applyFiltersAndPagination();
+            }
+        });
+        btnNext.setOnAction(e -> {
+            if (currentPage < totalPages) {
+                currentPage++;
+                applyFiltersAndPagination();
+            }
         });
     }
 
@@ -91,7 +131,8 @@ public class InventoryController {
 
         task.setOnSucceeded(evt -> {
             allProducts = task.getValue();
-            filterProducts(txtSearch.getText());
+            currentPage = 1;
+            applyFiltersAndPagination();
         });
         task.setOnFailed(evt -> {
             Throwable t = task.getException();
@@ -103,24 +144,43 @@ public class InventoryController {
         th.start();
     }
 
-    private void filterProducts(String searchText) {
+    private void applyFiltersAndPagination() {
+        String searchText = txtSearch.getText();
+        List<Product> filtered;
         if (searchText == null || searchText.trim().isEmpty()) {
-            tblProducts.setItems(FXCollections.observableArrayList(allProducts));
-            return;
-        }
-
-        String search = searchText.trim().toLowerCase();
-        List<Product> filtered = allProducts.stream()
+            filtered = allProducts;
+        } else {
+            String search = searchText.trim().toLowerCase();
+            filtered = allProducts.stream()
                 .filter(p -> {
                     String name = p.getString("name");
                     String id = String.valueOf(p.getInteger("id"));
-
-                    return (name != null && name.toLowerCase().contains(search)) ||
-                           (id.contains(search));
+                    return (name != null && name.toLowerCase().contains(search)) || (id.contains(search));
                 })
                 .collect(java.util.stream.Collectors.toList());
+        }
+        totalItems = filtered.size();
+        totalPages = Math.max(1, (int)Math.ceil(totalItems / (double)pageSize));
+        if (currentPage > totalPages) currentPage = totalPages;
+        int fromIndex = (currentPage - 1) * pageSize;
+        int toIndex = Math.min(fromIndex + pageSize, totalItems);
+        List<Product> pageSlice = fromIndex >= toIndex ? java.util.Collections.emptyList() : filtered.subList(fromIndex, toIndex);
+        currentPageItems.setAll(pageSlice);
+        tblProducts.setItems(currentPageItems);
+        updatePaginationControls();
+    }
 
-        tblProducts.setItems(FXCollections.observableArrayList(filtered));
+    private void updatePaginationControls() {
+        if (lblPage != null) lblPage.setText(String.format("Página %d/%d (%d)", currentPage, totalPages, totalItems));
+        if (btnPrev != null) btnPrev.setDisable(currentPage <= 1);
+        if (btnNext != null) btnNext.setDisable(currentPage >= totalPages);
+    }
+
+    private void filterProducts(String searchText) {
+        // Método original reemplazado por applyFiltersAndPagination; mantenido para compatibilidad si hay llamadas existentes
+        txtSearch.setText(searchText == null ? "" : searchText);
+        currentPage = 1;
+        applyFiltersAndPagination();
     }
 
     private void openCreateDialog() {

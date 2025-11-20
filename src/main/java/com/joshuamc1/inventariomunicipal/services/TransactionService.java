@@ -126,4 +126,44 @@ public class TransactionService {
     public List<Transaction> findLatest(int limit) {
         return DatabaseManager.callInConnection(() -> repo.findLatest(limit));
     }
+
+    public long countThisMonth() {
+        return DatabaseManager.callInConnection(repo::countThisMonth);
+    }
+
+    public long countLastMonth() {
+        return DatabaseManager.callInConnection(repo::countLastMonth);
+    }
+
+    public long countActiveLoans() {
+        return DatabaseManager.callInConnection(repo::countActiveLoans);
+    }
+
+    public List<Transaction> findLast30Days() {
+        return DatabaseManager.callInConnection(repo::findLast30Days);
+    }
+
+    public java.util.Map<String, Long> getMostMovedProducts(int limit) {
+        return DatabaseManager.callInConnection(() -> repo.getMostMovedProducts(limit));
+    }
+
+    public java.util.Map<String, Long> getTransactionsByType() {
+        return DatabaseManager.callInConnection(repo::getTransactionsByType);
+    }
+
+    public java.util.Map<Integer, Long> getWeeklyActivity() {
+        return DatabaseManager.callInConnection(repo::getWeeklyActivity);
+    }
+
+    public long countByTypeThisMonth(String type) {
+        return DatabaseManager.callInConnection(() -> repo.countByTypeThisMonth(type));
+    }
+
+    public long countByTypeLastMonth(String type) {
+        return DatabaseManager.callInConnection(() -> repo.countByTypeLastMonth(type));
+    }
+
+    public java.util.Map<String, java.util.Map<String, Long>> getQuarterlyTrend() {
+        return DatabaseManager.callInConnection(repo::getQuarterlyTrend);
+    }
 }

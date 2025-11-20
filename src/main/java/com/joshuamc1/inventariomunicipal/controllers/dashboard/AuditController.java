@@ -4,17 +4,16 @@ import com.joshuamc1.inventariomunicipal.core.AsyncLoadable;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.models.dto.AuditDTO;
 import com.joshuamc1.inventariomunicipal.services.AuditService;
+import com.joshuamc1.inventariomunicipal.export.PdfAuditExporter;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.concurrent.Task;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.BufferedWriter;
@@ -25,7 +24,6 @@ import java.nio.file.Files;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.function.Predicate;
 
 public class AuditController implements AsyncLoadable {
     @FXML private TableView<AuditDTO> tblAudit;
@@ -49,7 +47,7 @@ public class AuditController implements AsyncLoadable {
     @FXML private ChoiceBox<Integer> choicePageSize;
 
     private final AuditService auditService = new AuditService();
-    private ObservableList<AuditDTO> data = FXCollections.observableArrayList();
+    private final ObservableList<AuditDTO> data = FXCollections.observableArrayList();
     private volatile boolean loading = true;
     private Runnable onLoaded;
 
@@ -178,7 +176,7 @@ public class AuditController implements AsyncLoadable {
                 Platform.runLater(() -> {
                     loading = false;
                     if (onLoaded != null) onLoaded.run();
-                    showAlert("Error", "No se pudieron cargar registros de auditoría: " + t.getMessage());
+                    showError("No se pudieron cargar registros de auditoría: " + t.getMessage());
                 });
             }
         }).start();
@@ -217,7 +215,7 @@ public class AuditController implements AsyncLoadable {
             showInfo("Exportado", "CSV exportado: " + f.getAbsolutePath());
         } catch (IOException ex) {
             Logs.error(this.getClass(), "Error exportando CSV", ex);
-            showAlert("Error", "No se pudo exportar CSV: " + ex.getMessage());
+            showError("No se pudo exportar CSV: " + ex.getMessage());
         }
     }
 
@@ -237,167 +235,84 @@ public class AuditController implements AsyncLoadable {
         File f = fc.showSaveDialog(tblAudit.getScene().getWindow());
         if (f == null) return;
 
-        try (PDDocument doc = new PDDocument()) {
-            PDPage page = new PDPage(PDRectangle.LETTER);
-            doc.addPage(page);
+        // Crear diálogo de progreso
+        Dialog<Void> progressDialog = new Dialog<>();
+        progressDialog.setTitle("Exportando PDF");
+        ProgressBar pb = new ProgressBar(0);
+        pb.setPrefWidth(300);
+        Label lblStatus = new Label("Inicializando...");
+        ButtonType cancelType = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        progressDialog.getDialogPane().getButtonTypes().add(cancelType);
+        VBox box = new VBox(10, lblStatus, pb);
+        box.setPrefWidth(320);
+        progressDialog.getDialogPane().setContent(box);
+        progressDialog.getDialogPane().setHeaderText(null);
+        progressDialog.setResizable(false);
+        progressDialog.getDialogPane().lookupButton(cancelType).addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+            // marcar cancelación
+            lblStatus.setText("Cancelando...");
+        });
 
-            float margin = 40f;
-            PDPageContentStream cs = new PDPageContentStream(doc, page);
-
-            float pageWidth = page.getMediaBox().getWidth();
-            float y = page.getMediaBox().getHeight() - margin;
-
-            // logo centrado
-            try (java.io.InputStream is = getClass().getResourceAsStream("/images/logo.png")) {
-                if (is != null) {
-                    byte[] imgBytes = is.readAllBytes();
-                    org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject pdImage =
-                            org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject.createFromByteArray(doc, imgBytes, "logo");
-                    float imgW = 80f;
-                    float imgH = 80f;
-                    float imgX = (pageWidth - imgW) / 2f;
-                    float imgY = y - imgH;
-                    cs.drawImage(pdImage, imgX, imgY, imgW, imgH);
-                    y = imgY - 10f;
+        // Task de exportación
+        final boolean[] cancelled = {false};
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() {
+                try {
+                    updateMessage("Preparando documento...");
+                    PdfAuditExporter.export(data, f, p -> {
+                        updateProgress(p, 1.0);
+                        updateMessage(String.format("Procesando %.0f%%", p * 100));
+                        if (cancelled[0]) {
+                            updateMessage("Cancelado por el usuario");
+                        }
+                    }, () -> cancelled[0], com.joshuamc1.inventariomunicipal.core.Session.getCurrentUsername());
+                } catch (IOException ex) {
+                    Logs.error(this.getClass(), "Error exportando PDF", ex);
+                    Platform.runLater(() -> showError("No se pudo exportar PDF: " + ex.getMessage()));
                 }
-            } catch (Exception imgEx) {
-                Logs.warn(this.getClass(), "No se pudo cargar logo para PDF: {}", imgEx.getMessage());
-            }
-
-            // título centrado
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 16);
-            String title = "Reporte de auditoría";
-            float titleWidth = PDType1Font.HELVETICA_BOLD.getStringWidth(title) / 1000 * 16;
-            float titleX = (pageWidth - titleWidth) / 2f;
-            cs.beginText();
-            cs.newLineAtOffset(titleX, y);
-            cs.showText(title);
-            cs.endText();
-            y -= 24f;
-
-            // linea con usuario y fecha (usuario a la izquierda, fecha a la derecha)
-            String username = com.joshuamc1.inventariomunicipal.core.Session.getCurrentUsername();
-            String fechaReporte = java.time.LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-
-            cs.setFont(PDType1Font.HELVETICA, 10);
-            cs.beginText();
-            cs.newLineAtOffset(margin, y);
-            cs.showText("Usuario: " + (username == null ? "-" : username));
-            cs.endText();
-
-            String fechaText = "Fecha: " + fechaReporte;
-            float fechaWidth = PDType1Font.HELVETICA.getStringWidth(fechaText) / 1000 * 10;
-            cs.beginText();
-            cs.newLineAtOffset(pageWidth - margin - fechaWidth, y);
-            cs.showText(fechaText);
-            cs.endText();
-
-            y -= 24f;
-
-            // encabezados de la tabla
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 9);
-            float tableX = margin;
-            float tableWidth = pageWidth - margin * 2;
-
-            // definir anchos de columnas (ajustables)
-            float colIdW = 40f;
-            float colUserW = 120f;
-            float colActionW = 80f;
-            float colTableW = 80f;
-            float colRegW = 60f;
-            float colFechaW = 110f;
-            float colDetailsW = tableWidth - (colIdW + colUserW + colActionW + colTableW + colRegW + colFechaW);
-
-            // dibujar encabezado
-            float cx = tableX;
-            float headerY = y;
-            cs.beginText();
-            cs.newLineAtOffset(cx + 2, headerY);
-            cs.showText("ID");
-            cs.endText();
-            cx += colIdW;
-
-            cs.beginText(); cs.newLineAtOffset(cx + 2, headerY); cs.showText("Usuario"); cs.endText(); cx += colUserW;
-            cs.beginText(); cs.newLineAtOffset(cx + 2, headerY); cs.showText("Acción"); cs.endText(); cx += colActionW;
-            cs.beginText(); cs.newLineAtOffset(cx + 2, headerY); cs.showText("Tabla"); cs.endText(); cx += colTableW;
-            cs.beginText(); cs.newLineAtOffset(cx + 2, headerY); cs.showText("Reg ID"); cs.endText(); cx += colRegW;
-            cs.beginText(); cs.newLineAtOffset(cx + 2, headerY); cs.showText("Fecha"); cs.endText(); cx += colFechaW;
-            cs.beginText(); cs.newLineAtOffset(cx + 2, headerY); cs.showText("Detalles"); cs.endText();
-
-            y -= 16f;
-
-            cs.setFont(PDType1Font.HELVETICA, 9);
-            float rowHeight = 14f;
-
-            for (AuditDTO r : data) {
-                if (y < margin + rowHeight) {
-                    cs.close();
-                    page = new PDPage(PDRectangle.LETTER);
-                    doc.addPage(page);
-                    cs = new PDPageContentStream(doc, page);
-                    y = page.getMediaBox().getHeight() - margin;
-                }
-
-                cx = tableX;
-                // ID
-                cs.beginText(); cs.newLineAtOffset(cx + 2, y); cs.showText(String.valueOf(r.getId() == null ? "" : r.getId())); cs.endText(); cx += colIdW;
-                // Usuario
-                String uname = r.getUsuarioName() != null ? r.getUsuarioName() : (r.getUsuarioId() == null ? "" : String.valueOf(r.getUsuarioId()));
-                cs.beginText(); cs.newLineAtOffset(cx + 2, y); cs.showText(truncate(uname, (int)colUserW/6)); cs.endText(); cx += colUserW;
-                // Acción
-                cs.beginText(); cs.newLineAtOffset(cx + 2, y); cs.showText(truncate(r.getAccion(), (int)colActionW/6)); cs.endText(); cx += colActionW;
-                // Tabla
-                cs.beginText(); cs.newLineAtOffset(cx + 2, y); cs.showText(truncate(r.getTablaAfectada(), (int)colTableW/6)); cs.endText(); cx += colTableW;
-                // Reg ID
-                cs.beginText(); cs.newLineAtOffset(cx + 2, y); cs.showText(r.getRegistroAfectadoId() == null ? "" : String.valueOf(r.getRegistroAfectadoId())); cs.endText(); cx += colRegW;
-                // Fecha
-                cs.beginText(); cs.newLineAtOffset(cx + 2, y); cs.showText(truncate(r.getFecha(), (int)colFechaW/6)); cs.endText(); cx += colFechaW;
-                // Detalles
-                cs.beginText(); cs.newLineAtOffset(cx + 2, y); cs.showText(truncate(r.getDetalles(), Math.max(10, (int)colDetailsW/6))); cs.endText();
-
-                y -= rowHeight;
-            }
-
-            cs.close();
-            doc.save(f);
-            showInfo("Exportado", "PDF exportado: " + f.getAbsolutePath());
-        } catch (IOException ex) {
-            Logs.error(this.getClass(), "Error exportando PDF", ex);
-            showAlert("Error", "No se pudo exportar PDF: " + ex.getMessage());
-        }
-    }
-
-    private @NotNull String truncate(String s, int max) {
-        if (s == null) return "";
-        return s.length() <= max ? s : s.substring(0, max - 3) + "...";
-    }
-
-    private void applyFilter(String q) {
-        // kept for backward compatibility but now triggers DB reload via txtSearch listener
-        if (q == null || q.trim().isEmpty()) {
-            tblAudit.setItems(data);
-            return;
-        }
-
-        String qq = q.toLowerCase();
-        Predicate<AuditDTO> p = r -> {
-            try {
-                return (r.getAccion() != null && r.getAccion().toLowerCase().contains(qq))
-                        || (r.getTablaAfectada() != null && r.getTablaAfectada().toLowerCase().contains(qq))
-                        || (r.getDetalles() != null && r.getDetalles().toLowerCase().contains(qq))
-                        || (r.getUsuarioName() != null && r.getUsuarioName().toLowerCase().contains(qq))
-                        || String.valueOf(r.getUsuarioId()).contains(qq);
-            } catch (Throwable t) {
-                return false;
+                return null;
             }
         };
 
-        tblAudit.setItems(data.filtered(p));
+        pb.progressProperty().bind(task.progressProperty());
+        lblStatus.textProperty().bind(task.messageProperty());
+
+        task.setOnSucceeded(ev -> {
+            if (!cancelled[0]) {
+                showInfo("Exportado", "PDF exportado: " + f.getAbsolutePath());
+            }
+            progressDialog.close();
+        });
+        task.setOnFailed(ev -> {
+            showError("Fallo exportación PDF");
+            progressDialog.close();
+        });
+        task.setOnCancelled(ev -> {
+            cancelled[0] = true;
+            showInfo("Cancelado", "Exportación cancelada");
+            progressDialog.close();
+        });
+
+        // Botón cancelar efectúa cancel
+        progressDialog.setOnCloseRequest(e -> {
+            if (!task.isDone()) {
+                cancelled[0] = true;
+                task.cancel();
+            }
+        });
+
+        Thread th = new Thread(task, "pdf-export-task");
+        th.setDaemon(true);
+        th.start();
+        Stage owner = (Stage) tblAudit.getScene().getWindow();
+        progressDialog.initOwner(owner);
+        progressDialog.show();
     }
 
-    private void showAlert(String title, String msg) {
+    private void showError(String msg) {
         Alert alert = new Alert(Alert.AlertType.ERROR);
-        alert.setTitle(title);
+        alert.setTitle("Error");
         alert.setHeaderText(null);
         alert.setContentText(msg);
         alert.showAndWait();

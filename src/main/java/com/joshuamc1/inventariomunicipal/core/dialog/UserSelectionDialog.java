@@ -1,5 +1,6 @@
-package com.joshuamc1.inventariomunicipal.core;
+package com.joshuamc1.inventariomunicipal.core.dialog;
 
+import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.services.UserService;
 import javafx.geometry.Insets;

@@ -106,4 +106,17 @@ public class UserRepository {
         Long c = User.count("role = ?", "root");
         return c == null ? 0 : c;
     }
+
+    public boolean updateOwnProfile(Integer id, String name, String newPassword) {
+        User u = User.findById(id);
+        if (u == null) return false;
+        if (name != null && !name.isBlank()) {
+            u.set("name", name);
+        }
+        if (newPassword != null && !newPassword.isBlank()) {
+            u.setPassword(newPassword);
+            u.set("must_change_password", 0);
+        }
+        return u.saveIt();
+    }
 }

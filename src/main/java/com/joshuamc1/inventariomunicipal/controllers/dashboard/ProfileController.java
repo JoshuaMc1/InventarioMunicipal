@@ -94,17 +94,23 @@ public class ProfileController {
             }
 
             // Actualizar usuario
-            String username = currentUser.getString("username");
             String role = currentUser.getString("role");
+            String username = currentUser.getString("username");
             String passwordToUpdate = changingPassword ? newPassword : null;
 
-            boolean success = userService.updateUser(
-                    currentUser.getInteger("id"),
-                    name,
-                    username,
-                    role,
-                    passwordToUpdate
-            );
+            boolean success;
+            if ("root".equalsIgnoreCase(role)) {
+                // Permitir que root modifique su propio nombre y contraseña
+                success = userService.updateOwnProfile(name, passwordToUpdate);
+            } else {
+                success = userService.updateUser(
+                        currentUser.getInteger("id"),
+                        name,
+                        username,
+                        role,
+                        passwordToUpdate
+                );
+            }
 
             if (success) {
                 // Recargar el usuario actualizado en la sesión
@@ -139,4 +145,3 @@ public class ProfileController {
         txtConfirmPassword.clear();
     }
 }
-

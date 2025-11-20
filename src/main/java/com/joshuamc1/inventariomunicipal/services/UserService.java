@@ -149,4 +149,22 @@ public class UserService {
     public List<User> listPaged(int offset, int limit, String search) {
         return DatabaseManager.callInConnection(() -> repo.listPaged(offset, limit, search));
     }
+
+    public boolean updateOwnProfile(String name, String newPassword) {
+        return DatabaseManager.callInConnection(() -> {
+            Integer id = Session.getCurrentUserId();
+            if (id == null) throw new IllegalStateException("No hay sesión activa");
+            boolean ok = repo.updateOwnProfile(id, name, newPassword);
+            if (ok) {
+                auditService.logAction(
+                    id,
+                    "update_own_profile",
+                    "users",
+                    id,
+                    String.format("user_id=%d,changed_name=%b,changed_password=%b", id, name != null && !name.isBlank(), newPassword != null && !newPassword.isBlank())
+                );
+            }
+            return ok;
+        });
+    }
 }

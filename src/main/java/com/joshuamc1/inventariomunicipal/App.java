@@ -25,6 +25,7 @@ public class App extends Application {
     public void start(@NotNull Stage stage) {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
             Logs.error(App.class, "Uncaught exception in thread {}: {}", t.getName(), e.getMessage());
+            Logs.trace(App.class, "Trace:", e);
             Utils.showAlert("Error inesperado", "Se produjo un error inesperado: " + e.getMessage());
         });
 

@@ -414,7 +414,7 @@ public class ReportRepository {
     // Reporte de movimientos de inventario (últimos 30 días)
     public Report inventoryMovements() {
         String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.name as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
                      "       COALESCE(pe.last_name, '') as persona_apellido, t.notes " +
                      "FROM transactions t " +
                      "LEFT JOIN products p ON p.id = t.product_id " +
@@ -477,7 +477,7 @@ public class ReportRepository {
     // Reporte de movimientos de inventario por rango de fechas
     public Report inventoryMovementsByDateRange(String from, String to) {
         String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.name as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
                      "       COALESCE(pe.last_name, '') as persona_apellido " +
                      "FROM transactions t " +
                      "LEFT JOIN products p ON p.id = t.product_id " +
@@ -587,7 +587,7 @@ public class ReportRepository {
     // Reporte de historial de transacciones completo
     public Report transactionsAll() {
         String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.name as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
                      "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
                      "FROM transactions t " +
                      "LEFT JOIN products p ON p.id = t.product_id " +
@@ -647,7 +647,7 @@ public class ReportRepository {
     // Reporte de transacciones por tipo
     public Report transactionsByTypeReport(@NotNull String type) {
         String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.name as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
                      "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
                      "FROM transactions t " +
                      "LEFT JOIN products p ON p.id = t.product_id " +
@@ -721,7 +721,7 @@ public class ReportRepository {
     // Reporte de transacciones por tipo y rango de fechas
     public Report transactionsByTypeAndDateRange(@NotNull String type, String from, String to) {
         String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.name as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
                      "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
                      "FROM transactions t " +
                      "LEFT JOIN products p ON p.id = t.product_id " +
@@ -797,7 +797,7 @@ public class ReportRepository {
     // Reporte de transacciones por usuario
     public Report transactionsByUserReport(int userId) {
         String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.name as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
                      "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
                      "FROM transactions t " +
                      "LEFT JOIN products p ON p.id = t.product_id " +
@@ -864,7 +864,7 @@ public class ReportRepository {
     // Reporte de transacciones por persona
     public Report transactionsByPersonReport(int personId) {
         String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.name as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
                      "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
                      "FROM transactions t " +
                      "LEFT JOIN products p ON p.id = t.product_id " +
@@ -1113,7 +1113,7 @@ public class ReportRepository {
 
     // Reporte de actividad por usuario
     public Report userActivity(int userId, String from, String to) {
-        String sql = "SELECT u.name as usuario, u.username, " +
+        String sql = "SELECT u.username as usuario, u.username, " +
                      "       DATE(t.created_at) as fecha, " +
                      "       COUNT(t.id) as total_transacciones, " +
                      "       SUM(CASE WHEN t.type='in' THEN 1 ELSE 0 END) as ingresos, " +

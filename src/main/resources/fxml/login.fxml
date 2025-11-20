@@ -26,7 +26,7 @@
          <Font name="System Bold" size="24.0" />
       </font>
    </Label>
-    <TextField fx:id="txtUsername" prefHeight="110.0" prefWidth="399.0" promptText="Ingrese su usuario" text="admin">
+    <TextField fx:id="txtUsername" prefHeight="110.0" prefWidth="399.0" promptText="Ingrese su usuario">
       <font>
          <Font size="18.0" />
       </font>
@@ -39,7 +39,7 @@
       </font>
    </Label>
 
-    <PasswordField fx:id="txtPassword" prefHeight="110.0" promptText="Ingrese su contraseña" text="password">
+    <PasswordField fx:id="txtPassword" prefHeight="110.0" promptText="Ingrese su contraseña">
       <font>
          <Font size="18.0" />
       </font>

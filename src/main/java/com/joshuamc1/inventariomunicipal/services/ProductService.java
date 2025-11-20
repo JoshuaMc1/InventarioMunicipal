@@ -53,6 +53,18 @@ public class ProductService {
         return DatabaseManager.callInConnection(repo::countLowStock);
     }
 
+    public long countOutOfStock() {
+        return DatabaseManager.callInConnection(repo::countOutOfStock);
+    }
+
+    public long countCreatedThisMonth() {
+        return DatabaseManager.callInConnection(repo::countCreatedThisMonth);
+    }
+
+    public long countCreatedLastMonth() {
+        return DatabaseManager.callInConnection(repo::countCreatedLastMonth);
+    }
+
     public void save(Product product) {
         DatabaseManager.runInConnection(() -> {
             repo.save(product);

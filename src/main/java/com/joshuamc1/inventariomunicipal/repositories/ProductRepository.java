@@ -43,6 +43,21 @@ public class ProductRepository {
         return (long) Product.where("current_stock < minimum_stock").size();
     }
 
+    public long countOutOfStock() {
+        Long c = Product.count("current_stock = 0");
+        return c == null ? 0L : c;
+    }
+
+    public long countCreatedThisMonth() {
+        Long c = Product.count("YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())");
+        return c == null ? 0L : c;
+    }
+
+    public long countCreatedLastMonth() {
+        Long c = Product.count("YEAR(created_at) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND MONTH(created_at) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))");
+        return c == null ? 0L : c;
+    }
+
     // Borra un producto de la base de datos
     public void delete(@NotNull Product product) {
         // ActiveJDBC Model provee delete() para eliminar el registro

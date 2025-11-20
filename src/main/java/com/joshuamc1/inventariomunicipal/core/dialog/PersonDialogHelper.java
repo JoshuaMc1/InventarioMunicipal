@@ -1,5 +1,7 @@
-package com.joshuamc1.inventariomunicipal.core;
+package com.joshuamc1.inventariomunicipal.core.dialog;
 
+import com.joshuamc1.inventariomunicipal.core.Logs;
+import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.Person;
 import com.joshuamc1.inventariomunicipal.services.PersonService;
 import javafx.beans.binding.BooleanBinding;

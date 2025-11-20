@@ -1,13 +1,13 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
-import com.joshuamc1.inventariomunicipal.core.DateRangeDialog;
+import com.joshuamc1.inventariomunicipal.core.dialog.DateRangeDialog;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Roles;
 import com.joshuamc1.inventariomunicipal.core.Session;
-import com.joshuamc1.inventariomunicipal.core.TransactionTypeDialog;
-import com.joshuamc1.inventariomunicipal.core.UserSelectionDialog;
-import com.joshuamc1.inventariomunicipal.core.PersonSelectionDialog;
-import com.joshuamc1.inventariomunicipal.core.MonthYearDialog;
+import com.joshuamc1.inventariomunicipal.core.dialog.TransactionTypeDialog;
+import com.joshuamc1.inventariomunicipal.core.dialog.UserSelectionDialog;
+import com.joshuamc1.inventariomunicipal.core.dialog.PersonSelectionDialog;
+import com.joshuamc1.inventariomunicipal.core.dialog.MonthYearDialog;
 import com.joshuamc1.inventariomunicipal.models.Report;
 import com.joshuamc1.inventariomunicipal.services.ReportService;
 import javafx.fxml.FXML;
@@ -18,16 +18,27 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.pdfbox.pdmodel.font.PDFont;
 
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+import javafx.concurrent.Task;
+import javafx.scene.layout.VBox;
+import javafx.application.Platform;
+import java.util.logging.Logger;
+import java.util.logging.Level;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class ReportsController {
     // Botones de Usuarios
@@ -168,8 +179,7 @@ public class ReportsController {
             if (f == null) return;
 
             String description = "Lista completa de todos los usuarios del sistema, excluyendo el usuario Root por seguridad.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando usuarios sin root a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -207,8 +217,7 @@ public class ReportsController {
             if (f == null) return;
 
             String description = "Reporte de usuarios organizados y agrupados por su rol asignado en el sistema.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando usuarios agrupados a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -244,10 +253,8 @@ public class ReportsController {
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));
             File f = fc.showSaveDialog(btnInventoryCompletePdf.getScene().getWindow());
             if (f == null) return;
-
             String description = "Listado completo de todos los productos registrados en el sistema con su stock actual y mínimo.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando inventario completo a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -283,10 +290,8 @@ public class ReportsController {
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));
             File f = fc.showSaveDialog(btnInventoryLowStockPdf.getScene().getWindow());
             if (f == null) return;
-
             String description = "Productos cuyo stock actual es igual o menor al stock mínimo establecido. Ideal para planificar compras.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando productos con stock bajo a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -322,10 +327,8 @@ public class ReportsController {
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));
             File f = fc.showSaveDialog(btnInventoryOutOfStockPdf.getScene().getWindow());
             if (f == null) return;
-
             String description = "Productos que actualmente tienen stock en cero. Requieren reabastecimiento urgente.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando productos sin stock a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -361,10 +364,8 @@ public class ReportsController {
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));
             File f = fc.showSaveDialog(btnInventoryMovementsPdf.getScene().getWindow());
             if (f == null) return;
-
             String description = "Historial de todas las transacciones: ingresos, egresos y préstamos realizados en el último mes.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando movimientos de inventario a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -412,12 +413,10 @@ public class ReportsController {
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));
             File f = fc.showSaveDialog(btnMovementsByDatePdf.getScene().getWindow());
             if (f == null) return;
-
             String description = String.format("Historial de transacciones desde %s hasta %s.",
                 dateRange.getFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
                 dateRange.getTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando movimientos por fecha a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -465,12 +464,10 @@ public class ReportsController {
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));
             File f = fc.showSaveDialog(btnProductsByDatePdf.getScene().getWindow());
             if (f == null) return;
-
             String description = String.format("Productos registrados en el sistema desde %s hasta %s.",
                 dateRange.getFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
                 dateRange.getTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando productos por fecha a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -505,8 +502,7 @@ public class ReportsController {
             File f = fc.showSaveDialog(btnTransactionsAllPdf.getScene().getWindow());
             if (f == null) return;
             String description = "Todas las transacciones registradas en el sistema";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando historial de transacciones a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -545,8 +541,7 @@ public class ReportsController {
             File f = fc.showSaveDialog(btnTransactionsByTypePdf.getScene().getWindow());
             if (f == null) return;
             String description = "Transacciones filtradas por tipo: " + type.getDisplayName();
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando transacciones por tipo a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -591,8 +586,7 @@ public class ReportsController {
             String description = String.format("Transacciones de tipo %s desde %s hasta %s.", type.getDisplayName(),
                 dateRange.getFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
                 dateRange.getTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando transacciones por tipo y fecha a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -631,8 +625,7 @@ public class ReportsController {
             File f = fc.showSaveDialog(btnTransactionsByUserPdf.getScene().getWindow());
             if (f == null) return;
             String description = "Historial de transacciones realizadas por el usuario: " + userSel.getUserName();
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando transacciones por usuario a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -671,8 +664,7 @@ public class ReportsController {
             File f = fc.showSaveDialog(btnTransactionsByPersonPdf.getScene().getWindow());
             if (f == null) return;
             String description = "Transacciones asociadas a la persona: " + personSel.getPersonName();
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando transacciones por persona a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -713,8 +705,7 @@ public class ReportsController {
             String description = String.format("Top 20 productos con más transacciones desde %s hasta %s.",
                 dateRange.getFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
                 dateRange.getTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando productos más movidos a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -749,8 +740,7 @@ public class ReportsController {
             File f = fc.showSaveDialog(btnPeopleWithLoansPdf.getScene().getWindow());
             if (f == null) return;
             String description = "Control de préstamos activos con información detallada de días transcurridos.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando préstamos activos a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -785,8 +775,7 @@ public class ReportsController {
             File f = fc.showSaveDialog(btnMonthlyConsumptionPdf.getScene().getWindow());
             if (f == null) return;
             String description = "Análisis de consumo de productos de los últimos 12 meses con desglose mensual.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando consumo mensual a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -821,8 +810,7 @@ public class ReportsController {
             File f = fc.showSaveDialog(btnProductsNoMovementPdf.getScene().getWindow());
             if (f == null) return;
             String description = "Productos que no han tenido movimientos en los últimos 90 días. Detecta productos obsoletos.";
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando productos sin movimiento a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -868,8 +856,7 @@ public class ReportsController {
                 userSel.getUserName(),
                 dateRange.getFrom().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
                 dateRange.getTo().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando actividad de usuario a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
@@ -907,13 +894,192 @@ public class ReportsController {
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));
             File f = fc.showSaveDialog(btnMonthlyDashboardPdf.getScene().getWindow());
             if (f == null) return;
-            String description = String.format("Dashboard mensual con KPIs principales del sistema para %s.", monthYear.getFormatted());
-            exportToPdf(report, f, description);
-            showSuccess("PDF exportado exitosamente: " + f.getName());
+            exportMonthlyDashboardRichPdf(report, f, monthYear.getFormatted());
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando dashboard mensual a PDF", ex);
             showError("No se pudo exportar el reporte: " + ex.getMessage());
         }
+    }
+
+    // Exportación enriquecida con layout de KPIs y gráfico simple
+    private void exportMonthlyDashboardRichPdf(Report report, File file, String periodo) {
+        try (org.apache.pdfbox.pdmodel.PDDocument doc = new org.apache.pdfbox.pdmodel.PDDocument()) {
+            org.apache.pdfbox.pdmodel.font.PDType0Font font = loadEmbeddedFont(doc);
+            // Si no se carga fuente embebida se usarán las estándar
+            PDFont regularPdfFont = font != null ? font : PDType1Font.HELVETICA;
+            PDFont boldPdfFont = font != null ? font : PDType1Font.HELVETICA_BOLD;
+            org.apache.pdfbox.pdmodel.PDPage page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
+            doc.addPage(page);
+            org.apache.pdfbox.pdmodel.PDPageContentStream cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
+            final float MARGIN = 40f;
+            float y = page.getMediaBox().getHeight() - MARGIN;
+            float width = page.getMediaBox().getWidth() - 2 * MARGIN;
+
+            // Título
+            cs.beginText();
+            cs.setFont(boldPdfFont, 18);
+            cs.newLineAtOffset(MARGIN, y);
+            cs.showText("Dashboard Mensual - " + periodo);
+            cs.endText();
+            y -= 30;
+
+            // Fecha de generación
+            cs.beginText();
+            cs.setFont(regularPdfFont, 10);
+            cs.newLineAtOffset(MARGIN, y);
+            cs.showText("Generado: " + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+            cs.endText();
+            y -= 20;
+
+            // KPIs principales (tomar algunas métricas clave)
+            // Buscamos por nombre conocido en el reporte
+            java.util.Map<String, String> map = new java.util.LinkedHashMap<>();
+            for (java.util.List<String> row : report.getRows()) {
+                if (row.size() < 2) continue;
+                String k = row.get(0);
+                String v = row.get(1);
+                if (k.startsWith("---")) continue; // separador
+                map.put(k, v);
+            }
+
+            // Selección de KPIs importantes
+            String[] kpisOrden = {
+                "Total de Productos en Sistema",
+                "Productos con Stock Bajo",
+                "Productos Sin Stock",
+                "Total Transacciones",
+                "Ingresos",
+                "Egresos",
+                "Préstamos",
+                "Usuarios Activos"
+            };
+
+            float cardHeight = 60f;
+            float cardWidth = (width - 20) / 2f; // dos columnas
+            float cardYStart = y;
+            int col = 0;
+            int rowIdx = 0;
+
+            for (String kpi : kpisOrden) {
+                String val = map.get(kpi);
+                if (val == null) continue;
+                float x = MARGIN + col * (cardWidth + 20);
+                float cardY = cardYStart - rowIdx * (cardHeight + 15);
+                if (cardY - cardHeight < 80) { // nueva página si no hay espacio
+                    cs.close();
+                    page = new org.apache.pdfbox.pdmodel.PDPage(org.apache.pdfbox.pdmodel.common.PDRectangle.A4);
+                    doc.addPage(page);
+                    cs = new org.apache.pdfbox.pdmodel.PDPageContentStream(doc, page);
+                    cardYStart = page.getMediaBox().getHeight() - MARGIN - 30;
+                    rowIdx = 0;
+                    cardY = cardYStart;
+                }
+
+                // Dibujar tarjeta
+                drawRoundedRect(cs, x, cardY - cardHeight, cardWidth, cardHeight, new float[]{0.95f,0.95f,0.95f});
+                // KPI nombre
+                cs.beginText();
+                cs.setFont(regularPdfFont, 10);
+                cs.setNonStrokingColor(60/255f,60/255f,60/255f);
+                cs.newLineAtOffset(x + 10, cardY - 20);
+                cs.showText(kpi);
+                cs.endText();
+                // KPI valor
+                cs.beginText();
+                cs.setFont(boldPdfFont, 16);
+                cs.setNonStrokingColor(34/255f,102/255f,153/255f);
+                cs.newLineAtOffset(x + 10, cardY - 45);
+                cs.showText(val);
+                cs.endText();
+
+                if (col == 0) {
+                    col = 1;
+                } else {
+                    col = 0;
+                    rowIdx++;
+                }
+            }
+
+            y = cardYStart - (rowIdx + (col==1?1:0)) * (cardHeight + 15) - 30;
+
+            // Mini gráfico de barras: Ingresos/Egresos/Préstamos
+            Long ingresos = parseLong(map.get("Ingresos"));
+            Long egresos = parseLong(map.get("Egresos"));
+            Long prestamos = parseLong(map.get("Préstamos"));
+            if (ingresos == null) ingresos = 0L;
+            if (egresos == null) egresos = 0L;
+            if (prestamos == null) prestamos = 0L;
+            float chartHeight = 160f;
+            float chartY = y - chartHeight;
+
+            // Fondo gráfico
+            drawRoundedRect(cs, MARGIN, chartY, width, chartHeight, new float[]{1f,1f,1f});
+
+            cs.beginText();
+            cs.setFont(boldPdfFont, 12);
+            cs.setNonStrokingColor(0f,0f,0f);
+            cs.newLineAtOffset(MARGIN + 10, chartY + chartHeight - 20);
+            cs.showText("Distribución de Transacciones del Mes");
+            cs.endText();
+
+            long max = java.util.Collections.max(java.util.Arrays.asList(ingresos, egresos, prestamos, 1L));
+            float barAreaHeight = chartHeight - 50;
+            float barWidth = 60f;
+            float gap = 40f;
+            float startX = MARGIN + 40f;
+            float baseY = chartY + 30f;
+
+            // Dibujar barras
+            drawBar(cs, startX, baseY, barWidth, scaleValue(ingresos, max, barAreaHeight), new float[]{0.20f,0.60f,0.86f});
+            drawBar(cs, startX + barWidth + gap, baseY, barWidth, scaleValue(egresos, max, barAreaHeight), new float[]{0.91f,0.30f,0.24f});
+            drawBar(cs, startX + 2*(barWidth + gap), baseY, barWidth, scaleValue(prestamos, max, barAreaHeight), new float[]{0.56f,0.27f,0.68f});
+
+            // Etiquetas barras
+            writeCenteredPdf(cs, regularPdfFont, 10, startX + barWidth/2, baseY - 12, "Ingresos");
+            writeCenteredPdf(cs, regularPdfFont, 10, startX + barWidth + gap + barWidth/2, baseY - 12, "Egresos");
+            writeCenteredPdf(cs, regularPdfFont, 10, startX + 2*(barWidth + gap) + barWidth/2, baseY - 12, "Préstamos");
+            writeCenteredPdf(cs, boldPdfFont, 11, startX + barWidth/2, baseY + scaleValue(ingresos, max, barAreaHeight) + 5, String.valueOf(ingresos));
+            writeCenteredPdf(cs, boldPdfFont, 11, startX + barWidth + gap + barWidth/2, baseY + scaleValue(egresos, max, barAreaHeight) + 5, String.valueOf(egresos));
+            writeCenteredPdf(cs, boldPdfFont, 11, startX + 2*(barWidth + gap) + barWidth/2, baseY + scaleValue(prestamos, max, barAreaHeight) + 5, String.valueOf(prestamos));
+
+            cs.close();
+            doc.save(file);
+            showSuccess("Dashboard mensual PDF exportado: " + file.getName());
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error creando PDF enriquecido dashboard: {}", e.getMessage());
+            showError("Fallo exportando dashboard mensual: " + e.getMessage());
+        }
+    }
+
+    private Long parseLong(String v) {
+        try { return v == null ? null : Long.parseLong(v.replaceAll("[^0-9]", "")); } catch (Exception e) { return null; }
+    }
+
+    private float scaleValue(long value, long max, float height) {
+        if (max <= 0) return 0f;
+        return (value / (float) max) * height;
+    }
+
+    private void drawBar(org.apache.pdfbox.pdmodel.PDPageContentStream cs, float x, float y, float w, float h, float[] rgb) throws java.io.IOException {
+        cs.setNonStrokingColor(rgb[0], rgb[1], rgb[2]);
+        cs.addRect(x, y, w, h);
+        cs.fill();
+    }
+
+    private void writeCenteredPdf(org.apache.pdfbox.pdmodel.PDPageContentStream cs, PDFont font, float size, float cx, float y, String text) throws java.io.IOException {
+        float textWidth = font.getStringWidth(text) / 1000f * size;
+        cs.beginText();
+        cs.setFont(font, size);
+        cs.setNonStrokingColor(0f,0f,0f);
+        cs.newLineAtOffset(cx - textWidth/2, y);
+        cs.showText(text);
+        cs.endText();
+    }
+
+    private void drawRoundedRect(org.apache.pdfbox.pdmodel.PDPageContentStream cs, float x, float y, float w, float h, float[] rgb) throws java.io.IOException {
+        cs.setNonStrokingColor(rgb[0], rgb[1], rgb[2]);
+        cs.addRect(x, y, w, h);
+        cs.fill();
     }
 
     // ==================== MÉTODOS DE EXPORTACIÓN ====================
@@ -937,10 +1103,108 @@ public class ReportsController {
         }
     }
 
-    private void exportToPdf(Report report, File file, String description) throws IOException {
+    // Wrapper asíncrono con barra de progreso
+    private void exportToPdfAsync(Report report, File file, String description) {
+        Dialog<Void> progressDialog = new Dialog<>();
+        progressDialog.setTitle("Generando PDF");
+        ProgressBar pb = new ProgressBar(0);
+        pb.setPrefWidth(300);
+        Label lblStatus = new Label("Inicializando...");
+        ButtonType cancelType = new ButtonType("Cancelar", ButtonBar.ButtonData.CANCEL_CLOSE);
+        progressDialog.getDialogPane().getButtonTypes().add(cancelType);
+        VBox box = new VBox(10, lblStatus, pb);
+        box.setPrefWidth(320);
+        progressDialog.getDialogPane().setContent(box);
+        progressDialog.getDialogPane().setHeaderText(null);
+        progressDialog.setResizable(false);
+        final boolean[] cancelled = {false};
+        progressDialog.getDialogPane().lookupButton(cancelType).addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
+            if (!cancelled[0]) {
+                cancelled[0] = true;
+                lblStatus.setText("Cancelando...");
+                e.consume(); // mantener diálogo hasta que termine cancelación
+            }
+        });
+
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() {
+                try {
+                    // Consumidor de progreso adaptado al Task
+                    Consumer<Double> progressConsumer = p -> {
+                        updateProgress(p, 1.0);
+                        updateMessage(String.format("Progreso %.0f%%", p * 100));
+                    };
+                    Supplier<Boolean> cancelSupplier = () -> cancelled[0];
+                    updateMessage("Iniciando...");
+                    exportToPdfWithProgress(report, file, description, progressConsumer, cancelSupplier);
+                    if (cancelled[0]) {
+                        updateMessage("Cancelado");
+                    } else {
+                        updateMessage("Completado");
+                    }
+                } catch (Exception ex) {
+                    Logs.error(getClass(), "Error generando PDF", ex);
+                    Platform.runLater(() -> showError("No se pudo generar el PDF: " + ex.getMessage()));
+                }
+                return null;
+            }
+        };
+
+        pb.progressProperty().bind(task.progressProperty());
+        lblStatus.textProperty().bind(task.messageProperty());
+
+        task.setOnSucceeded(ev -> {
+            if (!cancelled[0]) showSuccess("PDF exportado exitosamente: " + file.getName());
+            progressDialog.close();
+        });
+        task.setOnFailed(ev -> {
+            showError("Fallo al generar PDF");
+            progressDialog.close();
+        });
+        task.setOnCancelled(ev -> {
+            cancelled[0] = true;
+            showError("Exportación cancelada");
+            progressDialog.close();
+        });
+
+        progressDialog.setOnCloseRequest(e -> {
+            if (!task.isDone()) {
+                cancelled[0] = true;
+                task.cancel();
+                e.consume();
+            }
+        });
+
+        Thread th = new Thread(task, "reports-pdf-export");
+        th.setDaemon(true);
+        th.start();
+        progressDialog.initOwner(btnMonthlyDashboardPdf.getScene().getWindow());
+        progressDialog.show();
+    }
+
+    // Método interno con progreso
+    private void exportToPdfWithProgress(Report report, File file, String description, Consumer<Double> progressConsumer, Supplier<Boolean> cancelled) throws IOException {
+        configurePdfEnvironment();
         try (PDDocument doc = new PDDocument()) {
+            PdfFonts fonts = loadFonts(doc);
+            PDFont regularFont = fonts.regular;
+            PDFont boldFont = fonts.bold;
+
+            int totalRows = report.getRows().size();
+            int steps = 6 + totalRows; // fuentes, página, encabezado, descripción, encabezados tabla, filas, guardado
+            AtomicInteger currentStep = new AtomicInteger(0);
+            Runnable step = () -> {
+                int cs = currentStep.incrementAndGet();
+                progressConsumer.accept(Math.min(1.0, cs / (double) steps));
+            };
+            if (cancelled.get()) return;
+            step.run(); // carga inicial
+
             PDPage page = new PDPage(PDRectangle.LETTER);
             doc.addPage(page);
+            step.run();
+            if (cancelled.get()) return;
 
             float margin = 50f;
             float pageWidth = page.getMediaBox().getWidth();
@@ -949,169 +1213,209 @@ public class ReportsController {
 
             PDPageContentStream cs = new PDPageContentStream(doc, page);
 
-            // ========== ENCABEZADO ==========
-
-            // 1. Logo
+            // Logo
             try (java.io.InputStream is = getClass().getResourceAsStream("/images/logo.png")) {
                 if (is != null) {
                     byte[] imgBytes = is.readAllBytes();
                     org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject pdImage =
-                            org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject.createFromByteArray(doc, imgBytes, "logo");
-                    float imgW = 60f;
-                    float imgH = 60f;
-                    float imgX = margin;
-                    float imgY = y - imgH;
-                    cs.drawImage(pdImage, imgX, imgY, imgW, imgH);
+                        org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject.createFromByteArray(doc, imgBytes, "logo");
+                    float imgW = 60f; float imgH = 60f; float imgY = y - imgH;
+                    cs.drawImage(pdImage, margin, imgY, imgW, imgH);
                     y = imgY;
-                } else {
-                    Logs.warn(getClass(), "No se encontró el logo en /images/logo.png");
                 }
-            } catch (Exception imgEx) {
-                Logs.warn(getClass(), "Error cargando logo: {}", imgEx.getMessage());
+            } catch (Exception ex) {
+                Logs.warn(getClass(), "Logo no cargado: {}", ex.getMessage());
             }
 
-            // 2. Título del reporte (a la derecha del logo)
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 18);
-            cs.beginText();
-            cs.newLineAtOffset(margin + 75, y + 35);
-            cs.showText(report.getTitle());
-            cs.endText();
-
+            // Título
+            cs.setFont(boldFont, 18);
+            cs.beginText(); cs.newLineAtOffset(margin + 75, y + 35); cs.showText(safe(report.getTitle())); cs.endText();
             y -= 20f;
 
-            // 3. Línea separadora
-            cs.setLineWidth(1f);
-            cs.moveTo(margin, y);
-            cs.lineTo(pageWidth - margin, y);
-            cs.stroke();
+            // Línea
+            cs.setLineWidth(1f); cs.moveTo(margin, y); cs.lineTo(pageWidth - margin, y); cs.stroke(); y -= 20f;
 
-            y -= 20f;
-
-            // 4. Descripción del reporte
-            cs.setFont(PDType1Font.HELVETICA, 11);
-            List<String> descLines = wrapText(description, 90);
+            // Descripción
+            cs.setFont(regularFont, 11);
+            List<String> descLines = wrapTextByWidth(description, regularFont, 11, pageWidth - margin * 2, 8);
             for (String line : descLines) {
-                cs.beginText();
-                cs.newLineAtOffset(margin, y);
-                cs.showText(line);
-                cs.endText();
-                y -= 14f;
+                if (cancelled.get()) { cs.close(); return; }
+                cs.beginText(); cs.newLineAtOffset(margin, y); cs.showText(line); cs.endText(); y -= 14f;
             }
-
             y -= 5f;
+            step.run(); // descripción procesada
 
-            // 5. Usuario que generó el reporte
-            String username = Session.getCurrentUsername();
-            if (username == null || username.isEmpty()) {
-                username = "Sistema";
-            }
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
-            cs.beginText();
-            cs.newLineAtOffset(margin, y);
-            cs.showText("Generado por: ");
-            cs.endText();
-
-            cs.setFont(PDType1Font.HELVETICA, 10);
-            float userX = margin + PDType1Font.HELVETICA_BOLD.getStringWidth("Generado por: ") / 1000 * 10;
-            cs.beginText();
-            cs.newLineAtOffset(userX, y);
-            cs.showText(username);
-            cs.endText();
-
-            y -= 14f;
-
-            // 6. Fecha de generación
+            // Usuario y fecha
+            String username = Session.getCurrentUsername(); if (username == null || username.isEmpty()) username = "Sistema";
+            cs.setFont(boldFont, 10); cs.beginText(); cs.newLineAtOffset(margin, y); cs.showText("Generado por: "); cs.endText();
+            float userLabelWidth = boldFont.getStringWidth("Generado por: ") / 1000 * 10;
+            cs.setFont(regularFont, 10); cs.beginText(); cs.newLineAtOffset(margin + userLabelWidth, y); cs.showText(safe(username)); cs.endText(); y -= 14f;
             String fecha = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 10);
-            cs.beginText();
-            cs.newLineAtOffset(margin, y);
-            cs.showText("Fecha: ");
-            cs.endText();
+            cs.setFont(boldFont, 10); cs.beginText(); cs.newLineAtOffset(margin, y); cs.showText("Fecha: "); cs.endText();
+            float fechaLabelWidth = boldFont.getStringWidth("Fecha: ") / 1000 * 10;
+            cs.setFont(regularFont, 10); cs.beginText(); cs.newLineAtOffset(margin + fechaLabelWidth, y); cs.showText(fecha); cs.endText(); y -= 25f;
 
-            cs.setFont(PDType1Font.HELVETICA, 10);
-            float fechaX = margin + PDType1Font.HELVETICA_BOLD.getStringWidth("Fecha: ") / 1000 * 10;
-            cs.beginText();
-            cs.newLineAtOffset(fechaX, y);
-            cs.showText(fecha);
-            cs.endText();
-
-            y -= 25f;
-
-            // ========== TABLA DE DATOS ==========
-
-            List<String> headers = report.getHeaders();
-            int numCols = headers.size();
-            float tableWidth = pageWidth - 2 * margin;
-            float colWidth = tableWidth / numCols;
-            float rowHeight = 18f;
-
-            // Encabezados de tabla
-            cs.setFont(PDType1Font.HELVETICA_BOLD, 9);
+            // Tabla
+            List<String> headers = report.getHeaders(); int numCols = headers.size();
+            float tableWidth = pageWidth - 2 * margin; float colWidth = tableWidth / numCols;
+            float cellPaddingX = 3f; float cellPaddingY = 2f; int headerFontSize = 9; int bodyFontSize = 8;
+            cs.setFont(boldFont, headerFontSize);
+            float headerMaxWidth = colWidth - cellPaddingX * 2; float headerRowHeight = 0f;
+            List<List<String>> headerLines = new ArrayList<>();
+            for (String h : headers) {
+                List<String> lines = wrapTextByWidth(h, boldFont, headerFontSize, headerMaxWidth, 3);
+                headerLines.add(lines);
+                headerRowHeight = Math.max(headerRowHeight, lines.size() * (headerFontSize + cellPaddingY));
+            }
+            headerRowHeight = Math.max(headerRowHeight, headerFontSize + 6);
             for (int i = 0; i < numCols; i++) {
-                float x = margin + i * colWidth;
-                cs.beginText();
-                cs.newLineAtOffset(x + 3, y);
-                cs.showText(truncate(headers.get(i), getMaxChars(colWidth)));
-                cs.endText();
-            }
+                float x = margin + i * colWidth; List<String> lines = headerLines.get(i); float lineY = y;
+                for (String line : lines) { cs.beginText(); cs.newLineAtOffset(x + cellPaddingX, lineY); cs.showText(line); cs.endText(); lineY -= (headerFontSize + cellPaddingY);} }
+            y -= headerRowHeight + 4f;
+            step.run(); // encabezados tabla
 
-            y -= rowHeight;
-
-            // Línea bajo encabezados
-//            cs.setLineWidth(0.5f);
-//            cs.moveTo(margin, y + 3);
-//            cs.lineTo(pageWidth - margin, y + 5);
-//            cs.stroke();
-
-            // Filas de datos
-            cs.setFont(PDType1Font.HELVETICA, 8);
+            cs.setFont(regularFont, bodyFontSize);
             for (List<String> row : report.getRows()) {
-                // Verificar si necesitamos nueva página
-                if (y < margin + rowHeight * 2) {
+                if (cancelled.get()) { cs.close(); return; }
+                List<List<String>> rowLines = new ArrayList<>(); float rowHeight = 0f;
+                for (int i = 0; i < numCols; i++) {
+                    String cellValue = (i < row.size()) ? row.get(i) : ""; if (cellValue == null) cellValue = "";
+                    if (headers.get(i).equalsIgnoreCase("Rol")) { cellValue = Roles.getRoleFullName(cellValue); }
+                    List<String> lines = wrapTextByWidth(cellValue, regularFont, bodyFontSize, colWidth - cellPaddingX * 2, 6);
+                    rowLines.add(lines); rowHeight = Math.max(rowHeight, lines.size() * (bodyFontSize + cellPaddingY));
+                }
+                rowHeight = Math.max(rowHeight, bodyFontSize + 6);
+                if (y - rowHeight < margin) {
                     cs.close();
-                    page = new PDPage(PDRectangle.LETTER);
-                    doc.addPage(page);
-                    cs = new PDPageContentStream(doc, page);
-                    y = pageHeight - margin;
-
-                    // Reescribir encabezados
-                    cs.setFont(PDType1Font.HELVETICA_BOLD, 9);
-                    for (int i = 0; i < numCols; i++) {
-                        float x = margin + i * colWidth;
-                        cs.beginText();
-                        cs.newLineAtOffset(x + 3, y);
-                        cs.showText(truncate(headers.get(i), getMaxChars(colWidth)));
-                        cs.endText();
-                    }
-                    y -= rowHeight;
-                    cs.setFont(PDType1Font.HELVETICA, 8);
+                    page = new PDPage(PDRectangle.LETTER); doc.addPage(page); y = pageHeight - margin;
+                    cs = new PDPageContentStream(doc, page); cs.setFont(boldFont, headerFontSize);
+                    for (int i = 0; i < numCols; i++) { float x = margin + i * colWidth; List<String> lines = headerLines.get(i); float lineY = y; for (String line : lines) { cs.beginText(); cs.newLineAtOffset(x + cellPaddingX, lineY); cs.showText(line); cs.endText(); lineY -= (headerFontSize + cellPaddingY);} }
+                    y -= headerRowHeight + 4f; cs.setFont(regularFont, bodyFontSize);
                 }
-
-                // Escribir fila
-                for (int i = 0; i < numCols && i < row.size(); i++) {
-                    float x = margin + i * colWidth;
-                    String cellValue = row.get(i);
-                    if (cellValue != null) {
-                        // Formatear rol para mostrar nombre completo
-                        if (i == 3 && headers.get(i).equalsIgnoreCase("Rol")) {
-                            cellValue = Roles.getRoleFullName(cellValue);
-                        }
-                        cs.beginText();
-                        cs.newLineAtOffset(x + 3, y);
-                        cs.showText(truncate(cellValue, getMaxChars(colWidth)));
-                        cs.endText();
-                    }
-                }
-
-                y -= rowHeight;
+                for (int i = 0; i < numCols; i++) {
+                    float x = margin + i * colWidth; List<String> lines = rowLines.get(i); float lineY = y;
+                    for (String line : lines) { cs.beginText(); cs.newLineAtOffset(x + cellPaddingX, lineY); cs.showText(line); cs.endText(); lineY -= (bodyFontSize + cellPaddingY);} }
+            y -= rowHeight + 2f;
+            step.run(); // fila procesada
             }
-
             cs.close();
             doc.save(file);
+            step.run(); // guardado
         }
     }
 
-    // ==================== MÉTODOS AUXILIARES ====================
+    // --- Helpers de PDF para wrapping por ancho ---
+    private List<String> wrapTextByWidth(String text, PDFont font, int fontSize, float maxWidth, int maxLines) {
+        List<String> result = new ArrayList<>();
+        if (text == null) return result;
+        String sanitized = text.replace('\r',' ').replace('\n',' ');
+        String[] words = sanitized.split(" ");
+        StringBuilder current = new StringBuilder();
+        for (String w : words) {
+            if (w.isEmpty()) continue;
+            String candidate = current.length()==0? w : current + " " + w;
+            float width = safeStringWidth(font, candidate, fontSize);
+            if (width <= maxWidth) {
+                current.setLength(0); current.append(candidate);
+            } else {
+                if (current.length()>0) result.add(current.toString());
+                float wordWidth = safeStringWidth(font, w, fontSize);
+                if (wordWidth > maxWidth && w.length() > 1) {
+                    result.addAll(splitLongWord(w, font, fontSize, maxWidth));
+                } else {
+                    current.setLength(0); current.append(w);
+                }
+            }
+            if (result.size() >= maxLines) break;
+        }
+        if (result.size() < maxLines && current.length()>0) result.add(current.toString());
+        // Ellipsis si se alcanzó límite de líneas y aún queda texto
+        if (result.size() >= maxLines && sanitized.length() > result.stream().mapToInt(String::length).sum()) {
+            String last = result.get(result.size()-1);
+            if (!last.endsWith("...")) {
+                while (safeStringWidth(font, last + "...", fontSize) > maxWidth && last.length()>1) {
+                    last = last.substring(0, last.length()-1);
+                }
+                result.set(result.size()-1, last + "...");
+            }
+        }
+        return result;
+    }
+
+    private float safeStringWidth(PDFont font, String text, int fontSize) {
+        try {
+            return font.getStringWidth(text)/1000 * fontSize;
+        } catch (IOException ex) {
+            Logs.warn(getClass(), "Fallo midiendo ancho de texto: {}", ex.getMessage());
+            return text.length() * fontSize * 0.5f; // aproximación conservadora
+        }
+    }
+
+    private List<String> splitLongWord(String word, PDFont font, int fontSize, float maxWidth) {
+        List<String> parts = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        for (char c : word.toCharArray()) {
+            sb.append(c);
+            if (safeStringWidth(font, sb.toString(), fontSize) > maxWidth && sb.length()>1) {
+                sb.setLength(sb.length()-1);
+                parts.add(sb.toString());
+                sb.setLength(0); sb.append(c);
+            }
+        }
+        if (sb.length()>0) parts.add(sb.toString());
+        return parts;
+    }
+
+    private static class PdfFonts { final PDFont regular; final PDFont bold; PdfFonts(PDFont r, PDFont b){ this.regular=r; this.bold=b;} }
+
+    private PdfFonts loadFonts(PDDocument doc) {
+        // Intenta cargar fuentes embebidas para evitar escaneo del sistema (que provoca EOF en fuentes corruptas)
+        try (var reg = getClass().getResourceAsStream("/fonts/DejaVuSans.ttf");
+             var bold = getClass().getResourceAsStream("/fonts/DejaVuSans-Bold.ttf")) {
+            if (reg != null && bold != null) {
+                PDFont r = PDType0Font.load(doc, reg, true);
+                PDFont b = PDType0Font.load(doc, bold, true);
+                return new PdfFonts(r, b);
+            } else if (reg != null) {
+                PDFont r = PDType0Font.load(doc, reg, true);
+                return new PdfFonts(r, r); // Simula bold
+            }
+        } catch (Exception ex) {
+            Logs.warn(getClass(), "No se pudieron cargar fuentes embebidas: {}", ex.getMessage());
+        }
+        // Fallback a fuentes estándar; puede generar escaneo, por eso ya configuramos logging
+        return new PdfFonts(PDType1Font.HELVETICA, PDType1Font.HELVETICA_BOLD);
+    }
+
+    // Carga simple de una fuente embebida (fallback a Helvetica)
+    private org.apache.pdfbox.pdmodel.font.PDType0Font loadEmbeddedFont(org.apache.pdfbox.pdmodel.PDDocument doc) {
+        try (var is = getClass().getResourceAsStream("/fonts/DejaVuSans.ttf")) {
+            if (is != null) {
+                return org.apache.pdfbox.pdmodel.font.PDType0Font.load(doc, is, true);
+            }
+        } catch (Exception e) {
+            Logs.warn(getClass(), "No se pudo cargar fuente embebida: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    private static volatile boolean pdfEnvConfigured = false;
+    private void configurePdfEnvironment() {
+        if (pdfEnvConfigured) return;
+        pdfEnvConfigured = true;
+        try {
+            // Establecer cache en temp para evitar re-build repetido
+            Path cachePath = Path.of(System.getProperty("java.io.tmpdir"), "pdfbox-font-cache");
+            System.setProperty("pdfbox.fontcache", cachePath.toString());
+            // Silenciar WARNING de fuentes corruptas
+            Logger.getLogger("org.apache.pdfbox.pdmodel.font").setLevel(Level.SEVERE);
+            Logger.getLogger("org.apache.fontbox.ttf").setLevel(Level.SEVERE);
+        } catch (Exception ex) {
+            Logs.warn(getClass(), "No se pudo configurar entorno PDF: {}", ex.getMessage());
+        }
+    }
+
+    private String safe(String s) { return s == null ? "" : s; }
 
     private String quoteCsv(String s) {
         if (s == null) return "";
@@ -1122,51 +1426,8 @@ public class ReportsController {
         return esc;
     }
 
-    private String truncate(String s, int max) {
-        if (s == null) return "";
-        if (s.length() <= max) return s;
-        return s.substring(0, Math.max(0, max - 3)) + "...";
-    }
-
-    private int getMaxChars(float colWidth) {
-        // Aproximación de caracteres que caben en el ancho de columna
-        return Math.max(8, (int)(colWidth / 5.5));
-    }
-
-    private List<String> wrapText(String text, int maxCharsPerLine) {
-        List<String> lines = new ArrayList<>();
-        if (text == null || text.isEmpty()) {
-            return lines;
-        }
-
-        String[] words = text.split(" ");
-        StringBuilder currentLine = new StringBuilder();
-
-        for (String word : words) {
-            if (currentLine.length() + word.length() + 1 <= maxCharsPerLine) {
-                if (currentLine.length() > 0) {
-                    currentLine.append(" ");
-                }
-                currentLine.append(word);
-            } else {
-                if (currentLine.length() > 0) {
-                    lines.add(currentLine.toString());
-                    currentLine = new StringBuilder(word);
-                } else {
-                    lines.add(word);
-                }
-            }
-        }
-
-        if (currentLine.length() > 0) {
-            lines.add(currentLine.toString());
-        }
-
-        return lines;
-    }
-
     private String getTimestamp() {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        return java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     }
 
     private void showSuccess(String message) {
@@ -1185,3 +1446,4 @@ public class ReportsController {
         alert.showAndWait();
     }
 }
+// FIN ReportsController

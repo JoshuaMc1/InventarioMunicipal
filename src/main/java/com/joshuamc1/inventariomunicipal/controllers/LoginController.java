@@ -78,7 +78,6 @@ public class LoginController {
             openMainWindow(user);
         } catch (Exception e) {
             Logs.error(this.getClass(), "Error during login: {}", e.getMessage());
-            e.printStackTrace();
             Utils.showAlert("Error", "Ocurrió un error durante el inicio de sesión");
         }
     }
