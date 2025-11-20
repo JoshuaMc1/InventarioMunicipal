@@ -185,7 +185,7 @@
         <!-- Fila 4: Productos Más Movidos + Distribución por Tipo -->
         <HBox spacing="20">
             <VBox spacing="10" style="-fx-background-color: white; -fx-background-radius: 10; -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.1), 10, 0, 0, 2); -fx-padding: 20;" HBox.hgrow="ALWAYS">
-                <Label text="Productos Más Movidos (Top 10)" style="-fx-font-size: 16; -fx-font-weight: bold; -fx-text-fill: #34495e;">
+                <Label text="Productos Con Más Movimientos (Top 10)" style="-fx-font-size: 16; -fx-font-weight: bold; -fx-text-fill: #34495e;">
                     <font>
                         <Font name="System Bold" size="16.0" />
                     </font>

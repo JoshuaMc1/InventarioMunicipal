@@ -16,6 +16,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.time.Year;
 import java.util.List;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 public class UsersController {
     @FXML
@@ -35,8 +37,18 @@ public class UsersController {
 
     private final UserService userService = new UserService();
 
-    private int offset = 0;
-    private final int limit = 50;
+    // Paginación
+    @FXML private Button btnPrev;
+    @FXML private Button btnNext;
+    @FXML private Label lblPage;
+    @FXML private ChoiceBox<Integer> choicePageSize;
+
+    private int currentPage = 1;
+    private int pageSize = 50;
+    private int totalItems = 0;
+    private int totalPages = 1;
+
+    private final ObservableList<User> currentPageItems = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
@@ -52,27 +64,52 @@ public class UsersController {
         colRole.setStyle("-fx-font-size: 17;");
         colCreated.setStyle("-fx-font-size: 17;");
 
-        loadPage();
+        // Inicializar paginación
+        choicePageSize.setItems(FXCollections.observableArrayList(10,25,50,100));
+        choicePageSize.setValue(pageSize);
+        choicePageSize.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null) {
+                pageSize = newV;
+                currentPage = 1;
+                loadPageFromRepo(currentPage);
+            }
+        });
+        btnPrev.setOnAction(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadPageFromRepo(currentPage);
+            }
+        });
+        btnNext.setOnAction(e -> {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadPageFromRepo(currentPage);
+            }
+        });
+
+        loadPageFromRepo(1);
     }
 
     @FXML
     public void onSearch() {
-        offset = 0;
-        loadPage();
+        currentPage = 1;
+        loadPageFromRepo(currentPage);
     }
 
     @FXML
     public void onPrev() {
-        if (offset - limit >= 0) {
-            offset -= limit;
-            loadPage();
+        if (currentPage > 1) {
+            currentPage--;
+            loadPageFromRepo(currentPage);
         }
     }
 
     @FXML
     public void onNext() {
-        offset += limit;
-        loadPage();
+        if (currentPage < totalPages) {
+            currentPage++;
+            loadPageFromRepo(currentPage);
+        }
     }
 
     @FXML
@@ -92,7 +129,7 @@ public class UsersController {
                 newUser.set("must_change_password", 1);
                 newUser.saveIt();
 
-                loadPage();
+                loadPageFromRepo(currentPage);
                 Utils.showAlert("Éxito", "Usuario creado. Contraseña por defecto: " + defaultPwd);
             } catch (Exception e) {
                 Logs.error(getClass(), "Error creando usuario: {}", e.getMessage());
@@ -116,7 +153,7 @@ public class UsersController {
                 selected.set("username", u.getString("username"));
                 selected.set("rol_id", u.get("rol_id"));
                 selected.saveIt();
-                loadPage();
+                loadPageFromRepo(currentPage);
             } catch (Exception e) {
                 Logs.error(getClass(), "Error actualizando usuario: {}", e.getMessage());
                 Utils.showAlert("Error", "No se pudo actualizar el usuario: " + e.getMessage());
@@ -136,7 +173,7 @@ public class UsersController {
             if (btn == ButtonType.YES) {
                 try {
                     userService.deleteUser(selected.getInteger("id"));
-                    loadPage();
+                    loadPageFromRepo(currentPage);
                 } catch (Exception e) {
                     Logs.error(getClass(), "Error eliminando usuario: {}", e.getMessage());
                     Utils.showAlert("Error", "No se pudo eliminar el usuario: " + e.getMessage());
@@ -161,7 +198,7 @@ public class UsersController {
                     boolean ok = userService.resetPassword(selected.getInteger("id"), defaultPwd, true);
                     if (ok) {
                         Utils.showAlert("Éxito", "Contraseña restablecida a: " + defaultPwd);
-                        loadPage();
+                        loadPageFromRepo(currentPage);
                     } else {
                         Utils.showAlert("Error", "No se pudo restablecer la contraseña");
                     }
@@ -173,17 +210,36 @@ public class UsersController {
         });
     }
 
-    private void loadPage() {
+    private void loadPageFromRepo(int page) {
+        final int p = page;
         new Thread(() -> {
             try {
                 String q = txtSearch == null ? null : txtSearch.getText();
-                List<User> users = userService.listPaged(offset, limit, q);
-                Platform.runLater(() -> tblUsers.getItems().setAll(users));
+                long count = userService.countUsers();
+                int total = (int) count;
+                int pages = Math.max(1, (int) Math.ceil(total / (double) pageSize));
+                int pageToLoad = Math.min(Math.max(1, p), pages);
+                int offset = (pageToLoad - 1) * pageSize;
+                List<User> pageItems = userService.listPaged(offset, pageSize, q);
+                Platform.runLater(() -> {
+                    totalItems = total;
+                    totalPages = pages;
+                    currentPage = pageToLoad;
+                    currentPageItems.setAll(pageItems == null ? java.util.List.of() : pageItems);
+                    tblUsers.setItems(currentPageItems);
+                    updatePaginationControls();
+                });
             } catch (Throwable t) {
                 Logs.error(getClass(), "Error listando usuarios: {}", t.getMessage());
                 Platform.runLater(() -> Utils.showAlert("Error", "No se pudo cargar usuarios: " + t.getMessage()));
             }
         }).start();
+    }
+
+    private void updatePaginationControls() {
+        if (lblPage != null) lblPage.setText(String.format("Página %d/%d (%d)", currentPage, totalPages, totalItems));
+        if (btnPrev != null) btnPrev.setDisable(currentPage <= 1);
+        if (btnNext != null) btnNext.setDisable(currentPage >= totalPages);
     }
 
     private @NotNull Dialog<User> userDialog(User base) {

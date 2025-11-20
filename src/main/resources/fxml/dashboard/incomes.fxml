@@ -36,4 +36,28 @@
             </columns>
         </TableView>
     </center>
+
+    <bottom>
+        <VBox>
+            <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-padding: 8;">
+                <Button fx:id="btnPrev" text="Anterior">
+                    <font>
+                        <Font name="System Bold" size="14.0" />
+                    </font></Button>
+                <Label fx:id="lblPage" text="Página 1/1">
+                    <font>
+                        <Font size="14.0" />
+                    </font></Label>
+                <Button fx:id="btnNext" text="Siguiente">
+                    <font>
+                        <Font name="System Bold" size="14.0" />
+                    </font></Button>
+                <Label text="Tamaño:">
+                    <font>
+                        <Font size="14.0" />
+                    </font></Label>
+                <ChoiceBox fx:id="choicePageSize" />
+            </HBox>
+        </VBox>
+    </bottom>
 </BorderPane>

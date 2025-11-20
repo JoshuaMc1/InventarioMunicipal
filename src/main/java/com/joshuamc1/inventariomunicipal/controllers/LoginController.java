@@ -154,7 +154,7 @@ public class LoginController {
             stage.getIcons().add(new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/logo.png"))));
             MainController controller = loader.getController();
             controller.setLoggedUser(user);
-            stage.setMaximized(true);
+            stage.setFullScreen(true);
 
             stage.setOnCloseRequest(evt -> {
                 boolean ok = Utils.confirmAction("Confirmar salida", "¿Desea cerrar la aplicación?");

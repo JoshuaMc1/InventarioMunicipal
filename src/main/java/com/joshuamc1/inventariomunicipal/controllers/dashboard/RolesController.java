@@ -68,7 +68,7 @@ public class RolesController {
                     setText(null);
                 } else {
                     setText(item ? "Sí" : "No");
-                    setStyle(item ? "-fx-text-fill: green;" : "-fx-text-fill: red;");
+                    setStyle(item ? "-fx-text-fill: green; -fx-font-size: 17;" : "-fx-text-fill: red; -fx-font-size: 17;");
                 }
             }
         });
@@ -83,9 +83,9 @@ public class RolesController {
             private final HBox hbox = new HBox(5, btnPermisos, btnEditar, btnEliminar);
 
             {
-                btnPermisos.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-padding: 5 10;");
-                btnEditar.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white; -fx-padding: 5 10;");
-                btnEliminar.setStyle("-fx-background-color: #f44336; -fx-text-fill: white; -fx-padding: 5 10;");
+                btnPermisos.setStyle("-fx-background-color: #2196F3; -fx-text-fill: white; -fx-padding: 5 10; -fx-font-size: 14;");
+                btnEditar.setStyle("-fx-background-color: #FF9800; -fx-text-fill: white; -fx-padding: 5 10; -fx-font-size: 14;");
+                btnEliminar.setStyle("-fx-background-color: #f44336; -fx-text-fill: white; -fx-padding: 5 10; -fx-font-size: 14;");
 
                 btnPermisos.setOnAction(e -> {
                     Rol rol = getTableView().getItems().get(getIndex());
@@ -117,6 +117,13 @@ public class RolesController {
                 }
             }
         });
+
+        colId.setStyle("-fx-font-size: 17;");
+        colNombre.setStyle("-fx-font-size: 17;");
+        colDescripcion.setStyle("-fx-font-size: 17;");
+        colActivo.setStyle("-fx-font-size: 17;");
+        colUsuarios.setStyle("-fx-font-size: 17;");
+        colAcciones.setStyle("-fx-font-size: 17;");
     }
 
     private void cargarRoles() {
@@ -146,7 +153,7 @@ public class RolesController {
         });
     }
 
-    private void onEditarRol(Rol rol) {
+    private void onEditarRol(@NotNull Rol rol) {
         if (rol.isRoot()) {
             Utils.showAlert("Aviso", "No se puede editar el rol ROOT");
             return;
@@ -168,7 +175,7 @@ public class RolesController {
         });
     }
 
-    private void onEliminarRol(Rol rol) {
+    private void onEliminarRol(@NotNull Rol rol) {
         if (rol.isRoot()) {
             Utils.showAlert("Aviso", "No se puede eliminar el rol ROOT");
             return;
@@ -216,7 +223,9 @@ public class RolesController {
         Dialog<Rol> dialog = new Dialog<>();
         dialog.setTitle(base == null ? "Nuevo Rol" : "Editar Rol");
         dialog.setResizable(true);
-        dialog.getDialogPane().setPrefSize(610, 300);
+        dialog.getDialogPane().setPrefSize(830, 300);
+        String lblStyle = "-fx-font-weight: bold; -fx-font-size: 17;";
+        String inputStyle = "-fx-font-size: 17;";
 
         ButtonType saveButton = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(saveButton, ButtonType.CANCEL);
@@ -231,6 +240,9 @@ public class RolesController {
         CheckBox chkActivo = new CheckBox("Activo");
         chkActivo.setSelected(true);
 
+        txtNombre.setStyle(inputStyle);
+        txtDescripcion.setStyle(inputStyle);
+
         if (base != null) {
             txtNombre.setText(base.getString("nombre"));
             txtDescripcion.setText(base.getString("descripcion"));
@@ -242,9 +254,14 @@ public class RolesController {
         grid.setVgap(10);
         grid.setPadding(new Insets(20));
 
-        grid.add(new Label("Nombre:"), 0, 0);
+        Label lblNombre = new Label("Nombre:");
+        lblNombre.setStyle(lblStyle);
+        Label lblDescripcion = new Label("Descripción:");
+        lblDescripcion.setStyle(lblStyle);
+
+        grid.add(lblNombre, 0, 0);
         grid.add(txtNombre, 1, 0);
-        grid.add(new Label("Descripción:"), 0, 1);
+        grid.add(lblDescripcion, 0, 1);
         grid.add(txtDescripcion, 1, 1);
         grid.add(chkActivo, 1, 2);
 
@@ -264,11 +281,11 @@ public class RolesController {
         return dialog;
     }
 
-    private Dialog<List<Integer>> crearDialogoPermisos(Rol rol) {
+    private @NotNull Dialog<List<Integer>> crearDialogoPermisos(@NotNull Rol rol) {
         Dialog<List<Integer>> dialog = new Dialog<>();
         dialog.setTitle("Gestionar Permisos - " + rol.getString("nombre"));
         dialog.setResizable(true);
-        dialog.getDialogPane().setPrefSize(700, 600);
+        dialog.getDialogPane().setPrefSize(780, 600);
 
         ButtonType saveButton = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(saveButton, ButtonType.CANCEL);

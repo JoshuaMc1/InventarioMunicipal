@@ -19,6 +19,21 @@ public class TransactionRepository {
         return Transaction.where("type = ?", type).orderBy("created_at DESC");
     }
 
+    // Nuevo: contar transacciones por tipo (útil para paginación)
+    public long countByType(String type) {
+        Long c = Transaction.count("type = ?", type);
+        return c == null ? 0L : c;
+    }
+
+    // Nuevo: obtener página de transacciones por tipo usando LIMIT/OFFSET
+    public List<Transaction> findByTypePage(String type, int limit, int offset) {
+        // ActiveJDBC permite chaining de limit() y offset()
+        return Transaction.where("type = ?", type)
+                .orderBy("created_at DESC")
+                .limit(limit)
+                .offset(offset);
+    }
+
     // Nuevo: contar movimientos del día
     public long countToday() {
         Long count = Transaction.count("DATE(created_at) = CURDATE()");

@@ -154,8 +154,8 @@ public class ReportsController {
         try {
             Report report = reportService.usersExcludingRoot();
             FileChooser fc = new FileChooser();
-            fc.setTitle("Exportar Usuarios (sin Root) - CSV");
-            fc.setInitialFileName("usuarios_sin_root_" + getTimestamp() + ".csv");
+            fc.setTitle("Exportar Usuarios - CSV");
+            fc.setInitialFileName("usuarios_" + getTimestamp() + ".csv");
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV files", "*.csv"));
             File f = fc.showSaveDialog(btnUsersNoRootCsv.getScene().getWindow());
             if (f == null) return;
@@ -172,13 +172,13 @@ public class ReportsController {
         try {
             Report report = reportService.usersExcludingRoot();
             FileChooser fc = new FileChooser();
-            fc.setTitle("Exportar Usuarios (sin Root) - PDF");
-            fc.setInitialFileName("usuarios_sin_root_" + getTimestamp() + ".pdf");
+            fc.setTitle("Exportar Usuarios - PDF");
+            fc.setInitialFileName("usuarios_" + getTimestamp() + ".pdf");
             fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));
             File f = fc.showSaveDialog(btnUsersNoRootPdf.getScene().getWindow());
             if (f == null) return;
 
-            String description = "Lista completa de todos los usuarios del sistema, excluyendo el usuario Root por seguridad.";
+            String description = "Lista completa de todos los usuarios del sistema.";
             exportToPdfAsync(report, f, description);
         } catch (Exception ex) {
             Logs.error(getClass(), "Error exportando usuarios sin root a PDF", ex);

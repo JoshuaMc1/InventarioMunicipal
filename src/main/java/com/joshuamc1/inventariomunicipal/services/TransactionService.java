@@ -119,6 +119,14 @@ public class TransactionService {
         );
     }
 
+    public long countByType(String type) {
+        return DatabaseManager.callInConnection(() -> repo.countByType(type));
+    }
+
+    public List<Transaction> findByTypePage(String type, int limit, int offset) {
+        return DatabaseManager.callInConnection(() -> repo.findByTypePage(type, limit, offset));
+    }
+
     public long countToday() {
         return DatabaseManager.callInConnection(repo::countToday);
     }

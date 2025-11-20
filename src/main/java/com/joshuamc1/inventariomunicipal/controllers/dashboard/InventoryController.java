@@ -151,6 +151,7 @@ public class InventoryController {
             return new SimpleDoubleProperty(v == null ? 0.0 : v).asObject();
         });
 
+        colId.setStyle("-fx-font-size: 17;");
         colName.setStyle("-fx-font-size: 17;");
         colDescription.setStyle("-fx-font-size: 17;");
         colUnit.setStyle("-fx-font-size: 17;");

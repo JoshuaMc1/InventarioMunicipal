@@ -11,6 +11,8 @@ import javafx.fxml.FXML;
 import javafx.scene.control.*;
 
 import java.util.List;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 
 public class PeopleController {
     @FXML
@@ -30,10 +32,20 @@ public class PeopleController {
     @FXML
     private TextField txtSearch;
 
+    // Controles de paginación
+    @FXML private Button btnPrev;
+    @FXML private Button btnNext;
+    @FXML private Label lblPage;
+    @FXML private ChoiceBox<Integer> choicePageSize;
+
     private final PersonService personService = new PersonService();
 
-    private int offset = 0;
-    private final int limit = 50;
+    private int currentPage = 1;
+    private int pageSize = 50;
+    private int totalItems = 0;
+    private int totalPages = 1;
+
+    private final ObservableList<Person> currentPageItems = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
@@ -51,34 +63,59 @@ public class PeopleController {
         colPhone.setStyle("-fx-font-size: 17;");
         colInternalCode.setStyle("-fx-font-size: 17;");
 
-        loadPage();
+        // Inicializar paginación
+        choicePageSize.setItems(FXCollections.observableArrayList(10,25,50,100));
+        choicePageSize.setValue(pageSize);
+        choicePageSize.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null) {
+                pageSize = newV;
+                currentPage = 1;
+                loadPageFromRepo(currentPage);
+            }
+        });
+        btnPrev.setOnAction(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadPageFromRepo(currentPage);
+            }
+        });
+        btnNext.setOnAction(e -> {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadPageFromRepo(currentPage);
+            }
+        });
+
+        loadPageFromRepo(1);
     }
 
     @FXML
     public void onSearch() {
-        offset = 0;
-        loadPage();
+        currentPage = 1;
+        loadPageFromRepo(currentPage);
     }
 
     @FXML
     public void onPrev() {
-        if (offset - limit >= 0) {
-            offset -= limit;
-            loadPage();
+        if (currentPage > 1) {
+            currentPage--;
+            loadPageFromRepo(currentPage);
         }
     }
 
     @FXML
     public void onNext() {
-        offset += limit;
-        loadPage();
+        if (currentPage < totalPages) {
+            currentPage++;
+            loadPageFromRepo(currentPage);
+        }
     }
 
     @FXML
     public void onNew() {
         Person created = PersonDialogHelper.showCreatePersonDialog();
         if (created != null) {
-            loadPage();
+            loadPageFromRepo(currentPage);
         }
     }
 
@@ -100,7 +137,7 @@ public class PeopleController {
                     p.getString("phone"),
                     p.getString("internal_code")
                 );
-                loadPage();
+                loadPageFromRepo(currentPage);
                 Utils.showAlert("Éxito", "Persona actualizada exitosamente");
             } catch (Exception e) {
                 Logs.error(getClass(), "Error actualizando persona: {}", e.getMessage());
@@ -123,7 +160,7 @@ public class PeopleController {
             if (btn == ButtonType.YES) {
                 try {
                     personService.delete(selected.getInteger("id"));
-                    loadPage();
+                    loadPageFromRepo(currentPage);
                     Utils.showAlert("Éxito", "Persona eliminada exitosamente");
                 } catch (Exception e) {
                     Logs.error(getClass(), "Error eliminando persona: {}", e.getMessage());
@@ -133,17 +170,40 @@ public class PeopleController {
         });
     }
 
-    private void loadPage() {
+    private void loadPageFromRepo(int page) {
+        final int p = page;
         new Thread(() -> {
             try {
                 String q = txtSearch == null ? null : txtSearch.getText();
-                List<Person> people = personService.listPaged(offset, limit, q);
-                Platform.runLater(() -> tblPeople.getItems().setAll(people));
+                long count = personService.count();
+                if (q != null && !q.isBlank()) {
+                    // Cuando hay búsqueda, podemos ignorar el count general y contar resultados filtrados en repo si se necesita.
+                    // Para simplicidad se usa el count general como aproximación; alternativamente se podría agregar countFiltered en repo.
+                    // Aquí, mejor obtener lista y setear paginación según tamaño real si es necesario.
+                }
+                int total = (int) count;
+                int pages = Math.max(1, (int) Math.ceil(total / (double) pageSize));
+                int pageToLoad = Math.min(Math.max(1, p), pages);
+                int offset = (pageToLoad - 1) * pageSize;
+                List<Person> pageItems = personService.listPaged(offset, pageSize, q);
+                Platform.runLater(() -> {
+                    totalItems = total;
+                    totalPages = pages;
+                    currentPage = pageToLoad;
+                    currentPageItems.setAll(pageItems == null ? java.util.List.of() : pageItems);
+                    tblPeople.setItems(currentPageItems);
+                    updatePaginationControls();
+                });
             } catch (Throwable t) {
                 Logs.error(getClass(), "Error listando personas: {}", t.getMessage());
                 Platform.runLater(() -> Utils.showAlert("Error", "No se pudo cargar personas: " + t.getMessage()));
             }
         }).start();
     }
-}
 
+    private void updatePaginationControls() {
+        if (lblPage != null) lblPage.setText(String.format("Página %d/%d (%d)", currentPage, totalPages, totalItems));
+        if (btnPrev != null) btnPrev.setDisable(currentPage <= 1);
+        if (btnNext != null) btnNext.setDisable(currentPage >= totalPages);
+    }
+}

@@ -32,11 +32,11 @@
             <TableView fx:id="tableRoles" VBox.vgrow="ALWAYS">
                 <columns>
                     <TableColumn fx:id="colId" text="ID" prefWidth="50"/>
-                    <TableColumn fx:id="colNombre" text="Nombre" prefWidth="150"/>
-                    <TableColumn fx:id="colDescripcion" text="Descripción" prefWidth="300"/>
-                    <TableColumn fx:id="colActivo" text="Activo" prefWidth="80"/>
+                    <TableColumn fx:id="colNombre" text="Nombre" prefWidth="200"/>
+                    <TableColumn fx:id="colDescripcion" text="Descripción" prefWidth="380"/>
+                    <TableColumn fx:id="colActivo" text="Activo" prefWidth="120"/>
                     <TableColumn fx:id="colUsuarios" text="Usuarios" prefWidth="100"/>
-                    <TableColumn fx:id="colAcciones" text="Acciones" prefWidth="200"/>
+                    <TableColumn fx:id="colAcciones" text="Acciones" prefWidth="280"/>
                 </columns>
             </TableView>
         </VBox>

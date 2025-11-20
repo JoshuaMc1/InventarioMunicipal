@@ -21,10 +21,10 @@
             <!-- Reporte 1: Usuarios sin Root -->
             <HBox spacing="15" alignment="CENTER_LEFT" style="-fx-padding: 10; -fx-background-color: #ecf0f1; -fx-background-radius: 5;">
                 <VBox spacing="5" HBox.hgrow="ALWAYS">
-                    <Label text="Usuarios del Sistema (sin Root)" style="-fx-font-size: 16px; -fx-font-weight: bold;">
+                    <Label text="Usuarios del Sistema" style="-fx-font-size: 16px; -fx-font-weight: bold;">
                         <font><Font name="System Bold" size="16.0" /></font>
                     </Label>
-                    <Label text="Lista completa de todos los usuarios del sistema, excluyendo el usuario Root por seguridad."
+                    <Label text="Lista completa de todos los usuarios del sistema."
                            style="-fx-text-fill: #7f8c8d; -fx-font-size: 13px;" wrapText="true" />
                 </VBox>
                 <Button fx:id="btnUsersNoRootCsv" text="Exportar CSV" style="-fx-min-width: 120;">

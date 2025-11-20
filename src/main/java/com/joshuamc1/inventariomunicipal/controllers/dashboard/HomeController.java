@@ -283,7 +283,6 @@ public class HomeController implements AsyncLoadable {
                     });
                 } catch (Exception e) {
                     Logs.error(HomeController.class, "Error loading dashboard data: {}", e.getMessage());
-                    e.printStackTrace();
                     throw e;
                 }
             }

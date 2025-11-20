@@ -15,6 +15,7 @@ import javafx.application.Platform;
 import javafx.beans.binding.BooleanBinding;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
@@ -48,6 +49,20 @@ public class IncomesController {
     private TableColumn<Transaction, String> colPerson;
     @FXML
     private TableColumn<Transaction, String> colNotes;
+
+    // Controles de paginación (agregados)
+    @FXML private Button btnPrev;
+    @FXML private Button btnNext;
+    @FXML private Label lblPage;
+    @FXML private ChoiceBox<Integer> choicePageSize;
+
+    // Estado de paginación
+    private int currentPage = 1; // 1-based
+    private int pageSize = 25;
+    private int totalItems = 0;
+    private int totalPages = 1;
+
+    private final ObservableList<Transaction> currentPageItems = FXCollections.observableArrayList();
 
     private final TransactionService transactionService = new TransactionService();
     private final ProductService productService = new ProductService();
@@ -91,7 +106,30 @@ public class IncomesController {
         colPerson.setStyle("-fx-font-size: 17;");
         colNotes.setStyle("-fx-font-size: 17;");
 
-        loadTransactions();
+        // Inicializar paginación (similar a InventoryController)
+        choicePageSize.setItems(FXCollections.observableArrayList(10,25,50,100));
+        choicePageSize.setValue(pageSize);
+        choicePageSize.getSelectionModel().selectedItemProperty().addListener((obs, oldV, newV) -> {
+            if (newV != null) {
+                pageSize = newV;
+                currentPage = 1;
+                loadPageFromRepo(currentPage);
+            }
+        });
+        btnPrev.setOnAction(e -> {
+            if (currentPage > 1) {
+                currentPage--;
+                loadPageFromRepo(currentPage);
+            }
+        });
+        btnNext.setOnAction(e -> {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadPageFromRepo(currentPage);
+            }
+        });
+
+        loadPageFromRepo(1);
     }
 
     @FXML
@@ -107,7 +145,7 @@ public class IncomesController {
                         t.getInteger("person_id"),
                         t.getString("notes")
                 );
-                loadTransactions();
+                loadPageFromRepo(currentPage);
                 Utils.showAlert("Éxito", "Ingreso registrado exitosamente");
             } catch (Exception e) {
                 Logs.error(getClass(), "Error creando ingreso: {}", e.getMessage());
@@ -116,16 +154,35 @@ public class IncomesController {
         });
     }
 
-    private void loadTransactions() {
+    private void loadPageFromRepo(int page) {
+        final int p = page;
         new Thread(() -> {
             try {
-                List<Transaction> transactions = transactionService.findByType(Transaction.TYPE_IN);
-                Platform.runLater(() -> tblTransactions.getItems().setAll(transactions));
+                long count = transactionService.countByType(Transaction.TYPE_IN);
+                int total = (int) count;
+                int pages = Math.max(1, (int) Math.ceil(total / (double) pageSize));
+                int pageToLoad = Math.min(Math.max(1, p), pages);
+                int offset = (pageToLoad - 1) * pageSize;
+                List<Transaction> pageItems = transactionService.findByTypePage(Transaction.TYPE_IN, pageSize, offset);
+                Platform.runLater(() -> {
+                    totalItems = total;
+                    totalPages = pages;
+                    currentPage = pageToLoad;
+                    currentPageItems.setAll(pageItems == null ? java.util.List.of() : pageItems);
+                    tblTransactions.setItems(currentPageItems);
+                    updatePaginationControls();
+                });
             } catch (Throwable t) {
-                Logs.error(getClass(), "Error listando ingresos: {}", t.getMessage());
+                Logs.error(getClass(), "Error cargando página de ingresos: {}", t.getMessage());
                 Platform.runLater(() -> Utils.showAlert("Error", "No se pudo cargar ingresos: " + t.getMessage()));
             }
-        }).start();
+        }, "incomes-pager").start();
+    }
+
+    private void updatePaginationControls() {
+        if (lblPage != null) lblPage.setText(String.format("Página %d/%d (%d)", currentPage, totalPages, totalItems));
+        if (btnPrev != null) btnPrev.setDisable(currentPage <= 1);
+        if (btnNext != null) btnNext.setDisable(currentPage >= totalPages);
     }
 
     private @NotNull Dialog<Transaction> transactionDialog() {
