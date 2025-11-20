@@ -1,7 +1,7 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
+import com.joshuamc1.inventariomunicipal.core.AsyncLoadable;
 import com.joshuamc1.inventariomunicipal.core.Logs;
-import com.joshuamc1.inventariomunicipal.core.Roles;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.services.UserService;
@@ -43,7 +43,7 @@ public class UsersController {
         colId.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getInteger("id"))));
         colName.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getString("name")));
         colUsername.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getString("username")));
-        colRole.setCellValueFactory(data -> new SimpleStringProperty(Roles.getRoleFullName(data.getValue().getString("role"))));
+        colRole.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getRolNombre()));
         colCreated.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().get("created_at"))));
 
         colId.setStyle("-fx-font-size: 17;");
@@ -82,7 +82,16 @@ public class UsersController {
             try {
                 // Usar contraseña por defecto: "contraseña" + año actual
                 String defaultPwd = "contraseña" + Year.now().getValue();
-                userService.createUserFull(u.getString("name"), u.getString("username"), defaultPwd, u.getString("role"));
+
+                // Crear usuario directamente con el modelo
+                User newUser = new User();
+                newUser.set("name", u.getString("name"));
+                newUser.set("username", u.getString("username"));
+                newUser.setPassword(defaultPwd);
+                newUser.set("rol_id", u.get("rol_id"));
+                newUser.set("must_change_password", 1);
+                newUser.saveIt();
+
                 loadPage();
                 Utils.showAlert("Éxito", "Usuario creado. Contraseña por defecto: " + defaultPwd);
             } catch (Exception e) {
@@ -102,8 +111,11 @@ public class UsersController {
         Dialog<User> dialog = userDialog(selected);
         dialog.showAndWait().ifPresent(u -> {
             try {
-                // No permitir cambiar la contraseña aquí: pasar null para newPassword
-                userService.updateUser(selected.getInteger("id"), u.getString("name"), u.getString("username"), u.getString("role"), null);
+                // Actualizar directamente
+                selected.set("name", u.getString("name"));
+                selected.set("username", u.getString("username"));
+                selected.set("rol_id", u.get("rol_id"));
+                selected.saveIt();
                 loadPage();
             } catch (Exception e) {
                 Logs.error(getClass(), "Error actualizando usuario: {}", e.getMessage());
@@ -181,7 +193,7 @@ public class UsersController {
 
         // Hacer el diálogo redimensionable y darle un tamaño inicial un poco mayor
         d.setResizable(true);
-        d.getDialogPane().setPrefSize(480, 300);
+        d.getDialogPane().setPrefSize(680, 300);
 
         d.setTitle(base == null ? "Nuevo usuario" : "Editar usuario");
         ButtonType save = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
@@ -192,23 +204,39 @@ public class UsersController {
         TextField txtUsername = new TextField();
         txtUsername.setPromptText("Usuario");
 
-        // ComboBox con los roles asignables (excluyendo ROOT)
-        ComboBox<Roles.Role> cmbRole = new ComboBox<>();
-        cmbRole.getItems().addAll(Roles.getAssignableRoles());
+        // ComboBox con los roles disponibles de la base de datos (excluyendo ROOT)
+        ComboBox<com.joshuamc1.inventariomunicipal.models.Rol> cmbRole = new ComboBox<>();
+
+        // Cargar roles desde la base de datos
+        try {
+            List<com.joshuamc1.inventariomunicipal.models.Rol> roles =
+                com.joshuamc1.inventariomunicipal.models.Rol.where("activo = ? AND id != ?", 1, 1).orderBy("nombre");
+            cmbRole.getItems().addAll(roles);
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error cargando roles: {}", e.getMessage());
+        }
 
         // Configurar cómo se muestra cada rol
         cmbRole.setCellFactory(lv -> new javafx.scene.control.ListCell<>() {
             @Override
-            protected void updateItem(Roles.Role role, boolean empty) {
+            protected void updateItem(com.joshuamc1.inventariomunicipal.models.Rol role, boolean empty) {
                 super.updateItem(role, empty);
-                setText(empty || role == null ? null : role.getDisplayName());
+                if (empty || role == null) {
+                    setText(null);
+                } else {
+                    setText(role.getString("nombre") + " - " + role.getString("descripcion"));
+                }
             }
         });
         cmbRole.setButtonCell(new javafx.scene.control.ListCell<>() {
             @Override
-            protected void updateItem(Roles.Role role, boolean empty) {
+            protected void updateItem(com.joshuamc1.inventariomunicipal.models.Rol role, boolean empty) {
                 super.updateItem(role, empty);
-                setText(empty || role == null ? null : role.getDisplayName());
+                if (empty || role == null) {
+                    setText(null);
+                } else {
+                    setText(role.getString("nombre"));
+                }
             }
         });
 
@@ -220,11 +248,20 @@ public class UsersController {
             txtName.setText(base.getString("name"));
             txtUsername.setText(base.getString("username"));
             // Seleccionar el rol actual
-            Roles.Role currentRole = Roles.Role.fromCode(base.getString("role"));
-            cmbRole.getSelectionModel().select(currentRole);
+            com.joshuamc1.inventariomunicipal.models.Rol rolActual = base.getRol();
+            if (rolActual != null) {
+                for (com.joshuamc1.inventariomunicipal.models.Rol r : cmbRole.getItems()) {
+                    if (r.getId().equals(rolActual.getId())) {
+                        cmbRole.getSelectionModel().select(r);
+                        break;
+                    }
+                }
+            }
         } else {
-            // Por defecto seleccionar OPERATOR
-            cmbRole.getSelectionModel().select(Roles.Role.OPERATOR);
+            // Por defecto seleccionar el primer rol disponible (usualmente OPERADOR)
+            if (!cmbRole.getItems().isEmpty()) {
+                cmbRole.getSelectionModel().select(0);
+            }
         }
 
         Label lblName = new Label("Nombre");
@@ -261,7 +298,10 @@ public class UsersController {
                 User u = new User();
                 u.set("name", txtName.getText());
                 u.set("username", txtUsername.getText());
-                u.set("role", cmbRole.getValue().getCode());
+                com.joshuamc1.inventariomunicipal.models.Rol selectedRole = cmbRole.getValue();
+                if (selectedRole != null) {
+                    u.set("rol_id", selectedRole.getId());
+                }
                 return u;
             }
             return null;

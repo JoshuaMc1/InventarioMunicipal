@@ -71,20 +71,21 @@ public class UserRepository {
     }
 
     public long countAdmins() {
-        Long c = User.count("role = ?", "admin");
+        // Contar usuarios con rol ADMIN (id=2)
+        Long c = User.count("rol_id = ?", 2);
         return c == null ? 0 : c;
     }
 
     public List<User> listPaged(int offset, int limit, String search) {
-        // Excluir usuarios con rol root por seguridad
+        // Excluir usuarios con rol ROOT (id=1) por seguridad
         if (search != null && !search.isBlank()) {
-            return User.where("(name LIKE ? OR username LIKE ?) AND role != ?",
-                "%"+search+"%", "%"+search+"%", "root")
+            return User.where("(name LIKE ? OR username LIKE ?) AND rol_id != ?",
+                "%"+search+"%", "%"+search+"%", 1)
                 .orderBy("created_at DESC")
                 .offset(offset)
                 .limit(limit);
         } else {
-            return User.where("role != ?", "root")
+            return User.where("rol_id != ?", 1)
                 .orderBy("created_at DESC")
                 .offset(offset)
                 .limit(limit);
@@ -96,14 +97,15 @@ public class UserRepository {
      */
     public boolean isRootUser(Integer id) {
         User u = User.findById(id);
-        return u != null && "root".equals(u.getString("role"));
+        return u != null && u.isRootRole();
     }
 
     /**
      * Cuenta cuántos usuarios root existen
      */
     public long countRootUsers() {
-        Long c = User.count("role = ?", "root");
+        // Contar usuarios con rol ROOT (id=1)
+        Long c = User.count("rol_id = ?", 1);
         return c == null ? 0 : c;
     }
 

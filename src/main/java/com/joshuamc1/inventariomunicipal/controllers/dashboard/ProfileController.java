@@ -1,7 +1,6 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
 import com.joshuamc1.inventariomunicipal.core.Logs;
-import com.joshuamc1.inventariomunicipal.core.Roles;
 import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.User;
@@ -42,7 +41,7 @@ public class ProfileController {
 
             // Cargar datos en los campos
             txtUsername.setText(currentUser.getString("username"));
-            txtRole.setText(Roles.getRoleFullName(currentUser.getString("role")));
+            txtRole.setText(currentUser.getRolNombre());
             txtName.setText(currentUser.getString("name"));
 
         } catch (Exception e) {
@@ -94,22 +93,25 @@ public class ProfileController {
             }
 
             // Actualizar usuario
-            String role = currentUser.getString("role");
             String username = currentUser.getString("username");
             String passwordToUpdate = changingPassword ? newPassword : null;
 
             boolean success;
-            if ("root".equalsIgnoreCase(role)) {
+            if (currentUser.isRootRole()) {
                 // Permitir que root modifique su propio nombre y contraseña
-                success = userService.updateOwnProfile(name, passwordToUpdate);
+                currentUser.set("name", name);
+                if (passwordToUpdate != null) {
+                    currentUser.setPassword(passwordToUpdate);
+                }
+                currentUser.saveIt();
+                success = true;
             } else {
-                success = userService.updateUser(
-                        currentUser.getInteger("id"),
-                        name,
-                        username,
-                        role,
-                        passwordToUpdate
-                );
+                currentUser.set("name", name);
+                if (passwordToUpdate != null) {
+                    currentUser.setPassword(passwordToUpdate);
+                }
+                currentUser.saveIt();
+                success = true;
             }
 
             if (success) {

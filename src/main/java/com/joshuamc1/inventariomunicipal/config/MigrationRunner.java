@@ -102,13 +102,16 @@ public class MigrationRunner {
      */
     private static @NotNull List<String> getMigrationFiles() {
         List<String> files = new ArrayList<>();
+        files.add("20251114112627_create_roles_table.sql");
         files.add("20251114112628_create_user_table.sql");
         files.add("20251114112848_create_people_table.sql");
         files.add("20251114112911_create_product_table.sql");
         files.add("20251114113444_create_transaction_table.sql");
         files.add("20251114114102_create_audit_table.sql");
         files.add("20251114114104_create_indexes_table.sql");
-        // NOTE: intentionally excluding seeder file 20251114134713_create_seeder_table.sql to avoid default credentials
+        files.add("20251114114105_create_permissions_table.sql");
+        files.add("20251114114106_create_role_permissions_table.sql");
+        files.add("20251114114107_seed_roles_and_permissions.sql");
         Collections.sort(files);
         return files;
     }

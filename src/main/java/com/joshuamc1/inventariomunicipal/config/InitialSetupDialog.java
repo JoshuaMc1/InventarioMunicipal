@@ -4,7 +4,6 @@ import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.User;
-import com.joshuamc1.inventariomunicipal.repositories.UserRepository;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
@@ -38,7 +37,8 @@ public class InitialSetupDialog {
 
         try {
             rootCount = DatabaseManager.callInConnection(() -> {
-                Long c = User.count("role = ?", "root");
+                // Verificar si existe un usuario con rol ROOT (id=1)
+                Long c = User.count("rol_id = ?", 1);
                 return c != null ? c : 0L;
             });
         } catch (Exception ex) {
@@ -56,7 +56,8 @@ public class InitialSetupDialog {
             try {
                 DatabaseManager.runInConnection(MigrationRunner::runMigrations);
                 rootCount = DatabaseManager.callInConnection(() -> {
-                    Long c = User.count("role = ?", "root");
+                    // Verificar si existe un usuario con rol ROOT (id=1)
+                    Long c = User.count("rol_id = ?", 1);
                     return c != null ? c : 0L;
                 });
             } catch (Exception ex2) {
@@ -172,10 +173,12 @@ public class InitialSetupDialog {
 
             // Crear el usuario root
             try {
-                UserRepository userRepo = new UserRepository();
                 DatabaseManager.callInConnection(() -> {
-                    User rootUser = userRepo.createFull(name, username, password, "root");
-                    // El usuario root inicial no necesita cambiar contraseña forzadamente
+                    User rootUser = new User();
+                    rootUser.set("name", name);
+                    rootUser.set("username", username);
+                    rootUser.setPassword(password);
+                    rootUser.set("rol_id", 1); // Rol ROOT
                     rootUser.set("must_change_password", 0);
                     rootUser.saveIt();
                     Logs.info(InitialSetupDialog.class, "Usuario root inicial creado: {}", username);

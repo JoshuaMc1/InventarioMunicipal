@@ -39,6 +39,7 @@ public class MainController {
     @FXML private Button btnAudit;
     @FXML private Button btnReports;
     @FXML private Button btnUsers;
+    @FXML private Button btnRoles;
 
     @FXML private StackPane contentArea;
     @FXML private Label lblCurrentUser;
@@ -146,6 +147,13 @@ public class MainController {
         });
 
         btnLogout.setOnAction(e -> logout());
+        btnRoles.setOnAction(e -> {
+            if (loading.get()) {
+                Logs.info(this.getClass(), "Skipped loadView: already loading");
+                return;
+            }
+            loadView("/fxml/dashboard/roles.fxml");
+        });
     }
 
     private void logout() {
@@ -183,7 +191,7 @@ public class MainController {
 
     public void setLoggedUser(@NotNull User user) {
         lblCurrentUser.setText(user.getString("name"));
-        lblCurrentRole.setText(Roles.getRoleFullName(user.getString("role")));
+        lblCurrentRole.setText(user.getRolNombre());
         Session.setCurrentUser(user);
     }
 

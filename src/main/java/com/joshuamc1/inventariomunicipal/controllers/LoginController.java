@@ -130,12 +130,11 @@ public class LoginController {
         if (res.isPresent()) {
             String newPwd = res.get();
             try {
-                boolean ok = userService.updateUser(user.getInteger("id"), user.getString("name"), user.getString("username"), user.getString("role"), newPwd);
-                if (ok) {
-                    result.set(true);
-                } else {
-                    Utils.showAlert("Error", "No se pudo actualizar la contraseña");
-                }
+                // Actualizar contraseña directamente
+                user.setPassword(newPwd);
+                user.set("must_change_password", 0);
+                user.saveIt();
+                result.set(true);
             } catch (Exception e) {
                 Logs.error(this.getClass(), "Error cambiando contraseña forzada: {}", e.getMessage());
                 Utils.showAlert("Error", "Ocurrió un error al cambiar la contraseña: " + e.getMessage());

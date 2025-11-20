@@ -23,7 +23,7 @@ public final class Session {
 
     public static @Nullable String getCurrentUserRole() {
         if (currentUser == null) return null;
-        return currentUser.getString("role");
+        return currentUser.getRolNombre();
     }
 
     public static  String getCurrentUsername() {

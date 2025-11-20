@@ -19,8 +19,8 @@ public class ReportService {
 
     // --- NUEVOS: reportes de usuarios ---
     public Report usersExcludingRoot() {
-        // Si el usuario actual es root, incluirlo en el reporte
-        boolean isRoot = "root".equals(Session.getCurrentUserRole());
+        // Si el usuario actual es ROOT, incluirlo en el reporte
+        boolean isRoot = "ROOT".equalsIgnoreCase(Session.getCurrentUserRole());
         if (isRoot) {
             return DatabaseManager.callInConnection(repo::usersWithRoles);
         }
@@ -28,8 +28,8 @@ public class ReportService {
     }
 
     public Report usersGroupedByRole() {
-        // Si el usuario actual es root, incluirlo en el reporte
-        boolean isRoot = "root".equals(Session.getCurrentUserRole());
+        // Si el usuario actual es ROOT, incluirlo en el reporte
+        boolean isRoot = "ROOT".equalsIgnoreCase(Session.getCurrentUserRole());
         if (isRoot) {
             return DatabaseManager.callInConnection(repo::usersWithRoles);
         }

@@ -70,6 +70,7 @@
             <Label text="Gestión"
                    style="-fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 0 5 0;"/>
             <Button fx:id="btnUsers" text="Usuarios" maxWidth="Infinity" styleClass="sidebar-btn"/>
+            <Button fx:id="btnRoles" text="Roles" maxWidth="Infinity" styleClass="sidebar-btn"/>
             <Button fx:id="btnPeople" text="Personas" maxWidth="Infinity" styleClass="sidebar-btn"/>
             <Button fx:id="btnAudit" text="Auditoría" maxWidth="Infinity" styleClass="sidebar-btn"/>
             <Button fx:id="btnReports" text="Reportes" maxWidth="Infinity" styleClass="sidebar-btn"/>

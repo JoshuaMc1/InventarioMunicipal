@@ -13,7 +13,10 @@ import java.util.List;
 public class ReportRepository {
     // Reporte de usuarios con roles
     public Report usersWithRoles() {
-        String sql = "SELECT id, name, username, role, created_at FROM users ORDER BY name";
+        String sql = "SELECT u.id, u.name, u.username, r.nombre as role, u.created_at " +
+                     "FROM users u " +
+                     "LEFT JOIN roles r ON u.rol_id = r.id " +
+                     "ORDER BY u.name";
         Report res = new Report("Usuarios y roles");
         res.addHeader("ID"); res.addHeader("Nombre"); res.addHeader("Username"); res.addHeader("Rol"); res.addHeader("Creado");
 
@@ -269,7 +272,11 @@ public class ReportRepository {
     // --- NUEVOS: reportes de usuarios ---
     // Reporte de usuarios excluyendo root
     public Report usersExcludingRoot() {
-        String sql = "SELECT id, name, username, role, created_at FROM users WHERE role != 'root' ORDER BY name";
+        String sql = "SELECT u.id, u.name, u.username, r.nombre as role, u.created_at " +
+                     "FROM users u " +
+                     "LEFT JOIN roles r ON u.rol_id = r.id " +
+                     "WHERE u.rol_id != 1 " +
+                     "ORDER BY u.name";
         Report res = new Report("Usuarios del Sistema (sin Root)");
         res.addHeader("ID"); res.addHeader("Nombre"); res.addHeader("Username"); res.addHeader("Rol"); res.addHeader("Creado");
 
@@ -293,7 +300,11 @@ public class ReportRepository {
 
     // Reporte de usuarios agrupados por rol
     public Report usersGroupedByRole() {
-        String sql = "SELECT id, name, username, role, created_at FROM users WHERE role != 'root' ORDER BY role, name";
+        String sql = "SELECT u.id, u.name, u.username, r.nombre as role, u.created_at " +
+                     "FROM users u " +
+                     "LEFT JOIN roles r ON u.rol_id = r.id " +
+                     "WHERE u.rol_id != 1 " +
+                     "ORDER BY r.nombre, u.name";
         Report res = new Report("Usuarios Agrupados por Rol");
         res.addHeader("ID"); res.addHeader("Nombre"); res.addHeader("Username"); res.addHeader("Rol"); res.addHeader("Creado");
 
@@ -1177,7 +1188,7 @@ public class ReportRepository {
                      "  (SELECT COUNT(DISTINCT user_id) FROM transactions WHERE DATE_FORMAT(created_at, '%Y-%m') = ?) as usuarios_activos, " +
                      "  (SELECT COUNT(DISTINCT person_id) FROM transactions WHERE person_id IS NOT NULL AND DATE_FORMAT(created_at, '%Y-%m') = ?) as personas_activas, " +
                      "  (SELECT COUNT(*) FROM people) as total_personas_registradas, " +
-                     "  (SELECT COUNT(*) FROM users WHERE role != 'root') as total_usuarios_sistema";
+                     "  (SELECT COUNT(*) FROM users WHERE rol_id != 1) as total_usuarios_sistema";
 
         Report res = new Report("Dashboard Mensual - " + yearMonth);
         res.addHeader("Métrica");
