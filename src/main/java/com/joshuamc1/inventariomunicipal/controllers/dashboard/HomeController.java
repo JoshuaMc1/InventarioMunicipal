@@ -1,7 +1,10 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
 import com.joshuamc1.inventariomunicipal.core.AsyncLoadable;
+import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
 import com.joshuamc1.inventariomunicipal.core.Logs;
+import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
+import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.models.Product;
 import com.joshuamc1.inventariomunicipal.models.Transaction;
 import com.joshuamc1.inventariomunicipal.models.User;
@@ -10,7 +13,6 @@ import com.joshuamc1.inventariomunicipal.services.TransactionService;
 import com.joshuamc1.inventariomunicipal.services.UserService;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyObjectWrapper;
-import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
@@ -31,7 +33,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 public class HomeController implements AsyncLoadable {
     // KPIs
@@ -83,7 +84,106 @@ public class HomeController implements AsyncLoadable {
     public void initialize() {
         btnRefresh.setOnAction(e -> loadDashboardAsync());
         setupTableColumns();
+        configurePermissions();
         loadDashboardAsync();
+    }
+
+    /**
+     * Configura la visibilidad de elementos según los permisos del usuario
+     */
+    private void configurePermissions() {
+        User currentUser = Session.getCurrentUser();
+        if (currentUser == null) {
+            Logs.warn(getClass(), "No hay usuario en sesión para configurar permisos");
+            return;
+        }
+
+        Logs.info(getClass(), "Configurando permisos del dashboard para: {}", currentUser.getString("username"));
+
+        // Verificar acceso general al dashboard
+        // Si tiene DASHBOARD.READ, puede ver todas las estadísticas (solo observación)
+        boolean canViewDashboard = PermissionHelper.canAccess("DASHBOARD", "READ");
+
+        if (!canViewDashboard) {
+            Logs.warn(getClass(), "Usuario sin permiso DASHBOARD.READ - acceso denegado");
+            // Ocultar todo el dashboard
+            hideAllWidgets();
+            return;
+        }
+
+        // Con DASHBOARD.READ puede ver todas las estadísticas
+        Logs.info(getClass(), "Usuario con DASHBOARD.READ - mostrando todas las estadísticas");
+    }
+
+    /**
+     * Oculta todos los widgets del dashboard
+     */
+    private void hideAllWidgets() {
+        hideInventoryWidgets();
+        hideTransactionWidgets();
+        Logs.info(getClass(), "Todos los widgets del dashboard ocultos");
+    }
+
+    /**
+     * Oculta widgets relacionados con inventario
+     */
+    private void hideInventoryWidgets() {
+        if (lblTotalProductos != null) {
+            lblTotalProductos.getParent().setVisible(false);
+            lblTotalProductos.getParent().setManaged(false);
+        }
+        if (lblBajoStock != null) {
+            lblBajoStock.getParent().setVisible(false);
+            lblBajoStock.getParent().setManaged(false);
+        }
+        if (lblSinStock != null) {
+            lblSinStock.getParent().setVisible(false);
+            lblSinStock.getParent().setManaged(false);
+        }
+        if (barStock != null) {
+            barStock.setVisible(false);
+            barStock.setManaged(false);
+        }
+        if (pieStock != null) {
+            pieStock.setVisible(false);
+            pieStock.setManaged(false);
+        }
+        if (barMasMovidos != null) {
+            barMasMovidos.setVisible(false);
+            barMasMovidos.setManaged(false);
+        }
+        Logs.info(getClass(), "Widgets de inventario ocultos");
+    }
+
+    /**
+     * Oculta widgets relacionados con transacciones
+     */
+    private void hideTransactionWidgets() {
+        if (lblTransaccionesMes != null) {
+            lblTransaccionesMes.getParent().setVisible(false);
+            lblTransaccionesMes.getParent().setManaged(false);
+        }
+        if (lblPrestamosActivos != null) {
+            lblPrestamosActivos.getParent().setVisible(false);
+            lblPrestamosActivos.getParent().setManaged(false);
+        }
+        if (lineMovimientos != null) {
+            lineMovimientos.setVisible(false);
+            lineMovimientos.setManaged(false);
+        }
+        if (pieTipoTransaccion != null) {
+            pieTipoTransaccion.setVisible(false);
+            pieTipoTransaccion.setManaged(false);
+        }
+        if (barActividadSemanal != null) {
+            barActividadSemanal.setVisible(false);
+            barActividadSemanal.setManaged(false);
+        }
+        if (tblTransacciones != null) {
+            tblTransacciones.setVisible(false);
+            tblTransacciones.setManaged(false);
+        }
+        Logs.info(getClass(), "Widgets de transacciones ocultos");
     }
 
     @Override
@@ -142,36 +242,48 @@ public class HomeController implements AsyncLoadable {
             @Override
             protected @Nullable DashboardData call() {
                 try {
-                    DashboardData data = new DashboardData();
+                    // Envolver TODA la lógica (incluida la verificación de permisos) dentro de la conexión
+                    return DatabaseManager.callInConnection(() -> {
+                        // Si tiene DASHBOARD.READ, puede ver todas las estadísticas
+                        boolean canViewDashboard = PermissionHelper.canAccess("DASHBOARD", "READ");
 
-                    // KPIs básicos
-                    data.totalProducts = productService.countAll();
-                    data.lowStock = productService.countLowStock();
-                    data.outOfStock = productService.countOutOfStock();
-                    data.activeLoans = transactionService.countActiveLoans();
-                    data.transactionsThisMonth = transactionService.countThisMonth();
-                    data.transactionsLastMonth = transactionService.countLastMonth();
+                        if (!canViewDashboard) {
+                            Logs.warn(HomeController.class, "Usuario sin DASHBOARD.READ - no se cargan datos");
+                            return new DashboardData(); // Retorna datos vacíos
+                        }
 
-                    // Datos para gráficos
-                    data.products = productService.findAll();
-                    data.latestTransactions = transactionService.findLatest(15);
-                    data.last30DaysTransactions = transactionService.findLast30Days();
-                    data.mostMovedProducts = transactionService.getMostMovedProducts(10);
-                    data.transactionsByType = transactionService.getTransactionsByType();
-                    data.weeklyActivity = transactionService.getWeeklyActivity();
+                        DashboardData data = new DashboardData();
 
-                    // Comparativas
-                    data.newProductsThisMonth = productService.countCreatedThisMonth();
-                    data.newProductsLastMonth = productService.countCreatedLastMonth();
-                    data.incomesThisMonth = transactionService.countByTypeThisMonth("in");
-                    data.incomesLastMonth = transactionService.countByTypeLastMonth("in");
+                        Logs.info(HomeController.class, "Cargando datos completos del dashboard");
 
-                    // Tendencia trimestral
-                    data.quarterlyTrend = transactionService.getQuarterlyTrend();
+                        // KPIs básicos de inventario
+                        data.totalProducts = productService.countAll();
+                        data.lowStock = productService.countLowStock();
+                        data.outOfStock = productService.countOutOfStock();
+                        data.products = productService.findAll();
+                        data.newProductsThisMonth = productService.countCreatedThisMonth();
+                        data.newProductsLastMonth = productService.countCreatedLastMonth();
 
-                    return data;
+                        // KPIs de transacciones
+                        data.activeLoans = transactionService.countActiveLoans();
+                        data.transactionsThisMonth = transactionService.countThisMonth();
+                        data.transactionsLastMonth = transactionService.countLastMonth();
+                        data.latestTransactions = transactionService.findLatest(15);
+                        data.last30DaysTransactions = transactionService.findLast30Days();
+                        data.mostMovedProducts = transactionService.getMostMovedProducts(10);
+                        data.transactionsByType = transactionService.getTransactionsByType();
+                        data.weeklyActivity = transactionService.getWeeklyActivity();
+                        data.incomesThisMonth = transactionService.countByTypeThisMonth("in");
+                        data.incomesLastMonth = transactionService.countByTypeLastMonth("in");
+                        data.quarterlyTrend = transactionService.getQuarterlyTrend();
+
+                        Logs.info(HomeController.class, "Dashboard data loaded successfully");
+
+                        return data;
+                    });
                 } catch (Exception e) {
                     Logs.error(HomeController.class, "Error loading dashboard data: {}", e.getMessage());
+                    e.printStackTrace();
                     throw e;
                 }
             }

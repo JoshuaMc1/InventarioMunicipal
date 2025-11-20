@@ -41,6 +41,10 @@ public class MainController {
     @FXML private Button btnUsers;
     @FXML private Button btnRoles;
 
+    // Labels de grupos
+    @FXML private Label lblGroupTransactions;
+    @FXML private Label lblGroupManagement;
+
     @FXML private StackPane contentArea;
     @FXML private Label lblCurrentUser;
     @FXML private Button btnProfile;
@@ -71,6 +75,10 @@ public class MainController {
                 return;
             }
 
+            if (!PermissionHelper.validateAndShow("DASHBOARD", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/home.fxml");
         });
 
@@ -79,6 +87,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+
+            if (!PermissionHelper.validateAndShow("INVENTARIO", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/inventory.fxml");
         });
 
@@ -87,6 +100,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+
+            if (!PermissionHelper.validateAndShow("INGRESOS", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/incomes.fxml");
         });
 
@@ -95,6 +113,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+            
+            if (!PermissionHelper.validateAndShow("EGRESOS", "READ")) {
+                return;
+            }
+            
             loadView("/fxml/dashboard/outcomes.fxml");
         });
 
@@ -103,6 +126,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+
+            if (!PermissionHelper.validateAndShow("PRESTAMOS", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/loans.fxml");
         });
 
@@ -111,6 +139,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+
+            if (!PermissionHelper.validateAndShow("PERSONAS", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/people.fxml");
         });
 
@@ -119,6 +152,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+
+            if (!PermissionHelper.validateAndShow("AUDITORIA", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/audit.fxml");
         });
 
@@ -127,6 +165,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+
+            if (!PermissionHelper.validateAndShow("USUARIOS", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/users.fxml");
         });
 
@@ -135,6 +178,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+
+            if (!PermissionHelper.validateAndShow("REPORTES", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/reports.fxml");
         });
 
@@ -152,6 +200,11 @@ public class MainController {
                 Logs.info(this.getClass(), "Skipped loadView: already loading");
                 return;
             }
+
+            if (!PermissionHelper.validateAndShow("ROLES", "READ")) {
+                return;
+            }
+
             loadView("/fxml/dashboard/roles.fxml");
         });
     }
@@ -193,6 +246,85 @@ public class MainController {
         lblCurrentUser.setText(user.getString("name"));
         lblCurrentRole.setText(user.getRolNombre());
         Session.setCurrentUser(user);
+
+        // Configurar permisos después de establecer el usuario
+        Platform.runLater(this::configurePermissions);
+    }
+
+    /**
+     * Configura la visibilidad y habilitación de los botones según los permisos del usuario
+     */
+    private void configurePermissions() {
+        User currentUser = Session.getCurrentUser();
+        if (currentUser == null) {
+            Logs.warn(getClass(), "No hay usuario en sesión, no se pueden configurar permisos");
+            return;
+        }
+
+        Logs.info(getClass(), "Configurando permisos para usuario: {} con rol: {}",
+            currentUser.getString("username"), currentUser.getRolNombre());
+
+        // Dashboard - Siempre visible si tiene acceso al sistema
+        PermissionHelper.hideIfNoPermission(btnDashboard, "DASHBOARD", "READ");
+
+        // Inventario
+        PermissionHelper.hideIfNoPermission(btnInventory, "INVENTARIO", "READ");
+
+        // Ingresos
+        PermissionHelper.hideIfNoPermission(btnIncomes, "INGRESOS", "READ");
+
+        // Egresos
+        PermissionHelper.hideIfNoPermission(btnOutcomes, "EGRESOS", "READ");
+
+        // Préstamos
+        PermissionHelper.hideIfNoPermission(btnLoans, "PRESTAMOS", "READ");
+
+        // Personas
+        PermissionHelper.hideIfNoPermission(btnPeople, "PERSONAS", "READ");
+
+        // Usuarios
+        PermissionHelper.hideIfNoPermission(btnUsers, "USUARIOS", "READ");
+
+        // Roles - Solo ROOT puede acceder
+        PermissionHelper.hideIfNoPermission(btnRoles, "ROLES", "READ");
+
+        // Auditoría
+        PermissionHelper.hideIfNoPermission(btnAudit, "AUDITORIA", "READ");
+
+        // Reportes
+        PermissionHelper.hideIfNoPermission(btnReports, "REPORTES", "READ");
+
+        // Ocultar grupos si todos sus botones están ocultos
+        hideGroupIfAllButtonsHidden();
+
+        Logs.info(getClass(), "Permisos configurados exitosamente");
+    }
+
+    /**
+     * Oculta los labels de grupo si todos los botones de ese grupo están ocultos
+     */
+    private void hideGroupIfAllButtonsHidden() {
+        // Grupo Transacciones: Ingresos, Egresos, Préstamos
+        boolean hasTransactionAccess = btnIncomes.isVisible() ||
+                                       btnOutcomes.isVisible() ||
+                                       btnLoans.isVisible();
+        if (!hasTransactionAccess && lblGroupTransactions != null) {
+            lblGroupTransactions.setVisible(false);
+            lblGroupTransactions.setManaged(false);
+            Logs.info(getClass(), "Grupo 'Transacciones' oculto - sin acceso a ningún botón");
+        }
+
+        // Grupo Gestión: Usuarios, Roles, Personas, Auditoría, Reportes
+        boolean hasManagementAccess = btnUsers.isVisible() ||
+                                      btnRoles.isVisible() ||
+                                      btnPeople.isVisible() ||
+                                      btnAudit.isVisible() ||
+                                      btnReports.isVisible();
+        if (!hasManagementAccess && lblGroupManagement != null) {
+            lblGroupManagement.setVisible(false);
+            lblGroupManagement.setManaged(false);
+            Logs.info(getClass(), "Grupo 'Gestión' oculto - sin acceso a ningún botón");
+        }
     }
 
     private void loadView(String fxmlPath) {

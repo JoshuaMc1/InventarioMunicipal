@@ -1,8 +1,12 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
+import com.joshuamc1.inventariomunicipal.core.Logs;
+import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
+import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.core.enums.Units;
 import com.joshuamc1.inventariomunicipal.models.Product;
+import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.services.ProductService;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -52,6 +56,7 @@ public class InventoryController {
     @FXML
     public void initialize() {
         setupTable();
+        configurePermissions(); // Agregar configuración de permisos
         loadProducts();
 
         btnRefresh.setOnAction(e -> loadProducts());
@@ -92,6 +97,40 @@ public class InventoryController {
                 applyFiltersAndPagination();
             }
         });
+    }
+
+    /**
+     * Configura la visibilidad de los botones según los permisos del usuario
+     */
+    private void configurePermissions() {
+        User currentUser = Session.getCurrentUser();
+        if (currentUser == null) {
+            Logs.warn(getClass(), "No hay usuario en sesión para configurar permisos");
+            return;
+        }
+
+        Logs.info(getClass(), "Configurando permisos de inventario para: {}",
+            currentUser.getString("username"));
+
+        // Botón Nuevo - Requiere CREATE
+        PermissionHelper.hideIfNoPermission(btnNew, "INVENTARIO", "CREATE");
+
+        // Botón Editar - Requiere UPDATE
+        PermissionHelper.hideIfNoPermission(btnEdit, "INVENTARIO", "UPDATE");
+
+        // Botón Eliminar - Requiere DELETE
+        PermissionHelper.hideIfNoPermission(btnDelete, "INVENTARIO", "DELETE");
+
+        // Si solo tiene READ, la tabla es de solo lectura
+        boolean hasOnlyRead = PermissionHelper.canAccess("INVENTARIO", "READ") &&
+                             !PermissionHelper.canAccess("INVENTARIO", "UPDATE") &&
+                             !PermissionHelper.canAccess("INVENTARIO", "DELETE");
+
+        if (hasOnlyRead) {
+            Logs.info(getClass(), "Usuario con acceso de solo lectura al inventario");
+        }
+
+        Logs.info(getClass(), "Permisos de inventario configurados");
     }
 
     private void setupTable() {
@@ -184,6 +223,11 @@ public class InventoryController {
     }
 
     private void openCreateDialog() {
+        // Validar permiso antes de abrir el diálogo
+        if (!PermissionHelper.validateAndShow("INVENTARIO", "CREATE")) {
+            return;
+        }
+
         Dialog<Product> dialog = new Dialog<>();
         dialog.setTitle("Nuevo producto");
 
@@ -269,6 +313,11 @@ public class InventoryController {
     }
 
     private void openEditDialog() {
+        // Validar permiso antes de abrir el diálogo
+        if (!PermissionHelper.validateAndShow("INVENTARIO", "UPDATE")) {
+            return;
+        }
+
         Product sel = tblProducts.getSelectionModel().getSelectedItem();
         if (sel == null) {
             Utils.showAlert("Info", "Seleccione un producto para editar");
@@ -362,6 +411,11 @@ public class InventoryController {
     }
 
     private void deleteSelected() {
+        // Validar permiso antes de eliminar
+        if (!PermissionHelper.validateAndShow("INVENTARIO", "DELETE")) {
+            return;
+        }
+
         Product sel = tblProducts.getSelectionModel().getSelectedItem();
 
         if (sel == null) {

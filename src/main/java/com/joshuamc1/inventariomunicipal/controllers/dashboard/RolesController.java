@@ -15,6 +15,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import org.javalite.activejdbc.Base;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -211,11 +212,11 @@ public class RolesController {
         });
     }
 
-    private Dialog<Rol> crearDialogoRol(Rol base) {
+    private @NotNull Dialog<Rol> crearDialogoRol(Rol base) {
         Dialog<Rol> dialog = new Dialog<>();
         dialog.setTitle(base == null ? "Nuevo Rol" : "Editar Rol");
         dialog.setResizable(true);
-        dialog.getDialogPane().setPrefSize(500, 300);
+        dialog.getDialogPane().setPrefSize(610, 300);
 
         ButtonType saveButton = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(saveButton, ButtonType.CANCEL);
