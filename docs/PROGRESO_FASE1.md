@@ -1,5 +1,13 @@
 # ✅ FASE 1 - PROGRESO DE IMPLEMENTACIÓN
 
+## Estado General
+**Fecha de inicio:** 20 de Noviembre de 2025 - 00:10  
+**Fecha de finalización:** 20 de Noviembre de 2025 - 01:00  
+**Estado:** ✅ COMPLETADA (100% - 3/3 módulos)  
+**Última actualización:** 21 de Noviembre de 2025 - 00:00
+
+---
+
 ## 🔵 MÓDULO 1: MainController - ✅ COMPLETADO (100%)
 
 ### ✨ Implementación Realizada
@@ -21,6 +29,7 @@ private void configurePermissions()
 - ✅ btnRoles → `ROLES.READ` (Solo ROOT)
 - ✅ btnAudit → `AUDITORIA.READ`
 - ✅ btnReports → `REPORTES.READ`
+- ✅ btnBackup → `BACKUP.READ` (Solo ROOT y ADMIN)
 
 #### 2. Método `hideGroupIfAllButtonsHidden()` Creado ✨ NUEVO
 ```java
@@ -93,24 +102,30 @@ Platform.runLater(this::configurePermissions);
 
 ### 🎯 Comportamiento Esperado por Rol
 
-#### ROOT (49 permisos)
+#### ROOT (52 permisos - incluye Backup)
 - ✅ Ve todos los botones
 - ✅ Acceso total al sistema
+- ✅ Incluye módulo Backup
 
-#### ADMIN (37 permisos)
-- ✅ Ve Dashboard, Inventario, Transacciones, Personas, Usuarios, Reportes
+#### ADMIN (40 permisos - incluye Backup)
+- ✅ Ve Dashboard, Inventario, Transacciones, Personas, Usuarios, Reportes, Backup
 - ❌ NO ve: Auditoría, Roles
+
+#### SUPERVISOR (25 permisos)
+- ✅ Ve Dashboard, Inventario, Transacciones, Personas, Reportes
+- ❌ NO ve: Usuarios, Roles, Auditoría, Backup
 
 #### OPERADOR (16 permisos)
 - ✅ Ve Dashboard, Inventario, Transacciones, Personas
-- ❌ NO ve: Usuarios, Roles, Auditoría, Reportes
+- ❌ NO ve: Usuarios, Roles, Auditoría, Reportes, Backup
 
 #### CONSULTOR (12 permisos - solo lectura)
 - ✅ Ve Dashboard, Inventario (lectura), Reportes
-- ❌ NO ve: Transacciones, Personas, Usuarios, Roles, Auditoría
+- ❌ NO ve: Transacciones, Personas, Usuarios, Roles, Auditoría, Backup
 
 #### AUDITOR (5 permisos)
 - ✅ Ve Dashboard, Auditoría, Reportes
+- ❌ NO ve: Backup
 - ❌ NO ve: Inventario, Transacciones, Personas, Usuarios, Roles
 
 ### 📝 Características de Seguridad
