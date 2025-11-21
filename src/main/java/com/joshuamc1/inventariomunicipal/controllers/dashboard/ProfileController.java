@@ -22,7 +22,18 @@ public class ProfileController {
 
     @FXML
     public void initialize() {
+        configurePermissions();
         loadCurrentUserData();
+    }
+
+    private void configurePermissions() {
+        com.joshuamc1.inventariomunicipal.core.Logs.info(getClass(), "Configurando perfil para: {}",
+            com.joshuamc1.inventariomunicipal.core.Session.getCurrentUser().getString("username"));
+
+        // El perfil es accesible para todos los usuarios
+        // Solo pueden editar su propio perfil (validación en onSave())
+
+        com.joshuamc1.inventariomunicipal.core.Logs.info(getClass(), "Perfil configurado - Acceso universal para editar perfil propio");
     }
 
     private void loadCurrentUserData() {

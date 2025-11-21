@@ -55,6 +55,7 @@ public class LoansController {
     @FXML private Button btnNext;
     @FXML private Label lblPage;
     @FXML private ChoiceBox<Integer> choicePageSize;
+    @FXML private Button btnNewLoan;
 
     private int currentPage = 1;
     private int pageSize = 25;
@@ -128,10 +129,22 @@ public class LoansController {
         });
 
         loadPageFromRepo(1);
+
+        configurePermissions();
+    }
+
+    private void configurePermissions() {
+        if (btnNewLoan != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnNewLoan, "PRESTAMOS", "CREATE");
+        }
     }
 
     @FXML
     public void onNew() {
+        // Validar permiso específico del módulo PRESTAMOS
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("PRESTAMOS", "CREATE")) {
+            return;
+        }
         Dialog<Transaction> dialog = transactionDialog();
         dialog.showAndWait().ifPresent(t -> {
             try {

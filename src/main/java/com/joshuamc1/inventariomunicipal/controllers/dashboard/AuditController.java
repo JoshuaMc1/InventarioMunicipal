@@ -62,6 +62,9 @@ public class AuditController implements AsyncLoadable {
 
     @FXML
     public void initialize() {
+        // Configurar permisos primero
+        configurePermissions();
+
         // column mappings
         colId.setCellValueFactory(c -> javafx.beans.binding.Bindings.createObjectBinding(() -> c.getValue().getId()));
         colUser.setCellValueFactory(c -> javafx.beans.binding.Bindings.createObjectBinding(() -> {
@@ -152,6 +155,22 @@ public class AuditController implements AsyncLoadable {
         loadPageAsync(currentPage);
     }
 
+    private void configurePermissions() {
+        com.joshuamc1.inventariomunicipal.core.Logs.info(getClass(), "Configurando permisos de auditoría para: {}",
+            com.joshuamc1.inventariomunicipal.core.Session.getCurrentUser().getString("username"));
+
+        // Los botones de exportación requieren permiso de EXPORT (si existe) o READ
+        // Por ahora, si tiene acceso al módulo (AUDITORIA.READ), puede ver y exportar
+        if (btnExportCsv != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnExportCsv, "AUDITORIA", "READ");
+        }
+        if (btnExportPdf != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnExportPdf, "AUDITORIA", "READ");
+        }
+
+        com.joshuamc1.inventariomunicipal.core.Logs.info(getClass(), "Permisos de auditoría configurados - Solo lectura y exportación");
+    }
+
     private void loadPageAsync(int page) {
         loading = true;
         int pageToLoad = Math.max(1, page);
@@ -189,6 +208,11 @@ public class AuditController implements AsyncLoadable {
     }
 
     private void exportCsv() {
+        // Validar permiso de auditoría para exportar
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("AUDITORIA", "READ")) {
+            return;
+        }
+
         FileChooser fc = new FileChooser();
         fc.setTitle("Exportar auditoría a CSV");
         fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV files", "*.csv"));
@@ -229,6 +253,11 @@ public class AuditController implements AsyncLoadable {
     }
 
     private void exportPdf() {
+        // Validar permiso de auditoría para exportar
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("AUDITORIA", "READ")) {
+            return;
+        }
+
         FileChooser fc = new FileChooser();
         fc.setTitle("Exportar auditoría a PDF");
         fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("PDF files", "*.pdf"));

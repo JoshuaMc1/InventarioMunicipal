@@ -112,6 +112,8 @@ public class MigrationRunner {
         files.add("20251114114105_create_permissions_table.sql");
         files.add("20251114114106_create_role_permissions_table.sql");
         files.add("20251114114107_seed_roles_and_permissions.sql");
+        files.add("20251120000001_create_backups_table.sql");
+        files.add("20251120000002_add_backup_permissions.sql");
         Collections.sort(files);
         return files;
     }

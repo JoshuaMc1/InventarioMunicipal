@@ -10,6 +10,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Dialog;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
 import javafx.scene.image.Image;
@@ -38,8 +39,10 @@ public class MainController {
     @FXML private Button btnPeople;
     @FXML private Button btnAudit;
     @FXML private Button btnReports;
+    @FXML private Button btnBackup;
     @FXML private Button btnUsers;
     @FXML private Button btnRoles;
+    @FXML private Button btnAbout;
 
     // Labels de grupos
     @FXML private Label lblGroupTransactions;
@@ -56,12 +59,15 @@ public class MainController {
     @FXML
     public void initialize() {
         Platform.runLater(() -> {
-            contentArea.getScene().getStylesheets().add(
-                    Objects.requireNonNull(
-                            getClass()
-                                    .getResource("/css/dashboard.css")
-                    ).toExternalForm()
-            );
+            // Verificar que la escena esté disponible antes de agregar estilos
+            if (contentArea.getScene() != null) {
+                contentArea.getScene().getStylesheets().add(
+                        Objects.requireNonNull(
+                                getClass()
+                                        .getResource("/css/dashboard.css")
+                        ).toExternalForm()
+                );
+            }
 
             Image logo = new Image(Objects.requireNonNull(getClass().getResourceAsStream("/images/logo.png")));
             imgLogo.setImage(logo);
@@ -194,6 +200,29 @@ public class MainController {
             loadView("/fxml/dashboard/profile.fxml");
         });
 
+        btnBackup.setOnAction(e -> {
+            if (loading.get()) {
+                Logs.info(this.getClass(), "Skipped loadView: already loading");
+                return;
+            }
+
+            if (!PermissionHelper.validateAndShow("BACKUP", "READ")) {
+                return;
+            }
+
+            loadView("/fxml/dashboard/backup.fxml");
+        });
+
+        btnAbout.setOnAction(e -> {
+            if (loading.get()) {
+                Logs.info(this.getClass(), "Skipped loadView: already loading");
+                return;
+            }
+
+            // Mostrar un dialogo con los datos del desarrollador
+            showAboutDialog();
+        });
+
         btnLogout.setOnAction(e -> logout());
         btnRoles.setOnAction(e -> {
             if (loading.get()) {
@@ -207,6 +236,131 @@ public class MainController {
 
             loadView("/fxml/dashboard/roles.fxml");
         });
+    }
+
+    private void showAboutDialog() {
+        Dialog<Void> aboutDialog = new Dialog<>();
+        aboutDialog.setTitle("Acerca de");
+        aboutDialog.setHeaderText("Sistema de Inventario Municipal");
+
+        // Crear contenido del diálogo
+        VBox content = new VBox(15);
+        content.setStyle("-fx-padding: 20; -fx-alignment: center-left;");
+
+        // Logo (opcional, si quieres incluir la imagen)
+        try {
+            ImageView logo = new ImageView(new Image(
+                Objects.requireNonNull(getClass().getResourceAsStream("/images/logo.png"))
+            ));
+            logo.setFitHeight(80);
+            logo.setFitWidth(80);
+            logo.setPreserveRatio(true);
+            content.getChildren().add(logo);
+        } catch (Exception e) {
+            // Si no se puede cargar el logo, continuar sin él
+        }
+
+        // Información del sistema
+        Label lblVersion = new Label("Versión 1.0.0");
+        lblVersion.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+
+        Label lblDescription = new Label("Sistema de Gestión de Inventario Municipal");
+        lblDescription.setStyle("-fx-font-size: 14px;");
+
+        // Separador
+        Label lblSeparator1 = new Label("─────────────────────────────────────");
+        lblSeparator1.setStyle("-fx-text-fill: #cccccc;");
+
+        // Información del desarrollador
+        Label lblDeveloper = new Label("Desarrollado por:");
+        lblDeveloper.setStyle("-fx-font-size: 13px; -fx-font-weight: bold;");
+
+        Label lblName = new Label("Joshua David Mclean Escaleras");
+        lblName.setStyle("-fx-font-size: 13px;");
+
+        Label lblUniversity = new Label("Universidad Tecnológica de Honduras (UTH)");
+        lblUniversity.setStyle("-fx-font-size: 12px;");
+
+        Label lblAccount = new Label("No. Cuenta (UTH): 201920020146");
+        lblAccount.setStyle("-fx-font-size: 12px;");
+
+        Label lblCareer = new Label("Ingeniería en Computación");
+        lblCareer.setStyle("-fx-font-size: 12px;");
+
+        // Información del proyecto
+        Label lblSeparator2 = new Label("─────────────────────────────────────");
+        lblSeparator2.setStyle("-fx-text-fill: #cccccc;");
+
+        Label lblProject = new Label("Proyecto de Práctica Profesional");
+        lblProject.setStyle("-fx-font-size: 12px; -fx-font-style: italic;");
+
+        Label lblDeliveredTo = new Label("Entregado a: Departamento de Sistemas");
+        lblDeliveredTo.setStyle("-fx-font-size: 12px;");
+
+        Label lblMunicipality = new Label("Municipalidad de Olanchito");
+        lblMunicipality.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
+
+        // GitHub
+        Label lblSeparator3 = new Label("─────────────────────────────────────");
+        lblSeparator3.setStyle("-fx-text-fill: #cccccc;");
+
+        Label lblGithub = new Label("GitHub:");
+        lblGithub.setStyle("-fx-font-size: 12px;");
+
+        Label lblGithubLink = new Label("@JoshuaMc1");
+        lblGithubLink.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true;");
+
+        // Correo electrónico
+        Label lblEmail = new Label("Correo electrónico:");
+        lblEmail.setStyle("-fx-font-size: 12px;");
+
+        Label lblEmailAddress = new Label("joshua15mclean@gmail.com");
+        lblEmailAddress.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true;");
+
+        // Linkear el GitHub
+        lblGithubLink.setOnMouseClicked(event -> {
+            Utils.openWebpage("https://github.com/JoshuaMc1");
+        });
+
+        // Hacer que el correo electrónico sea clickeable
+        lblEmailAddress.setOnMouseClicked(event -> {
+            Utils.openWebpage("mailto:joshua15mclean@gmail.com");
+        });
+
+        // Año
+        Label lblYear = new Label("© 2025 - Software Libre bajo Licencia MIT");
+
+
+        lblYear.setStyle("-fx-font-size: 11px; -fx-text-fill: #666666;");
+
+        // Agregar todos los elementos al contenido
+        content.getChildren().addAll(
+            lblVersion,
+            lblDescription,
+            lblSeparator1,
+            lblDeveloper,
+            lblName,
+            lblUniversity,
+            lblAccount,
+            lblCareer,
+            lblSeparator2,
+            lblProject,
+            lblDeliveredTo,
+            lblMunicipality,
+            lblSeparator3,
+            lblGithub,
+            lblGithubLink,
+            lblEmail,
+            lblEmailAddress,
+            lblYear
+        );
+
+        aboutDialog.getDialogPane().setContent(content);
+        aboutDialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
+        aboutDialog.getDialogPane().setMinWidth(450);
+        aboutDialog.getDialogPane().setMinHeight(500);
+
+        aboutDialog.showAndWait();
     }
 
     private void logout() {
@@ -247,8 +401,22 @@ public class MainController {
         lblCurrentRole.setText(user.getRolNombre());
         Session.setCurrentUser(user);
 
-        // Configurar permisos después de establecer el usuario
-        Platform.runLater(this::configurePermissions);
+        // Agregar estilos CSS si la escena está disponible
+        Platform.runLater(() -> {
+            if (contentArea != null && contentArea.getScene() != null) {
+                String cssPath = Objects.requireNonNull(
+                    getClass().getResource("/css/dashboard.css")
+                ).toExternalForm();
+
+                if (!contentArea.getScene().getStylesheets().contains(cssPath)) {
+                    contentArea.getScene().getStylesheets().add(cssPath);
+                    Logs.info(getClass(), "CSS dashboard.css agregado a la escena");
+                }
+            }
+
+            // Configurar permisos después de establecer el usuario
+            configurePermissions();
+        });
     }
 
     /**
@@ -294,6 +462,9 @@ public class MainController {
         // Reportes
         PermissionHelper.hideIfNoPermission(btnReports, "REPORTES", "READ");
 
+        // Backup - Solo ROOT y ADMIN
+        PermissionHelper.hideIfNoPermission(btnBackup, "BACKUP", "READ");
+
         // Ocultar grupos si todos sus botones están ocultos
         hideGroupIfAllButtonsHidden();
 
@@ -305,21 +476,22 @@ public class MainController {
      */
     private void hideGroupIfAllButtonsHidden() {
         // Grupo Transacciones: Ingresos, Egresos, Préstamos
-        boolean hasTransactionAccess = btnIncomes.isVisible() ||
-                                       btnOutcomes.isVisible() ||
-                                       btnLoans.isVisible();
+        boolean hasTransactionAccess = (btnIncomes != null && btnIncomes.isVisible()) ||
+                                       (btnOutcomes != null && btnOutcomes.isVisible()) ||
+                                       (btnLoans != null && btnLoans.isVisible());
         if (!hasTransactionAccess && lblGroupTransactions != null) {
             lblGroupTransactions.setVisible(false);
             lblGroupTransactions.setManaged(false);
             Logs.info(getClass(), "Grupo 'Transacciones' oculto - sin acceso a ningún botón");
         }
 
-        // Grupo Gestión: Usuarios, Roles, Personas, Auditoría, Reportes
-        boolean hasManagementAccess = btnUsers.isVisible() ||
-                                      btnRoles.isVisible() ||
-                                      btnPeople.isVisible() ||
-                                      btnAudit.isVisible() ||
-                                      btnReports.isVisible();
+        // Grupo Gestión: Usuarios, Roles, Personas, Auditoría, Reportes, Backup
+        boolean hasManagementAccess = (btnUsers != null && btnUsers.isVisible()) ||
+                                      (btnRoles != null && btnRoles.isVisible()) ||
+                                      (btnPeople != null && btnPeople.isVisible()) ||
+                                      (btnAudit != null && btnAudit.isVisible()) ||
+                                      (btnReports != null && btnReports.isVisible()) ||
+                                      (btnBackup != null && btnBackup.isVisible());
         if (!hasManagementAccess && lblGroupManagement != null) {
             lblGroupManagement.setVisible(false);
             lblGroupManagement.setManaged(false);

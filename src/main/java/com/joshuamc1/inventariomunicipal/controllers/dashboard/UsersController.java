@@ -1,6 +1,5 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
-import com.joshuamc1.inventariomunicipal.core.AsyncLoadable;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.User;
@@ -34,6 +33,12 @@ public class UsersController {
     private TableColumn<User, String> colCreated;
     @FXML
     private TextField txtSearch;
+
+    // Botones de acción
+    @FXML private Button btnNew;
+    @FXML private Button btnEdit;
+    @FXML private Button btnDelete;
+    @FXML private Button btnResetPassword;
 
     private final UserService userService = new UserService();
 
@@ -88,6 +93,28 @@ public class UsersController {
         });
 
         loadPageFromRepo(1);
+        configurePermissions();
+    }
+
+    private void configurePermissions() {
+        Logs.info(getClass(), "Configurando permisos de usuarios para: {}",
+            com.joshuamc1.inventariomunicipal.core.Session.getCurrentUser().getString("username"));
+
+        // Configurar visibilidad de botones según permisos
+        if (btnNew != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnNew, "USUARIOS", "CREATE");
+        }
+        if (btnEdit != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnEdit, "USUARIOS", "UPDATE");
+        }
+        if (btnDelete != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnDelete, "USUARIOS", "DELETE");
+        }
+        if (btnResetPassword != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnResetPassword, "USUARIOS", "UPDATE");
+        }
+
+        Logs.info(getClass(), "Permisos de usuarios configurados");
     }
 
     @FXML
@@ -114,6 +141,11 @@ public class UsersController {
 
     @FXML
     public void onNew() {
+        // Validar permiso USUARIOS.CREATE
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("USUARIOS", "CREATE")) {
+            return;
+        }
+
         Dialog<User> dialog = userDialog(null);
         dialog.showAndWait().ifPresent(u -> {
             try {
@@ -140,6 +172,11 @@ public class UsersController {
 
     @FXML
     public void onEdit() {
+        // Validar permiso USUARIOS.UPDATE
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("USUARIOS", "UPDATE")) {
+            return;
+        }
+
         User selected = tblUsers.getSelectionModel().getSelectedItem();
         if (selected == null) {
             Utils.showAlert("Aviso", "Seleccione un usuario");
@@ -163,11 +200,33 @@ public class UsersController {
 
     @FXML
     public void onDelete() {
+        // Validar permiso USUARIOS.DELETE
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("USUARIOS", "DELETE")) {
+            return;
+        }
+
         User selected = tblUsers.getSelectionModel().getSelectedItem();
         if (selected == null) {
             Utils.showAlert("Aviso", "Seleccione un usuario");
             return;
         }
+
+        // VALIDACIÓN ESPECIAL 1: No eliminar usuario ROOT
+        com.joshuamc1.inventariomunicipal.models.Rol rol = selected.getRol();
+        if (rol != null && "ROOT".equals(rol.getString("nombre"))) {
+            Utils.showAlert("Error", "No se puede eliminar el usuario ROOT del sistema");
+            Logs.warn(getClass(), "Intento de eliminar usuario ROOT bloqueado");
+            return;
+        }
+
+        // VALIDACIÓN ESPECIAL 2: No eliminar el usuario actual (a sí mismo)
+        User currentUser = com.joshuamc1.inventariomunicipal.core.Session.getCurrentUser();
+        if (selected.getId().equals(currentUser.getId())) {
+            Utils.showAlert("Error", "No puedes eliminar tu propio usuario");
+            Logs.warn(getClass(), "Intento de eliminar usuario actual bloqueado");
+            return;
+        }
+
         Alert confirm = new Alert(Alert.AlertType.CONFIRMATION, "¿Eliminar usuario " + selected.getString("username") + "?", ButtonType.YES, ButtonType.NO);
         confirm.showAndWait().ifPresent(btn -> {
             if (btn == ButtonType.YES) {
@@ -184,6 +243,11 @@ public class UsersController {
 
     @FXML
     public void onResetPassword() {
+        // Validar permiso USUARIOS.UPDATE (resetear contraseña es una actualización)
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("USUARIOS", "UPDATE")) {
+            return;
+        }
+
         User selected = tblUsers.getSelectionModel().getSelectedItem();
         if (selected == null) {
             Utils.showAlert("Aviso", "Seleccione un usuario");

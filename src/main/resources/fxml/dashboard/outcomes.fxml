@@ -24,7 +24,7 @@
             <font>
                <Font name="System Bold" size="14.0" />
             </font></Button>
-            <Button onAction="#onNew" text="Nuevo Egreso">
+            <Button fx:id="btnNewOutcome" onAction="#onNew" text="Nuevo Egreso">
             <font>
                <Font name="System Bold" size="14.0" />
             </font>

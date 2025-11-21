@@ -5,6 +5,7 @@ import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
 import org.mindrot.jbcrypt.BCrypt;
 
+import java.awt.*;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -183,5 +184,13 @@ public class Utils {
         }
 
         return alert.showAndWait().filter(response -> response == javafx.scene.control.ButtonType.OK).isPresent();
+    }
+
+    public static void openWebpage(String s) {
+        try {
+            Desktop.getDesktop().browse(new java.net.URI(s));
+        } catch (Exception e) {
+            Logs.error(Utils.class, "No se pudo abrir la página web: {}", e.getMessage());
+        }
     }
 }

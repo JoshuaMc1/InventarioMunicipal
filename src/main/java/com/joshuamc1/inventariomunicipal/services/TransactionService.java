@@ -2,6 +2,7 @@ package com.joshuamc1.inventariomunicipal.services;
 
 import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
 import com.joshuamc1.inventariomunicipal.core.Session;
+import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
 import com.joshuamc1.inventariomunicipal.models.Product;
 import com.joshuamc1.inventariomunicipal.models.Transaction;
 import com.joshuamc1.inventariomunicipal.repositories.ProductRepository;
@@ -18,6 +19,18 @@ public class TransactionService {
     public Transaction createTransaction(Integer productId, String type,
                                          double quantity, Integer userId,
                                          Integer personId, String notes) {
+
+        // Validar permisos específicos por tipo; ROOT siempre pasa
+        boolean isRoot = Session.getCurrentUser() != null && Session.getCurrentUser().isRootRole();
+        boolean allowed = switch (type) {
+            case "in" -> PermissionHelper.canAccess("INGRESOS", "CREATE");
+            case "out" -> PermissionHelper.canAccess("EGRESOS", "CREATE");
+            case "loan" -> PermissionHelper.canAccess("PRESTAMOS", "CREATE");
+            default -> false;
+        };
+        if (!isRoot && !allowed) {
+            throw new IllegalStateException("Acceso denegado: no tiene permiso para crear " + type);
+        }
 
         return DatabaseManager.callInConnection(() -> {
 
@@ -64,6 +77,17 @@ public class TransactionService {
     public Transaction createTransaction(Integer productId, String type,
                                          double quantity, String date,
                                          Integer personId, String notes) {
+
+        boolean isRoot = Session.getCurrentUser() != null && Session.getCurrentUser().isRootRole();
+        boolean allowed = switch (type) {
+            case "in" -> PermissionHelper.canAccess("INGRESOS", "CREATE");
+            case "out" -> PermissionHelper.canAccess("EGRESOS", "CREATE");
+            case "loan" -> PermissionHelper.canAccess("PRESTAMOS", "CREATE");
+            default -> false;
+        };
+        if (!isRoot && !allowed) {
+            throw new IllegalStateException("Acceso denegado: no tiene permiso para crear " + type);
+        }
 
         return DatabaseManager.callInConnection(() -> {
 

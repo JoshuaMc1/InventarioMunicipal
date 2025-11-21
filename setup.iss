@@ -48,7 +48,7 @@ MinVersion=10.0.17763
 ; ----------------------------------------------------------------
 ; Tipos de instalación
 [Types]
-Name: "full"; Description: "Instalación completa (incluye MySQL Workbench)"
+Name: "full"; Description: "Instalación completa (incluye MySQL Installer)"
 Name: "compact"; Description: "Instalación compacta (solo aplicación)"
 Name: "custom"; Description: "Instalación personalizada"; Flags: iscustom
 
@@ -59,7 +59,7 @@ Name: "core"; Description: "Archivos principales de {#MyAppName}"; Types: full c
 Name: "jdk"; Description: "Java Development Kit 25"; Types: full compact custom; Flags: fixed
 Name: "javafx"; Description: "JavaFX Runtime"; Types: full compact custom; Flags: fixed
 Name: "shortcuts"; Description: "Accesos directos"; Types: full compact; Flags: checkablealone
-Name: "mysql"; Description: "MySQL Workbench (herramienta de gestión de BD)"; Types: full custom
+Name: "mysql"; Description: "MySQL (herramienta de gestión de BD)"; Types: full custom
 
 ; ----------------------------------------------------------------
 ; Archivos a copiar
@@ -82,7 +82,7 @@ Source: "D:\Java\InventarioMunicipal\README.txt"; DestDir: "{app}"; Flags: ignor
 Source: "D:\Java\InventarioMunicipal\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
 
 ; MySQL Workbench (opcional)
-Source: "D:\Instaladores\mysql-workbench-community-8.0.44-winx64.msi"; DestDir: "{app}\mysql"; Flags: ignoreversion; Components: mysql
+Source: "D:\Instaladores\mysql-installer-community-8.0.msi"; DestDir: "{app}\mysql"; Flags: ignoreversion; Components: mysql
 
 ; Crear carpeta de logs se hará automáticamente
 
@@ -115,10 +115,10 @@ Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyApp
 ; Ejecutar al finalizar instalación
 [Run]
 ; Instalar MySQL Workbench si fue seleccionado
-Filename: "msiexec.exe"; Parameters: "/i ""{app}\mysql\mysql-workbench-community-8.0.44-winx64.msi"" /quiet"; Components: mysql; Flags: nowait postinstall skipifsilent; Description: "Instalar MySQL Workbench silenciosamente"
+Filename: "msiexec.exe"; Parameters: "/i ""{app}\mysql\mysql-installer-community-8.0.msi"" /quiet"; Components: mysql; Flags: postinstall skipifsilent waituntilterminated; Description: "Instalar MySQL"
 
 ; Ejecutar la aplicación
-Filename: "{app}\{#MyAppLauncher}"; Flags: nowait postinstall skipifsilent shellexec; Description: "Ejecutar {#MyAppName} ahora"; WorkingDir: "{app}"
+Filename: "{app}\{#MyAppLauncher}"; Flags: postinstall skipifsilent shellexec; Description: "Ejecutar {#MyAppName} ahora"; WorkingDir: "{app}"
 
 ; Abrir documentación
 Filename: "{app}\README.txt"; Flags: nowait postinstall skipifsilent shellexec unchecked; Description: "Ver documentación"

@@ -3,6 +3,7 @@ package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.dialog.PersonDialogHelper;
 import com.joshuamc1.inventariomunicipal.core.Utils;
+import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
 import com.joshuamc1.inventariomunicipal.models.Person;
 import com.joshuamc1.inventariomunicipal.services.PersonService;
 import javafx.application.Platform;
@@ -17,6 +18,9 @@ import javafx.collections.ObservableList;
 public class PeopleController {
     @FXML
     private TableView<Person> tblPeople;
+    @FXML @SuppressWarnings("unused") private Button btnNew;
+    @FXML @SuppressWarnings("unused") private Button btnEdit;
+    @FXML @SuppressWarnings("unused") private Button btnDelete;
     @FXML
     private TableColumn<Person, String> colId;
     @FXML
@@ -63,6 +67,15 @@ public class PeopleController {
         colPhone.setStyle("-fx-font-size: 17;");
         colInternalCode.setStyle("-fx-font-size: 17;");
 
+        // Configurar visibilidad/estado de botones según permisos
+        if (btnNew != null) PermissionHelper.hideIfNoPermission(btnNew, "PERSONAS", "CREATE");
+        if (btnEdit != null) PermissionHelper.hideIfNoPermission(btnEdit, "PERSONAS", "UPDATE");
+        if (btnDelete != null) PermissionHelper.hideIfNoPermission(btnDelete, "PERSONAS", "DELETE");
+
+        Logs.info(getClass(), "Permisos de personas configurados");
+
+        configurePermissions();
+
         // Inicializar paginación
         choicePageSize.setItems(FXCollections.observableArrayList(10,25,50,100));
         choicePageSize.setValue(pageSize);
@@ -89,6 +102,15 @@ public class PeopleController {
         loadPageFromRepo(1);
     }
 
+    private void configurePermissions() {
+        // Ya se configuró en initialize(), este método es para consistencia con otros controladores
+        Logs.info(getClass(), "Configurando permisos de personas para: {}",
+            com.joshuamc1.inventariomunicipal.core.Session.getCurrentUser().getString("username"));
+
+        // Los botones ya fueron configurados con hideIfNoPermission en initialize()
+        // Este método adicional permite logging y futuras extensiones
+    }
+
     @FXML
     public void onSearch() {
         currentPage = 1;
@@ -113,6 +135,8 @@ public class PeopleController {
 
     @FXML
     public void onNew() {
+        // Validar permiso en UI
+        if (!PermissionHelper.validateAndShow("PERSONAS", "CREATE")) return;
         Person created = PersonDialogHelper.showCreatePersonDialog();
         if (created != null) {
             loadPageFromRepo(currentPage);
@@ -121,6 +145,8 @@ public class PeopleController {
 
     @FXML
     public void onEdit() {
+        // Validar permiso en UI
+        if (!PermissionHelper.validateAndShow("PERSONAS", "UPDATE")) return;
         Person selected = tblPeople.getSelectionModel().getSelectedItem();
         if (selected == null) {
             Utils.showAlert("Aviso", "Seleccione una persona");
@@ -148,6 +174,8 @@ public class PeopleController {
 
     @FXML
     public void onDelete() {
+        // Validar permiso en UI
+        if (!PermissionHelper.validateAndShow("PERSONAS", "DELETE")) return;
         Person selected = tblPeople.getSelectionModel().getSelectedItem();
         if (selected == null) {
             Utils.showAlert("Aviso", "Seleccione una persona");
@@ -177,9 +205,9 @@ public class PeopleController {
                 String q = txtSearch == null ? null : txtSearch.getText();
                 long count = personService.count();
                 if (q != null && !q.isBlank()) {
-                    // Cuando hay búsqueda, podemos ignorar el count general y contar resultados filtrados en repo si se necesita.
-                    // Para simplicidad se usa el count general como aproximación; alternativamente se podría agregar countFiltered en repo.
-                    // Aquí, mejor obtener lista y setear paginación según tamaño real si es necesario.
+                    // Cuando hay búsqueda activa, usamos el count general como aproximación.
+                    // Si se requiere mayor precisión, agregar un método countFiltered en PersonRepository.
+                    Logs.info(getClass(), "Búsqueda activa en personas: usando count aproximado para paginación");
                 }
                 int total = (int) count;
                 int pages = Math.max(1, (int) Math.ceil(total / (double) pageSize));

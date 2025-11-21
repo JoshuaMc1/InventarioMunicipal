@@ -170,6 +170,7 @@ public class LoginController {
         } catch (IOException e) {
             Utils.showAlert("Error", "No se pudo abrir la ventana principal");
             Logs.error(this.getClass(), "Failed to open main window: {}", e.getMessage());
+            e.printStackTrace();
         }
     }
 }

@@ -146,11 +146,50 @@ public class ReportsController {
         btnUserActivityPdf.setOnAction(e -> exportUserActivityPdf());
         btnMonthlyDashboardCsv.setOnAction(e -> exportMonthlyDashboardCsv());
         btnMonthlyDashboardPdf.setOnAction(e -> exportMonthlyDashboardPdf());
+
+        // Configurar permisos
+        configurePermissions();
+    }
+
+    private void configurePermissions() {
+        com.joshuamc1.inventariomunicipal.core.Logs.info(getClass(), "Configurando permisos de reportes para: {}",
+            com.joshuamc1.inventariomunicipal.core.Session.getCurrentUser().getString("username"));
+
+        // Todos los botones de reportes requieren REPORTES.READ
+        // Los reportes se generan si tiene el permiso READ del módulo correspondiente
+        // Por simplicidad, mostramos todos los botones si tiene REPORTES.READ
+        // Las validaciones específicas se harán en cada método
+
+        com.joshuamc1.inventariomunicipal.core.Logs.info(getClass(), "Permisos de reportes configurados - Validación granular por tipo de reporte");
+    }
+
+    /**
+     * Valida permisos para generar reportes de un módulo específico
+     * @param module El módulo (INVENTARIO, USUARIOS, TRANSACCIONES, etc.)
+     * @return true si tiene permisos, false en caso contrario
+     */
+    private boolean validateReportPermission(String module) {
+        // Validar primero REPORTES.READ
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("REPORTES", "READ")) {
+            return false;
+        }
+
+        // Validar permiso específico del módulo
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess(module, "READ")) {
+            com.joshuamc1.inventariomunicipal.core.Utils.showAlert("Acceso Denegado",
+                "No tienes permiso para generar reportes de " + module + ". Se requiere permiso de lectura.");
+            return false;
+        }
+
+        return true;
     }
 
     // ==================== USUARIOS SIN ROOT ====================
 
     private void exportUsersExcludingRootCsv() {
+        // Validar permisos de reportes y usuarios
+        if (!validateReportPermission("USUARIOS")) return;
+
         try {
             Report report = reportService.usersExcludingRoot();
             FileChooser fc = new FileChooser();
@@ -169,6 +208,9 @@ public class ReportsController {
     }
 
     private void exportUsersExcludingRootPdf() {
+        // Validar permisos de reportes y usuarios
+        if (!validateReportPermission("USUARIOS")) return;
+
         try {
             Report report = reportService.usersExcludingRoot();
             FileChooser fc = new FileChooser();
@@ -227,6 +269,9 @@ public class ReportsController {
     // ==================== INVENTARIO COMPLETO ====================
 
     private void exportInventoryCompleteCsv() {
+        // Validar permisos de reportes e inventario
+        if (!validateReportPermission("INVENTARIO")) return;
+
         try {
             Report report = reportService.inventoryComplete();
             FileChooser fc = new FileChooser();

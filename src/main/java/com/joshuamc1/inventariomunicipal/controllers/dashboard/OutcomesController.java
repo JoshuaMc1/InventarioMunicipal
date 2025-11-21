@@ -55,6 +55,7 @@ public class OutcomesController {
     @FXML private Button btnNext;
     @FXML private Label lblPage;
     @FXML private ChoiceBox<Integer> choicePageSize;
+    @FXML private Button btnNewOutcome;
 
     private int currentPage = 1;
     private int pageSize = 25;
@@ -128,10 +129,22 @@ public class OutcomesController {
         });
 
         loadPageFromRepo(1);
+
+        configurePermissions();
+    }
+
+    private void configurePermissions() {
+        if (btnNewOutcome != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnNewOutcome, "EGRESOS", "CREATE");
+        }
     }
 
     @FXML
     public void onNew() {
+        // Validar permiso específico del módulo EGRESOS
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("EGRESOS", "CREATE")) {
+            return;
+        }
         Dialog<Transaction> dialog = transactionDialog();
         dialog.showAndWait().ifPresent(t -> {
             try {

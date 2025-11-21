@@ -74,7 +74,8 @@
             <Button fx:id="btnPeople" text="Personas" maxWidth="Infinity" styleClass="sidebar-btn"/>
             <Button fx:id="btnAudit" text="Auditoría" maxWidth="Infinity" styleClass="sidebar-btn"/>
             <Button fx:id="btnReports" text="Reportes" maxWidth="Infinity" styleClass="sidebar-btn"/>
-
+            <Button fx:id="btnBackup" text="Backup" maxWidth="Infinity" styleClass="sidebar-btn"/>
+            <Button fx:id="btnAbout" text="Acerca de" maxWidth="Infinity" styleClass="sidebar-btn" VBox.vgrow="ALWAYS"/>
         </VBox>
     </left>
 

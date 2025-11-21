@@ -16,7 +16,7 @@
                <Font size="24.0" />
             </font></Label>
             <Region HBox.hgrow="ALWAYS" />
-            <Button onAction="#onNew" text="Nuevo Ingreso">
+            <Button fx:id="btnNewIncome" onAction="#onNew" text="Nuevo Ingreso">
             <font>
                <Font name="System Bold" size="14.0" />
             </font></Button>

@@ -2,6 +2,7 @@ package com.joshuamc1.inventariomunicipal.services;
 
 import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
 import com.joshuamc1.inventariomunicipal.core.Session;
+import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
 import com.joshuamc1.inventariomunicipal.models.Person;
 import com.joshuamc1.inventariomunicipal.repositories.PersonRepository;
 
@@ -12,6 +13,10 @@ public class PersonService {
     private final AuditService auditService = new AuditService();
 
     public Person create(String dni, String firstName, String lastName, String phone, String internalCode) {
+        // Validación de permisos en la capa de servicio
+        if (!PermissionHelper.canAccess("PEOPLE", "CREATE")) {
+            throw new IllegalStateException("Acceso denegado: no tiene permiso para crear personas");
+        }
         return DatabaseManager.callInConnection(() -> {
             Person person = repo.create(dni, firstName, lastName, phone, internalCode);
 
@@ -29,6 +34,10 @@ public class PersonService {
     }
 
     public boolean update(Integer id, String dni, String firstName, String lastName, String phone, String internalCode) {
+        // Validación de permisos
+        if (!PermissionHelper.canAccess("PEOPLE", "UPDATE")) {
+            throw new IllegalStateException("Acceso denegado: no tiene permiso para actualizar personas");
+        }
         return DatabaseManager.callInConnection(() -> {
             boolean ok = repo.update(id, dni, firstName, lastName, phone, internalCode);
             if (ok) {
@@ -45,6 +54,10 @@ public class PersonService {
     }
 
     public boolean delete(Integer id) {
+        // Validación de permisos
+        if (!PermissionHelper.canAccess("PEOPLE", "DELETE")) {
+            throw new IllegalStateException("Acceso denegado: no tiene permiso para eliminar personas");
+        }
         return DatabaseManager.callInConnection(() -> {
             boolean ok = repo.delete(id);
             if (ok) {
@@ -80,4 +93,3 @@ public class PersonService {
         return DatabaseManager.callInConnection(repo::findAll);
     }
 }
-

@@ -8,6 +8,7 @@ import com.joshuamc1.inventariomunicipal.core.enums.Units;
 import com.joshuamc1.inventariomunicipal.models.Product;
 import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.services.ProductService;
+import com.joshuamc1.inventariomunicipal.config.DatabaseConfig;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -51,7 +52,7 @@ public class InventoryController {
     private int totalPages = 1;
 
     private List<Product> allProducts = FXCollections.observableArrayList();
-    private ObservableList<Product> currentPageItems = FXCollections.observableArrayList();
+    private final ObservableList<Product> currentPageItems = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
@@ -165,7 +166,14 @@ public class InventoryController {
         Task<List<Product>> task = new Task<>() {
             @Override
             protected java.util.List<Product> call() {
-                return productService.findAll();
+                // Asegurar que el hilo que ejecuta la tarea tenga una conexión abierta
+                // para operaciones ActiveJDBC que puedan no usar DatabaseManager internamente.
+                DatabaseConfig.openConnection();
+                try {
+                    return productService.findAll();
+                } finally {
+                    DatabaseConfig.closeConnection();
+                }
             }
         };
 
@@ -214,13 +222,6 @@ public class InventoryController {
         if (lblPage != null) lblPage.setText(String.format("Página %d/%d (%d)", currentPage, totalPages, totalItems));
         if (btnPrev != null) btnPrev.setDisable(currentPage <= 1);
         if (btnNext != null) btnNext.setDisable(currentPage >= totalPages);
-    }
-
-    private void filterProducts(String searchText) {
-        // Método original reemplazado por applyFiltersAndPagination; mantenido para compatibilidad si hay llamadas existentes
-        txtSearch.setText(searchText == null ? "" : searchText);
-        currentPage = 1;
-        applyFiltersAndPagination();
     }
 
     private void openCreateDialog() {

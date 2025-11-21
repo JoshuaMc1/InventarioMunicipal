@@ -35,6 +35,7 @@ import java.util.List;
 public class IncomesController {
     @FXML
     private TableView<Transaction> tblTransactions;
+    @FXML private Button btnNewIncome;
     @FXML
     private TableColumn<Transaction, String> colId;
     @FXML
@@ -130,10 +131,22 @@ public class IncomesController {
         });
 
         loadPageFromRepo(1);
+
+        configurePermissions();
+    }
+
+    private void configurePermissions() {
+        if (btnNewIncome != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnNewIncome, "INGRESOS", "CREATE");
+        }
     }
 
     @FXML
     public void onNew() {
+        // Validar permiso específico del módulo INGRESOS antes de crear
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("INGRESOS", "CREATE")) {
+            return;
+        }
         Dialog<Transaction> dialog = transactionDialog();
         dialog.showAndWait().ifPresent(t -> {
             try {

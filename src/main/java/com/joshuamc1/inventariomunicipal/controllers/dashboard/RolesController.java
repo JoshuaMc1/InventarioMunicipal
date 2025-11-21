@@ -14,7 +14,6 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
-import org.javalite.activejdbc.Base;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -43,8 +42,21 @@ public class RolesController {
     public void initialize() {
         configurarTabla();
         cargarRoles();
+        configurePermissions();
 
         btnNuevoRol.setOnAction(e -> onNuevoRol());
+    }
+
+    private void configurePermissions() {
+        Logs.info(getClass(), "Configurando permisos de roles para: {}",
+            com.joshuamc1.inventariomunicipal.core.Session.getCurrentUser().getString("username"));
+
+        // Solo ROOT puede gestionar roles
+        if (btnNuevoRol != null) {
+            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnNuevoRol, "ROLES", "CREATE");
+        }
+
+        Logs.info(getClass(), "Permisos de roles configurados - Solo ROOT tiene acceso");
     }
 
     private void configurarTabla() {
@@ -140,6 +152,11 @@ public class RolesController {
     }
 
     private void onNuevoRol() {
+        // Validar permiso ROLES.CREATE (Solo ROOT)
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("ROLES", "CREATE")) {
+            return;
+        }
+
         Dialog<Rol> dialog = crearDialogoRol(null);
         dialog.showAndWait().ifPresent(rol -> {
             try {
@@ -154,9 +171,28 @@ public class RolesController {
     }
 
     private void onEditarRol(@NotNull Rol rol) {
-        if (rol.isRoot()) {
-            Utils.showAlert("Aviso", "No se puede editar el rol ROOT");
+        // Validar permiso ROLES.UPDATE (Solo ROOT)
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("ROLES", "UPDATE")) {
             return;
+        }
+
+        // VALIDACIÓN ESPECIAL: No editar roles del sistema
+        if (rol.isRoot()) {
+            Utils.showAlert("Error", "No se puede editar el rol ROOT del sistema");
+            Logs.warn(getClass(), "Intento de editar rol ROOT bloqueado");
+            return;
+        }
+
+        // Validación adicional para otros roles del sistema
+        String nombreRol = rol.getString("nombre");
+        if (nombreRol != null && (nombreRol.equals("ADMIN") || nombreRol.equals("AUDITOR") ||
+            nombreRol.equals("SUPERVISOR") || nombreRol.equals("OPERADOR") || nombreRol.equals("CONSULTOR"))) {
+            Alert confirm = new Alert(Alert.AlertType.WARNING,
+                "Estás editando un rol del sistema. Los cambios pueden afectar el funcionamiento. ¿Continuar?",
+                ButtonType.YES, ButtonType.NO);
+            if (confirm.showAndWait().orElse(ButtonType.NO) == ButtonType.NO) {
+                return;
+            }
         }
 
         Dialog<Rol> dialog = crearDialogoRol(rol);
@@ -176,15 +212,27 @@ public class RolesController {
     }
 
     private void onEliminarRol(@NotNull Rol rol) {
-        if (rol.isRoot()) {
-            Utils.showAlert("Aviso", "No se puede eliminar el rol ROOT");
+        // Validar permiso ROLES.DELETE (Solo ROOT)
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("ROLES", "DELETE")) {
             return;
         }
 
+        // VALIDACIÓN ESPECIAL 1: No eliminar roles del sistema
+        String nombreRol = rol.getString("nombre");
+        java.util.List<String> rolesDelSistema = java.util.Arrays.asList("ROOT", "ADMIN", "AUDITOR", "SUPERVISOR", "OPERADOR", "CONSULTOR");
+
+        if (nombreRol != null && rolesDelSistema.contains(nombreRol)) {
+            Utils.showAlert("Error", "No se puede eliminar un rol del sistema: " + nombreRol);
+            Logs.warn(getClass(), "Intento de eliminar rol del sistema bloqueado: {}", nombreRol);
+            return;
+        }
+
+        // VALIDACIÓN ESPECIAL 2: No eliminar roles con usuarios asignados
         int cantidadUsuarios = rol.getUsuarios().size();
         if (cantidadUsuarios > 0) {
-            Utils.showAlert("Aviso",
+            Utils.showAlert("Error",
                 "No se puede eliminar el rol porque tiene " + cantidadUsuarios + " usuario(s) asignado(s)");
+            Logs.warn(getClass(), "Intento de eliminar rol con usuarios asignados bloqueado");
             return;
         }
 
@@ -207,6 +255,11 @@ public class RolesController {
     }
 
     private void onGestionarPermisos(Rol rol) {
+        // Validar permiso ROLES.UPDATE (gestionar permisos es una actualización)
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("ROLES", "UPDATE")) {
+            return;
+        }
+
         Dialog<List<Integer>> dialog = crearDialogoPermisos(rol);
         dialog.showAndWait().ifPresent(permisosIds -> {
             try {
