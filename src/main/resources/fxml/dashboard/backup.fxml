@@ -4,82 +4,87 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
 
-<VBox xmlns="http://javafx.com/javafx"
+<ScrollPane xmlns="http://javafx.com/javafx"
       xmlns:fx="http://javafx.com/fxml"
       fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.BackupController"
-      spacing="20" style="-fx-padding: 20;">
+      fitToWidth="true" fitToHeight="true">
 
-    <!-- Header con título y botones de acción -->
-    <HBox spacing="10" alignment="CENTER_LEFT">
-        <Label text="Gestión de Backups" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
-        <Region HBox.hgrow="ALWAYS"/>
+    <VBox spacing="20" style="-fx-padding: 20;">
 
-        <Button fx:id="btnCreateBackup" text="Crear Backup" onAction="#onCreateBackup"
-                style="-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;">
-            <graphic>
-                <Label text="💾" style="-fx-font-size: 16px;"/>
-            </graphic>
-        </Button>
+        <!-- Header con título y botones de acción -->
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <Label text="Gestión de Backups" style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
+            <Region HBox.hgrow="ALWAYS"/>
 
-        <Button fx:id="btnOpenFolder" text="Abrir Carpeta" onAction="#onOpenFolder"
-                style="-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;">
-            <graphic>
-                <Label text="📁" style="-fx-font-size: 16px;"/>
-            </graphic>
-        </Button>
+            <Button fx:id="btnCreateBackup" text="Crear Backup" onAction="#onCreateBackup"
+                    style="-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;">
+                <graphic>
+                    <Label text="💾" style="-fx-font-size: 16px;"/>
+                </graphic>
+            </Button>
 
-        <Button fx:id="btnRefresh" text="Actualizar" onAction="#onRefresh"
-                style="-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;">
-            <graphic>
-                <Label text="🔄" style="-fx-font-size: 16px;"/>
-            </graphic>
-        </Button>
-    </HBox>
+            <Button fx:id="btnOpenFolder" text="Abrir Carpeta" onAction="#onOpenFolder"
+                    style="-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;">
+                <graphic>
+                    <Label text="📁" style="-fx-font-size: 16px;"/>
+                </graphic>
+            </Button>
 
-    <!-- Información -->
-    <HBox spacing="10" style="-fx-background-color: #E3F2FD; -fx-padding: 15; -fx-background-radius: 5;">
-        <Label text="ℹ️" style="-fx-font-size: 20px;"/>
-        <VBox spacing="5">
-            <Label text="Los backups se guardan en un directorio seguro en tu perfil de usuario"
-                   style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
-            <Label text="Ubicación: %USERPROFILE%\.inventario_municipal\backups"
-                   style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
-            <Label text="Solo ROOT y ADMIN pueden crear y eliminar backups"
-                   style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
-        </VBox>
-    </HBox>
+            <Button fx:id="btnRefresh" text="Actualizar" onAction="#onRefresh"
+                    style="-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;">
+                <graphic>
+                    <Label text="🔄" style="-fx-font-size: 16px;"/>
+                </graphic>
+            </Button>
+        </HBox>
 
-    <!-- Tabla de backups -->
-    <TableView fx:id="tblBackups" VBox.vgrow="ALWAYS">
-        <columns>
-            <TableColumn fx:id="colId" text="ID" prefWidth="60"/>
-            <TableColumn fx:id="colFilename" text="Archivo" prefWidth="300"/>
-            <TableColumn fx:id="colSize" text="Tamaño" prefWidth="100"/>
-            <TableColumn fx:id="colUsuario" text="Usuario" prefWidth="150"/>
-            <TableColumn fx:id="colFecha" text="Fecha" prefWidth="180"/>
-            <TableColumn fx:id="colStatus" text="Estado" prefWidth="100"/>
-        </columns>
-    </TableView>
+        <!-- Información -->
+        <HBox spacing="10" style="-fx-background-color: #E3F2FD; -fx-padding: 15; -fx-background-radius: 5;">
+            <Label text="ℹ️" style="-fx-font-size: 20px;"/>
+            <VBox spacing="5">
+                <Label text="Los backups se guardan en un directorio seguro en tu perfil de usuario"
+                       style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+                <Label text="Ubicación: %USERPROFILE%\.inventario_municipal\backups"
+                       style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+                <Label text="Solo ROOT y ADMIN pueden crear y eliminar backups"
+                       style="-fx-font-size: 12px; -fx-text-fill: #666;"/>
+            </VBox>
+        </HBox>
 
-    <!-- Controles de paginación y acciones -->
-    <HBox spacing="10" alignment="CENTER_LEFT">
-        <!-- Botones de acción -->
-        <Button fx:id="btnDelete" text="Eliminar Seleccionado" onAction="#onDelete"
-                style="-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 15;"/>
+        <!-- Tabla de backups -->
+        <TableView fx:id="tblBackups" VBox.vgrow="ALWAYS">
+            <columns>
+                <TableColumn fx:id="colId" text="ID" prefWidth="60"/>
+                <TableColumn fx:id="colFilename" text="Archivo" prefWidth="300"/>
+                <TableColumn fx:id="colSize" text="Tamaño" prefWidth="100"/>
+                <TableColumn fx:id="colUsuario" text="Usuario" prefWidth="150"/>
+                <TableColumn fx:id="colMensaje" text="Mensaje" prefWidth="250"/>
+                <TableColumn fx:id="colFecha" text="Fecha" prefWidth="180"/>
+                <TableColumn fx:id="colStatus" text="Estado" prefWidth="100"/>
+            </columns>
+        </TableView>
 
-        <Button fx:id="btnCleanOld" text="Limpiar Antiguos" onAction="#onCleanOld"
-                style="-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 15;"/>
+        <!-- Controles de paginación y acciones -->
+        <HBox spacing="10" alignment="CENTER_LEFT">
+            <!-- Botones de acción -->
+            <Button fx:id="btnDelete" text="Eliminar Seleccionado" onAction="#onDelete"
+                    style="-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 15;"/>
 
-        <Region HBox.hgrow="ALWAYS"/>
+            <Button fx:id="btnCleanOld" text="Limpiar Antiguos" onAction="#onCleanOld"
+                    style="-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 8 15;"/>
 
-        <!-- Paginación -->
-        <Label text="Registros por página:" style="-fx-font-size: 14px;"/>
-        <ChoiceBox fx:id="choicePageSize" prefWidth="80" style="-fx-font-size: 14px;"/>
+            <Region HBox.hgrow="ALWAYS"/>
 
-        <Button fx:id="btnPrev" text="◄ Anterior" style="-fx-font-size: 14px; -fx-padding: 8 15;"/>
-        <Label fx:id="lblPage" text="Página 1/1" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
-        <Button fx:id="btnNext" text="Siguiente ►" style="-fx-font-size: 14px; -fx-padding: 8 15;"/>
-    </HBox>
+            <!-- Paginación -->
+            <Label text="Registros por página:" style="-fx-font-size: 14px;"/>
+            <ChoiceBox fx:id="choicePageSize" prefWidth="80" style="-fx-font-size: 14px;"/>
 
-</VBox>
+            <Button fx:id="btnPrev" text="◄ Anterior" style="-fx-font-size: 14px; -fx-padding: 8 15;"/>
+            <Label fx:id="lblPage" text="Página 1/1" style="-fx-font-size: 14px; -fx-font-weight: bold;"/>
+            <Button fx:id="btnNext" text="Siguiente ►" style="-fx-font-size: 14px; -fx-padding: 8 15;"/>
+        </HBox>
+
+    </VBox>
+
+</ScrollPane>
 

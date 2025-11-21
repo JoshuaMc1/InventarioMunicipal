@@ -35,6 +35,7 @@ public class BackupController {
     @FXML private TableColumn<Backup, String> colFilename;
     @FXML private TableColumn<Backup, String> colSize;
     @FXML private TableColumn<Backup, String> colUsuario;
+    @FXML private TableColumn<Backup, String> colMensaje;
     @FXML private TableColumn<Backup, String> colFecha;
     @FXML private TableColumn<Backup, String> colStatus;
 
@@ -100,6 +101,9 @@ public class BackupController {
         colUsuario.setCellValueFactory(data ->
             new SimpleStringProperty(data.getValue().getUsuarioNombre()));
 
+        colMensaje.setCellValueFactory(data ->
+            new SimpleStringProperty(data.getValue().getString("error_message")));
+
         colFecha.setCellValueFactory(data -> {
             try {
                 Object createdAt = data.getValue().get("created_at");
@@ -139,6 +143,7 @@ public class BackupController {
         colFilename.setStyle("-fx-font-size: 17;");
         colSize.setStyle("-fx-font-size: 17;");
         colUsuario.setStyle("-fx-font-size: 17;");
+        colMensaje.setStyle("-fx-font-size: 17;");
         colFecha.setStyle("-fx-font-size: 17;");
         colStatus.setStyle("-fx-font-size: 17;");
 

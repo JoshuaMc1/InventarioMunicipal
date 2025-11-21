@@ -5,59 +5,61 @@
 <?import javafx.scene.layout.*?>
 <?import javafx.scene.text.Font?>
 
-<BorderPane xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.IncomesController">
-    <top>
-        <HBox spacing="10">
-            <padding>
-                <Insets bottom="10" left="10" right="10" top="10" />
-            </padding>
-            <Label style="-fx-font-weight: bold;" text="Ingresos">
-            <font>
-               <Font size="24.0" />
-            </font></Label>
-            <Region HBox.hgrow="ALWAYS" />
-            <Button fx:id="btnNewIncome" onAction="#onNew" text="Nuevo Ingreso">
-            <font>
-               <Font name="System Bold" size="14.0" />
-            </font></Button>
-        </HBox>
-    </top>
-
-    <center>
-        <TableView fx:id="tblTransactions">
-            <columns>
-                <TableColumn fx:id="colId" prefWidth="60" text="ID" />
-                <TableColumn fx:id="colProduct" prefWidth="200" text="Producto" />
-                <TableColumn fx:id="colQuantity" prefWidth="100" text="Cantidad" />
-                <TableColumn fx:id="colDate" prefWidth="120" text="Fecha" />
-                <TableColumn fx:id="colDni" prefWidth="120" text="DNI" />
-                <TableColumn fx:id="colPerson" prefWidth="180" text="Persona" />
-                <TableColumn fx:id="colNotes" prefWidth="200" text="Notas" />
-            </columns>
-        </TableView>
-    </center>
-
-    <bottom>
-        <VBox>
-            <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-padding: 8;">
-                <Button fx:id="btnPrev" text="Anterior">
-                    <font>
-                        <Font name="System Bold" size="14.0" />
-                    </font></Button>
-                <Label fx:id="lblPage" text="Página 1/1">
-                    <font>
-                        <Font size="14.0" />
-                    </font></Label>
-                <Button fx:id="btnNext" text="Siguiente">
-                    <font>
-                        <Font name="System Bold" size="14.0" />
-                    </font></Button>
-                <Label text="Tamaño:">
-                    <font>
-                        <Font size="14.0" />
-                    </font></Label>
-                <ChoiceBox fx:id="choicePageSize" />
+<ScrollPane xmlns="http://javafx.com/javafx/25" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.IncomesController" fitToWidth="true" fitToHeight="true">
+    <BorderPane>
+        <top>
+            <HBox spacing="10">
+                <padding>
+                    <Insets bottom="10" left="10" right="10" top="10" />
+                </padding>
+                <Label style="-fx-font-weight: bold;" text="Ingresos">
+                <font>
+                   <Font size="24.0" />
+                </font></Label>
+                <Region HBox.hgrow="ALWAYS" />
+                <Button fx:id="btnNewIncome" onAction="#onNew" text="Nuevo Ingreso">
+                <font>
+                   <Font name="System Bold" size="14.0" />
+                </font></Button>
             </HBox>
-        </VBox>
-    </bottom>
-</BorderPane>
+        </top>
+
+        <center>
+            <TableView fx:id="tblTransactions">
+                <columns>
+                    <TableColumn fx:id="colId" prefWidth="60" text="ID" />
+                    <TableColumn fx:id="colProduct" prefWidth="200" text="Producto" />
+                    <TableColumn fx:id="colQuantity" prefWidth="100" text="Cantidad" />
+                    <TableColumn fx:id="colDate" prefWidth="120" text="Fecha" />
+                    <TableColumn fx:id="colDni" prefWidth="120" text="DNI" />
+                    <TableColumn fx:id="colPerson" prefWidth="180" text="Persona" />
+                    <TableColumn fx:id="colNotes" prefWidth="200" text="Notas" />
+                </columns>
+            </TableView>
+        </center>
+
+        <bottom>
+            <VBox>
+                <HBox alignment="CENTER_RIGHT" spacing="10" style="-fx-padding: 8;">
+                    <Button fx:id="btnPrev" text="Anterior">
+                        <font>
+                            <Font name="System Bold" size="14.0" />
+                        </font></Button>
+                    <Label fx:id="lblPage" text="Página 1/1">
+                        <font>
+                            <Font size="14.0" />
+                        </font></Label>
+                    <Button fx:id="btnNext" text="Siguiente">
+                        <font>
+                            <Font name="System Bold" size="14.0" />
+                        </font></Button>
+                    <Label text="Tamaño:">
+                        <font>
+                            <Font size="14.0" />
+                        </font></Label>
+                    <ChoiceBox fx:id="choicePageSize" />
+                </HBox>
+            </VBox>
+        </bottom>
+    </BorderPane>
+</ScrollPane>

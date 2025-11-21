@@ -6,6 +6,7 @@
 <?import javafx.scene.layout.*?>
 
 <?import javafx.scene.image.ImageView?>
+<?import javafx.scene.control.ScrollPane?>
 <BorderPane xmlns="http://javafx.com/javafx"
             xmlns:fx="http://javafx.com/fxml"
             fx:controller="com.joshuamc1.inventariomunicipal.controllers.dashboard.MainController">
@@ -50,33 +51,35 @@
     </top>
 
     <left>
-        <VBox fx:id="sidebar" styleClass="sidebar" spacing="10" prefWidth="220">
-            <padding>
-                <Insets top="20" left="20" bottom="20" right="20"/>
-            </padding>
+        <ScrollPane fitToWidth="true" styleClass="content-bg" prefWidth="220" style="-fx-background: transparent; -fx-background-color: transparent;">
+            <VBox fx:id="sidebar" styleClass="sidebar" spacing="10">
+                <padding>
+                    <Insets top="20" bottom="20"/>
+                </padding>
 
-            <Label text="Menú"
-                   style="-fx-text-fill: white; -fx-font-size: 18px;"/>
+                <Label text="Menú"
+                       style="-fx-text-fill: white; -fx-font-size: 18px;"/>
 
-            <Button fx:id="btnDashboard" text="Dashboard" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnInventory" text="Inventario" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnDashboard" text="Dashboard" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnInventory" text="Inventario" maxWidth="Infinity" styleClass="sidebar-btn"/>
 
-            <Label fx:id="lblGroupTransactions" text="Transacciones"
-                   style="-fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 0 5 0;"/>
-            <Button fx:id="btnIncomes" text="Ingresos" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnOutcomes" text="Egresos" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnLoans" text="Préstamos" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Label fx:id="lblGroupTransactions" text="Transacciones"
+                       style="-fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 0 5 0;"/>
+                <Button fx:id="btnIncomes" text="Ingresos" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnOutcomes" text="Egresos" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnLoans" text="Préstamos" maxWidth="Infinity" styleClass="sidebar-btn"/>
 
-            <Label fx:id="lblGroupManagement" text="Gestión"
-                   style="-fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 0 5 0;"/>
-            <Button fx:id="btnUsers" text="Usuarios" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnRoles" text="Roles" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnPeople" text="Personas" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnAudit" text="Auditoría" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnReports" text="Reportes" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnBackup" text="Backup" maxWidth="Infinity" styleClass="sidebar-btn"/>
-            <Button fx:id="btnAbout" text="Acerca de" maxWidth="Infinity" styleClass="sidebar-btn" VBox.vgrow="ALWAYS"/>
-        </VBox>
+                <Label fx:id="lblGroupManagement" text="Gestión"
+                       style="-fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 0 5 0;"/>
+                <Button fx:id="btnUsers" text="Usuarios" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnRoles" text="Roles" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnPeople" text="Personas" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnAudit" text="Auditoría" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnReports" text="Reportes" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnBackup" text="Backup" maxWidth="Infinity" styleClass="sidebar-btn"/>
+                <Button fx:id="btnAbout" text="Acerca de" maxWidth="Infinity" styleClass="sidebar-btn" VBox.vgrow="ALWAYS"/>
+            </VBox>
+        </ScrollPane>
     </left>
 
     <center>

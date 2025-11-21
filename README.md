@@ -69,15 +69,47 @@ Sistema de gestión de inventario desarrollado en JavaFX con base de datos MySQL
 - **Java JDK** 14 o superior
 - **Maven** 3.6+
 - **MySQL Server** 8.0+
+  - **mysqldump** (incluido con MySQL Server)
+- **gzip** (para compresión de backups)
+  - Windows: Instalar desde [GnuWin32](http://gnuwin32.sourceforge.net/packages/gzip.htm) o usar WSL
+  - Linux/macOS: Incluido por defecto
 - **IDE** compatible (IntelliJ IDEA, Eclipse, NetBeans)
 - **Git** (para clonar el repositorio)
 
 ### Para Producción/Uso
 - **MySQL Server** 8.0+
+  - **mysqldump** (incluido con MySQL Server, verificar en PATH)
+- **gzip** (para compresión de backups)
+  - Windows: Descargar e instalar [GnuWin32 gzip](http://gnuwin32.sourceforge.net/packages/gzip.htm)
+  - Linux: `sudo apt-get install gzip` (Debian/Ubuntu) o `sudo yum install gzip` (RedHat/CentOS)
+  - macOS: Incluido por defecto
 - **Sistema Operativo**: Windows 10/11, Linux, macOS
 - **RAM**: Mínimo 4GB recomendado
-- **Espacio en disco**: 500MB libres
+- **Espacio en disco**: 500MB libres (más espacio para backups)
 - **Java Runtime** 14+ (incluido en el instalador)
+
+#### Configuración Adicional para Windows
+
+Para que `mysqldump` y `gzip` funcionen correctamente en el sistema de backups:
+
+1. **mysqldump**: Agregar la carpeta `bin` de MySQL al PATH del sistema
+   ```
+   C:\Program Files\MySQL\MySQL Server 8.0\bin
+   ```
+
+2. **gzip**: Después de instalar GnuWin32, agregar al PATH del sistema
+   ```
+   C:\Program Files (x86)\GnuWin32\bin
+   ```
+
+**Verificar instalación:**
+```bash
+# Verificar mysqldump
+mysqldump --version
+
+# Verificar gzip
+gzip --version
+```
 
 ---
 
@@ -302,6 +334,26 @@ Ver [ARCHITECTURE.md](docs/ARCHITECTURE.md) para documentación completa de la a
 2. Reiniciar aplicación
 3. Completar configuración inicial nuevamente
 
+### Error: "mysqldump: command not found" o fallo en backup
+**Solución:**
+1. Verificar instalación: `mysqldump --version`
+2. Windows: Agregar MySQL bin al PATH:
+   - Panel de Control → Sistema → Configuración avanzada del sistema
+   - Variables de entorno → PATH → Agregar: `C:\Program Files\MySQL\MySQL Server 8.0\bin`
+3. Linux/macOS: Instalar mysql-client: `sudo apt-get install mysql-client`
+4. Reiniciar terminal o aplicación después de cambiar PATH
+
+### Error: "gzip: command not found" o fallo en compresión de backup
+**Solución:**
+1. Verificar instalación: `gzip --version`
+2. Windows: 
+   - Descargar GnuWin32 gzip desde http://gnuwin32.sourceforge.net/packages/gzip.htm
+   - Instalar y agregar al PATH: `C:\Program Files (x86)\GnuWin32\bin`
+   - O usar WSL (Windows Subsystem for Linux)
+3. Linux: `sudo apt-get install gzip`
+4. macOS: gzip viene preinstalado, verificar permisos
+5. Reiniciar aplicación después de instalar
+
 ### La aplicación no inicia
 **Solución:**
 1. Verificar que Java 14+ esté instalado: `java -version`
@@ -387,6 +439,6 @@ in the Software without restriction...
 ---
 
 **Versión:** 1.0-SNAPSHOT  
-**Última actualización:** 20 de Noviembre de 2025  
+**Última actualización:** 21 de Noviembre de 2025  
 **Estado:** Producción Ready
 
