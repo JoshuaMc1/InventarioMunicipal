@@ -92,6 +92,16 @@ public class UsersController {
             }
         });
 
+        // Búsqueda automática con debounce de 500ms
+        javafx.animation.PauseTransition searchPause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
+        txtSearch.textProperty().addListener((obs, oldVal, newVal) -> {
+            searchPause.setOnFinished(event -> {
+                currentPage = 1;
+                loadPageFromRepo(currentPage);
+            });
+            searchPause.playFromStart();
+        });
+
         loadPageFromRepo(1);
         configurePermissions();
     }
@@ -117,11 +127,6 @@ public class UsersController {
         Logs.info(getClass(), "Permisos de usuarios configurados");
     }
 
-    @FXML
-    public void onSearch() {
-        currentPage = 1;
-        loadPageFromRepo(currentPage);
-    }
 
     @FXML
     public void onPrev() {
@@ -313,7 +318,7 @@ public class UsersController {
 
         // Hacer el diálogo redimensionable y darle un tamaño inicial un poco mayor
         d.setResizable(true);
-        d.getDialogPane().setPrefSize(680, 300);
+        d.getDialogPane().setPrefSize(680, 380);
 
         d.setTitle(base == null ? "Nuevo usuario" : "Editar usuario");
         ButtonType save = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
@@ -364,9 +369,28 @@ public class UsersController {
         txtUsername.setStyle(inputStyle);
         cmbRole.setStyle(inputStyle);
 
+        // Helper texts para campos obligatorios
+        Label helperName = new Label("Obligatorio");
+        helperName.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperUsername = new Label("Obligatorio");
+        helperUsername.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperRole = new Label("Obligatorio");
+        helperRole.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+
+        // Verificar si el usuario actual es root
+        User currentUser = com.joshuamc1.inventariomunicipal.core.Session.getCurrentUser();
+        boolean isRoot = currentUser != null && "root".equalsIgnoreCase(currentUser.getRolNombre());
+
         if (base != null) {
             txtName.setText(base.getString("name"));
             txtUsername.setText(base.getString("username"));
+
+            // Deshabilitar username al editar si NO es root
+            if (!isRoot) {
+                txtUsername.setDisable(true);
+                txtUsername.setStyle(inputStyle + "; -fx-opacity: 0.6;");
+            }
+
             // Seleccionar el rol actual
             com.joshuamc1.inventariomunicipal.models.Rol rolActual = base.getRol();
             if (rolActual != null) {
@@ -384,6 +408,42 @@ public class UsersController {
             }
         }
 
+        // Validación de username duplicado
+        javafx.beans.property.BooleanProperty usernameExists = new javafx.beans.property.SimpleBooleanProperty(false);
+        if (base == null) {
+            // Solo validar en creación
+            com.joshuamc1.inventariomunicipal.utils.ValidationHelper.validateUniqueField(
+                txtUsername,
+                userService::existsByUsername,
+                helperUsername,
+                "El nombre de usuario ya existe"
+            );
+
+            // Actualizar el binding cuando cambie el estado de validación
+            txtUsername.focusedProperty().addListener((obs, was, is) -> {
+                if (!is && !txtUsername.getText().trim().isEmpty()) {
+                    usernameExists.set(userService.existsByUsername(txtUsername.getText().trim()));
+                }
+            });
+        } else {
+            // Validar en edición excluyendo el usuario actual
+            Integer currentId = base.getInteger("id");
+            com.joshuamc1.inventariomunicipal.utils.ValidationHelper.validateUniqueFieldWithId(
+                txtUsername,
+                currentId,
+                userService::getIdByUsername,
+                helperUsername,
+                "El nombre de usuario ya existe"
+            );
+
+            txtUsername.focusedProperty().addListener((obs, was, is) -> {
+                if (!is && !txtUsername.getText().trim().isEmpty()) {
+                    Integer foundId = userService.getIdByUsername(txtUsername.getText().trim());
+                    usernameExists.set(foundId != null && !foundId.equals(currentId));
+                }
+            });
+        }
+
         Label lblName = new Label("Nombre");
         lblName.setStyle(lblStyle);
         Label lblUsername = new Label("Usuario");
@@ -395,9 +455,15 @@ public class UsersController {
         gp.setHgap(10);
         gp.setVgap(10);
         gp.setPadding(new javafx.geometry.Insets(10));
-        gp.addRow(0, lblName, txtName);
-        gp.addRow(1, lblUsername, txtUsername);
-        gp.addRow(2, lblRole, cmbRole);
+        gp.add(lblName, 0, 0);
+        gp.add(txtName, 1, 0);
+        gp.add(helperName, 1, 1);
+        gp.add(lblUsername, 0, 2);
+        gp.add(txtUsername, 1, 2);
+        gp.add(helperUsername, 1, 3);
+        gp.add(lblRole, 0, 4);
+        gp.add(cmbRole, 1, 4);
+        gp.add(helperRole, 1, 5);
 
         // Permitir que los controles ocupen el espacio horizontal disponible
         gp.setPrefWidth(440);
@@ -410,11 +476,25 @@ public class UsersController {
         Node btnSave = d.getDialogPane().lookupButton(save);
         BooleanBinding invalid = txtName.textProperty().isEmpty()
                 .or(txtUsername.textProperty().isEmpty())
-                .or(cmbRole.getSelectionModel().selectedItemProperty().isNull());
+                .or(cmbRole.getSelectionModel().selectedItemProperty().isNull())
+                .or(usernameExists);
         btnSave.disableProperty().bind(invalid);
 
         d.setResultConverter(bt -> {
             if (bt == save) {
+                // Verificar una última vez antes de guardar
+                if (!txtUsername.isDisabled()) {
+                    String username = txtUsername.getText().trim();
+                    Integer existingId = userService.getIdByUsername(username);
+                    if (existingId != null) {
+                        Integer currentId = base != null ? base.getInteger("id") : null;
+                        if (currentId == null || !existingId.equals(currentId)) {
+                            Platform.runLater(() -> Utils.showAlert("Error", "El nombre de usuario ya existe"));
+                            return null;
+                        }
+                    }
+                }
+
                 User u = new User();
                 u.set("name", txtName.getText());
                 u.set("username", txtUsername.getText());

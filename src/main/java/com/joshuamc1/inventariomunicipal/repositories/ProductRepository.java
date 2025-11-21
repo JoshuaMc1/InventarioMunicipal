@@ -10,6 +10,24 @@ public class ProductRepository {
         return Product.findAll();
     }
 
+    /**
+     * Busca productos por nombre o ID con límite de resultados
+     * Optimizado para búsqueda en ComboBox con muchos productos
+     */
+    public List<Product> searchProducts(String query, int limit) {
+        if (query == null || query.trim().isEmpty()) {
+            // Sin búsqueda: devolver los primeros N productos ordenados por nombre
+            return Product.findAll().limit(limit).orderBy("name");
+        }
+
+        String searchPattern = "%" + query.trim() + "%";
+
+        // Buscar por nombre o ID (convertido a String para búsqueda)
+        return Product.where("name LIKE ? OR CAST(id AS CHAR) LIKE ?", searchPattern, searchPattern)
+            .limit(limit)
+            .orderBy("name");
+    }
+
     public Product findById(Integer id) {
         return Product.findById(id);
     }

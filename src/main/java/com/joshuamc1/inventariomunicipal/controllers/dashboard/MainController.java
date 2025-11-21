@@ -242,80 +242,120 @@ public class MainController {
         Dialog<Void> aboutDialog = new Dialog<>();
         aboutDialog.setTitle("Acerca de");
         aboutDialog.setHeaderText("Sistema de Inventario Municipal");
+        aboutDialog.setResizable(true);
+        aboutDialog.getDialogPane().setPrefSize(700, 450);
 
-        // Crear contenido del diálogo
-        VBox content = new VBox(15);
-        content.setStyle("-fx-padding: 20; -fx-alignment: center-left;");
+        // Contenedor principal horizontal
+        HBox mainContent = new HBox(30);
+        mainContent.setStyle("-fx-padding: 20; -fx-alignment: center;");
 
-        // Logo (opcional, si quieres incluir la imagen)
+        // Columna izquierda: Logo y versión
+        VBox leftColumn = new VBox(15);
+        leftColumn.setStyle("-fx-alignment: center;");
+        leftColumn.setPrefWidth(250);
+
+        // Logo
         try {
             ImageView logo = new ImageView(new Image(
                 Objects.requireNonNull(getClass().getResourceAsStream("/images/logo.png"))
             ));
-            logo.setFitHeight(80);
-            logo.setFitWidth(80);
+            logo.setFitHeight(120);
+            logo.setFitWidth(120);
             logo.setPreserveRatio(true);
-            content.getChildren().add(logo);
+            leftColumn.getChildren().add(logo);
         } catch (Exception e) {
             // Si no se puede cargar el logo, continuar sin él
         }
 
-        // Información del sistema
         Label lblVersion = new Label("Versión 1.0.0");
-        lblVersion.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        lblVersion.setStyle("-fx-font-size: 18px; -fx-font-weight: bold;");
+        leftColumn.getChildren().add(lblVersion);
 
-        Label lblDescription = new Label("Sistema de Gestión de Inventario Municipal");
-        lblDescription.setStyle("-fx-font-size: 14px;");
+        Label lblDescription = new Label("Sistema de Gestión\nde Inventario Municipal");
+        lblDescription.setStyle("-fx-font-size: 14px; -fx-text-alignment: center;");
+        lblDescription.setWrapText(true);
+        leftColumn.getChildren().add(lblDescription);
 
-        // Separador
-        Label lblSeparator1 = new Label("─────────────────────────────────────");
-        lblSeparator1.setStyle("-fx-text-fill: #cccccc;");
+        // Columna derecha: Información
+        VBox rightColumn = new VBox(12);
+        rightColumn.setStyle("-fx-alignment: top-left;");
+        rightColumn.setPrefWidth(380);
 
-        // Información del desarrollador
-        Label lblDeveloper = new Label("Desarrollado por:");
-        lblDeveloper.setStyle("-fx-font-size: 13px; -fx-font-weight: bold;");
+        // Desarrollador
+        Label lblDeveloperTitle = new Label("Desarrollado por:");
+        lblDeveloperTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2196F3;");
+        rightColumn.getChildren().add(lblDeveloperTitle);
 
         Label lblName = new Label("Joshua David Mclean Escaleras");
-        lblName.setStyle("-fx-font-size: 13px;");
+        lblName.setStyle("-fx-font-size: 13px; -fx-font-weight: bold;");
+        rightColumn.getChildren().add(lblName);
+
+        // Información académica
+        VBox academicInfo = new VBox(5);
+        academicInfo.setStyle("-fx-padding: 0 0 0 15;");
 
         Label lblUniversity = new Label("Universidad Tecnológica de Honduras (UTH)");
         lblUniversity.setStyle("-fx-font-size: 12px;");
 
-        Label lblAccount = new Label("No. Cuenta (UTH): 201920020146");
+        Label lblAccount = new Label("No. Cuenta: 201920020146");
         lblAccount.setStyle("-fx-font-size: 12px;");
 
         Label lblCareer = new Label("Ingeniería en Computación");
-        lblCareer.setStyle("-fx-font-size: 12px;");
+        lblCareer.setStyle("-fx-font-size: 12px; -fx-font-style: italic;");
+
+        academicInfo.getChildren().addAll(lblUniversity, lblAccount, lblCareer);
+        rightColumn.getChildren().add(academicInfo);
+
+        // Separador
+        javafx.scene.control.Separator separator1 = new javafx.scene.control.Separator();
+        rightColumn.getChildren().add(separator1);
 
         // Información del proyecto
-        Label lblSeparator2 = new Label("─────────────────────────────────────");
-        lblSeparator2.setStyle("-fx-text-fill: #cccccc;");
+        Label lblProjectTitle = new Label("Proyecto:");
+        lblProjectTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2196F3;");
+        rightColumn.getChildren().add(lblProjectTitle);
 
-        Label lblProject = new Label("Proyecto de Práctica Profesional");
-        lblProject.setStyle("-fx-font-size: 12px; -fx-font-style: italic;");
+        VBox projectInfo = new VBox(5);
+        projectInfo.setStyle("-fx-padding: 0 0 0 15;");
 
-        Label lblDeliveredTo = new Label("Entregado a: Departamento de Sistemas");
-        lblDeliveredTo.setStyle("-fx-font-size: 12px;");
+        Label lblProject = new Label("Práctica Profesional");
+        lblProject.setStyle("-fx-font-size: 12px;");
 
         Label lblMunicipality = new Label("Municipalidad de Olanchito");
         lblMunicipality.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
 
-        // GitHub
-        Label lblSeparator3 = new Label("─────────────────────────────────────");
-        lblSeparator3.setStyle("-fx-text-fill: #cccccc;");
+        Label lblDeliveredTo = new Label("Departamento de Sistemas");
+        lblDeliveredTo.setStyle("-fx-font-size: 12px;");
 
+        projectInfo.getChildren().addAll(lblProject, lblMunicipality, lblDeliveredTo);
+        rightColumn.getChildren().add(projectInfo);
+
+        // Separador
+        javafx.scene.control.Separator separator2 = new javafx.scene.control.Separator();
+        rightColumn.getChildren().add(separator2);
+
+        // Contacto
+        Label lblContactTitle = new Label("Contacto:");
+        lblContactTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2196F3;");
+        rightColumn.getChildren().add(lblContactTitle);
+
+        HBox githubBox = new HBox(5);
+        githubBox.setStyle("-fx-padding: 0 0 0 15;");
         Label lblGithub = new Label("GitHub:");
         lblGithub.setStyle("-fx-font-size: 12px;");
-
         Label lblGithubLink = new Label("@JoshuaMc1");
-        lblGithubLink.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true;");
+        lblGithubLink.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true; -fx-cursor: hand;");
+        githubBox.getChildren().addAll(lblGithub, lblGithubLink);
+        rightColumn.getChildren().add(githubBox);
 
-        // Correo electrónico
-        Label lblEmail = new Label("Correo electrónico:");
+        HBox emailBox = new HBox(5);
+        emailBox.setStyle("-fx-padding: 0 0 0 15;");
+        Label lblEmail = new Label("Email:");
         lblEmail.setStyle("-fx-font-size: 12px;");
-
         Label lblEmailAddress = new Label("joshua15mclean@gmail.com");
-        lblEmailAddress.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true;");
+        lblEmailAddress.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true; -fx-cursor: hand;");
+        emailBox.getChildren().addAll(lblEmail, lblEmailAddress);
+        rightColumn.getChildren().add(emailBox);
 
         // Linkear el GitHub
         lblGithubLink.setOnMouseClicked(event -> {
@@ -329,36 +369,14 @@ public class MainController {
 
         // Año
         Label lblYear = new Label("© 2025 - Software Libre bajo Licencia MIT");
+        lblYear.setStyle("-fx-font-size: 11px; -fx-text-fill: #666666; -fx-padding: 10 0 0 15;");
+        rightColumn.getChildren().add(lblYear);
 
+        // Agregar columnas al contenedor principal
+        mainContent.getChildren().addAll(leftColumn, rightColumn);
 
-        lblYear.setStyle("-fx-font-size: 11px; -fx-text-fill: #666666;");
-
-        // Agregar todos los elementos al contenido
-        content.getChildren().addAll(
-            lblVersion,
-            lblDescription,
-            lblSeparator1,
-            lblDeveloper,
-            lblName,
-            lblUniversity,
-            lblAccount,
-            lblCareer,
-            lblSeparator2,
-            lblProject,
-            lblDeliveredTo,
-            lblMunicipality,
-            lblSeparator3,
-            lblGithub,
-            lblGithubLink,
-            lblEmail,
-            lblEmailAddress,
-            lblYear
-        );
-
-        aboutDialog.getDialogPane().setContent(content);
+        aboutDialog.getDialogPane().setContent(mainContent);
         aboutDialog.getDialogPane().getButtonTypes().add(javafx.scene.control.ButtonType.CLOSE);
-        aboutDialog.getDialogPane().setMinWidth(450);
-        aboutDialog.getDialogPane().setMinHeight(500);
 
         aboutDialog.showAndWait();
     }

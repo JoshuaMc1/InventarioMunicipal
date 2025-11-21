@@ -26,7 +26,7 @@
                 <font>
                    <Font size="14.0" />
                 </font></TextField>
-                <Button onAction="#onSearch" text="Buscar">
+                <Button fx:id="btnRefresh" text="Refrescar">
                 <font>
                    <Font name="System Bold" size="14.0" />
                 </font></Button>

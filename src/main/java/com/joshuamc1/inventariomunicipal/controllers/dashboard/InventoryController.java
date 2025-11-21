@@ -65,10 +65,14 @@ public class InventoryController {
         btnEdit.setOnAction(e -> openEditDialog());
         btnDelete.setOnAction(e -> deleteSelected());
 
-        // Búsqueda en tiempo real
+        // Búsqueda automática con debounce de 500ms
+        javafx.animation.PauseTransition searchPause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
         txtSearch.textProperty().addListener((obs, oldVal, newVal) -> {
-            currentPage = 1;
-            applyFiltersAndPagination();
+            searchPause.setOnFinished(event -> {
+                currentPage = 1;
+                applyFiltersAndPagination();
+            });
+            searchPause.playFromStart();
         });
         btnClearSearch.setOnAction(e -> {
             txtSearch.clear();
@@ -240,12 +244,16 @@ public class InventoryController {
         TextArea txtDesc = new TextArea();
         ComboBox<Units> cbUnit = new ComboBox<>(FXCollections.observableArrayList(Units.values()));
         cbUnit.setValue(Units.UNIDAD);
-        TextField txtCurrentStock = new TextField("0");
+        TextField txtCurrentStock = new TextField();
         TextField txtMinStock = new TextField();
+
+        // Aplicar validadores numéricos
+        txtCurrentStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());
+        txtMinStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());
 
         txtDesc.setPrefRowCount(3);
 
-        // Agregar estilos a los labels ["-fx-font-weight: bold; -fx-font-size: 17;"] y campos de entrada ["-fx-font-weight: semibold; -fx-font-size: 17;"]
+        // Agregar estilos a los labels y campos de entrada
         txtName.setStyle("-fx-font-size: 17;");
         txtDesc.setStyle("-fx-font-size: 17;");
         cbUnit.setStyle("-fx-font-size: 17;");
@@ -264,21 +272,45 @@ public class InventoryController {
         lblCurrentStock.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
         lblMinStock.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
 
+        // Helper texts para campos obligatorios
+        Label helperName = new Label("Obligatorio");
+        helperName.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperUnit = new Label("Obligatorio");
+        helperUnit.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperCurrentStock = new Label("Obligatorio");
+        helperCurrentStock.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperMinStock = new Label("Obligatorio");
+        helperMinStock.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
         grid.add(lblName, 0, 0);
         grid.add(txtName, 1, 0);
-        grid.add(lblDescription, 0, 1);
-        grid.add(txtDesc, 1, 1);
-        grid.add(lblUnit, 0, 2);
-        grid.add(cbUnit, 1, 2);
-        grid.add(lblCurrentStock, 0, 3);
-        grid.add(txtCurrentStock, 1, 3);
-        grid.add(lblMinStock, 0, 4);
-        grid.add(txtMinStock, 1, 4);
+        grid.add(helperName, 1, 1);
+        grid.add(lblDescription, 0, 2);
+        grid.add(txtDesc, 1, 2);
+        grid.add(lblUnit, 0, 3);
+        grid.add(cbUnit, 1, 3);
+        grid.add(helperUnit, 1, 4);
+        grid.add(lblCurrentStock, 0, 5);
+        grid.add(txtCurrentStock, 1, 5);
+        grid.add(helperCurrentStock, 1, 6);
+        grid.add(lblMinStock, 0, 7);
+        grid.add(txtMinStock, 1, 7);
+        grid.add(helperMinStock, 1, 8);
 
         dialog.getDialogPane().setContent(grid);
+
+        // Deshabilitar botón crear hasta que todos los campos obligatorios estén llenos
+        javafx.scene.Node createButton = dialog.getDialogPane().lookupButton(createBtn);
+        javafx.beans.binding.BooleanBinding isInvalid =
+            com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isTextFieldEmpty(txtName)
+            .or(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isComboBoxEmpty(cbUnit))
+            .or(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isTextFieldEmpty(txtCurrentStock))
+            .or(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isTextFieldEmpty(txtMinStock));
+
+        createButton.disableProperty().bind(isInvalid);
 
         dialog.setResultConverter(btn -> {
             if (btn == createBtn) {
@@ -290,18 +322,19 @@ public class InventoryController {
 
                 try {
                     current = Double.parseDouble(txtCurrentStock.getText().trim());
-                } catch (Exception ignored) {}
-
-                try {
-                    min = Double.parseDouble(txtMinStock.getText().trim());
-                } catch (Exception ignored) {}
-
-                if (name.isEmpty()) {
-                    Utils.showAlert("Error", "El nombre es requerido");
+                } catch (Exception e) {
+                    Utils.showAlert("Error", "Stock actual debe ser un número válido");
                     return null;
                 }
 
-                return productService.createProduct(name, desc, unit == null ? Units.OTROS.getDbValue() : unit.getDbValue(), current, min);
+                try {
+                    min = Double.parseDouble(txtMinStock.getText().trim());
+                } catch (Exception e) {
+                    Utils.showAlert("Error", "Stock mínimo debe ser un número válido");
+                    return null;
+                }
+
+                return productService.createProduct(name, desc, unit.getDbValue(), current, min);
             }
             return null;
         });
@@ -339,6 +372,10 @@ public class InventoryController {
         TextField txtCurrentStock = new TextField(String.valueOf(sel.getDouble("current_stock") == null ? 0.0 : sel.getDouble("current_stock")));
         TextField txtMinStock = new TextField(String.valueOf(sel.getDouble("minimum_stock")));
 
+        // Aplicar validadores numéricos
+        txtCurrentStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());
+        txtMinStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());
+
         txtName.setStyle("-fx-font-size: 17;");
         txtDesc.setStyle("-fx-font-size: 17;");
         cbUnit.setStyle("-fx-font-size: 17;");
@@ -357,21 +394,45 @@ public class InventoryController {
         lblCurrentStock.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
         lblMinStock.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
 
+        // Helper texts para campos obligatorios
+        Label helperName = new Label("Obligatorio");
+        helperName.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperUnit = new Label("Obligatorio");
+        helperUnit.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperCurrentStock = new Label("Obligatorio");
+        helperCurrentStock.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperMinStock = new Label("Obligatorio");
+        helperMinStock.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
         grid.add(lblName, 0, 0);
         grid.add(txtName, 1, 0);
-        grid.add(lblDescription, 0, 1);
-        grid.add(txtDesc, 1, 1);
-        grid.add(lblUnit, 0, 2);
-        grid.add(cbUnit, 1, 2);
-        grid.add(lblCurrentStock, 0, 3);
-        grid.add(txtCurrentStock, 1, 3);
-        grid.add(lblMinStock, 0, 4);
-        grid.add(txtMinStock, 1, 4);
+        grid.add(helperName, 1, 1);
+        grid.add(lblDescription, 0, 2);
+        grid.add(txtDesc, 1, 2);
+        grid.add(lblUnit, 0, 3);
+        grid.add(cbUnit, 1, 3);
+        grid.add(helperUnit, 1, 4);
+        grid.add(lblCurrentStock, 0, 5);
+        grid.add(txtCurrentStock, 1, 5);
+        grid.add(helperCurrentStock, 1, 6);
+        grid.add(lblMinStock, 0, 7);
+        grid.add(txtMinStock, 1, 7);
+        grid.add(helperMinStock, 1, 8);
 
         dialog.getDialogPane().setContent(grid);
+
+        // Deshabilitar botón guardar hasta que todos los campos obligatorios estén llenos
+        javafx.scene.Node saveButton = dialog.getDialogPane().lookupButton(saveBtn);
+        javafx.beans.binding.BooleanBinding isInvalid =
+            com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isTextFieldEmpty(txtName)
+            .or(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isComboBoxEmpty(cbUnit))
+            .or(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isTextFieldEmpty(txtCurrentStock))
+            .or(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isTextFieldEmpty(txtMinStock));
+
+        saveButton.disableProperty().bind(isInvalid);
 
         dialog.setResultConverter(btn -> {
             if (btn == saveBtn) {
@@ -379,25 +440,26 @@ public class InventoryController {
                 String desc = txtDesc.getText().trim();
                 Units unit = cbUnit.getValue();
 
-                double min = sel.getDouble("minimum_stock");
-                double current = sel.getDouble("current_stock") == null ? 0.0 : sel.getDouble("current_stock");
+                double min = 0.0;
+                double current = 0.0;
 
                 try {
                     current = Double.parseDouble(txtCurrentStock.getText().trim());
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    Utils.showAlert("Error", "Stock actual debe ser un número válido");
+                    return null;
+                }
 
                 try {
                     min = Double.parseDouble(txtMinStock.getText().trim());
-                } catch (Exception ignored) {}
-
-                if (name.isEmpty()) {
-                    Utils.showAlert("Error", "El nombre es requerido");
+                } catch (Exception e) {
+                    Utils.showAlert("Error", "Stock mínimo debe ser un número válido");
                     return null;
                 }
 
                 sel.set("name", name);
                 sel.set("description", desc);
-                sel.set("unit", unit == null ? Units.OTROS.getDbValue() : unit.getDbValue());
+                sel.set("unit", unit.getDbValue());
                 sel.set("minimum_stock", min);
                 sel.set("current_stock", current);
 

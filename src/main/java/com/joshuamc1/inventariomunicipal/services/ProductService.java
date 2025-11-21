@@ -17,6 +17,16 @@ public class ProductService {
         return DatabaseManager.callInConnection(repo::findAll);
     }
 
+    /**
+     * Busca productos por nombre o ID con límite de resultados (optimizado para ComboBox)
+     * @param query Texto a buscar (nombre o ID)
+     * @param limit Número máximo de resultados
+     * @return Lista limitada de productos
+     */
+    public List<Product> searchProducts(String query, int limit) {
+        return DatabaseManager.callInConnection(() -> repo.searchProducts(query, limit));
+    }
+
     public Product findById(Integer id) {
         return DatabaseManager.callInConnection(() -> repo.findById(id));
     }

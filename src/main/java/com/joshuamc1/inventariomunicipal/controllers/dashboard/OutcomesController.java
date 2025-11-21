@@ -25,6 +25,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import javafx.animation.PauseTransition;
 import org.jetbrains.annotations.NotNull;
@@ -56,6 +57,8 @@ public class OutcomesController {
     @FXML private Label lblPage;
     @FXML private ChoiceBox<Integer> choicePageSize;
     @FXML private Button btnNewOutcome;
+    @FXML private TextField txtSearch;
+    @FXML private Button btnRefresh;
 
     private int currentPage = 1;
     private int pageSize = 25;
@@ -128,6 +131,23 @@ public class OutcomesController {
             }
         });
 
+        // Botón refrescar
+        if (btnRefresh != null) {
+            btnRefresh.setOnAction(e -> loadPageFromRepo(currentPage));
+        }
+
+        // Búsqueda automática con debounce de 500ms
+        if (txtSearch != null) {
+            PauseTransition searchPause = new PauseTransition(Duration.millis(500));
+            txtSearch.textProperty().addListener((obs, oldVal, newVal) -> {
+                searchPause.setOnFinished(event -> {
+                    currentPage = 1;
+                    loadPageFromRepo(currentPage);
+                });
+                searchPause.playFromStart();
+            });
+        }
+
         loadPageFromRepo(1);
 
         configurePermissions();
@@ -172,14 +192,46 @@ public class OutcomesController {
 
     private void loadPageFromRepo(int page) {
         final int p = page;
+        final String searchText = txtSearch != null ? txtSearch.getText() : "";
         new Thread(() -> {
             try {
-                long count = transactionService.countByType(Transaction.TYPE_OUT);
+                long count;
+                List<Transaction> pageItems;
+                int offset = (Math.max(1, p) - 1) * pageSize;
+
+                if (searchText == null || searchText.trim().isEmpty()) {
+                    count = transactionService.countByType(Transaction.TYPE_OUT);
+                    pageItems = transactionService.findByTypePage(Transaction.TYPE_OUT, pageSize, offset);
+                } else {
+                    // Búsqueda filtrada
+                    String search = searchText.trim().toLowerCase();
+                    List<Transaction> allTransactions = transactionService.findByType(Transaction.TYPE_OUT);
+                    List<Transaction> filtered = allTransactions.stream()
+                        .filter(t -> {
+                            if (String.valueOf(t.getInteger("id")).contains(search)) return true;
+                            Product product = productService.findById(t.getInteger("product_id"));
+                            if (product != null && product.getString("name").toLowerCase().contains(search)) return true;
+                            Integer personId = t.getInteger("person_id");
+                            if (personId != null) {
+                                Person person = personService.findById(personId);
+                                if (person != null) {
+                                    if (person.getString("dni").toLowerCase().contains(search)) return true;
+                                    if (person.getFullName().toLowerCase().contains(search)) return true;
+                                }
+                            }
+                            return false;
+                        })
+                        .collect(java.util.stream.Collectors.toList());
+                    count = filtered.size();
+                    int fromIndex = Math.min(offset, filtered.size());
+                    int toIndex = Math.min(offset + pageSize, filtered.size());
+                    pageItems = fromIndex < toIndex ? filtered.subList(fromIndex, toIndex) : List.of();
+                }
+
                 int total = (int) count;
                 int pages = Math.max(1, (int) Math.ceil(total / (double) pageSize));
                 int pageToLoad = Math.min(Math.max(1, p), pages);
-                int offset = (pageToLoad - 1) * pageSize;
-                List<Transaction> pageItems = transactionService.findByTypePage(Transaction.TYPE_OUT, pageSize, offset);
+
                 Platform.runLater(() -> {
                     totalItems = total;
                     totalPages = pages;
@@ -204,7 +256,7 @@ public class OutcomesController {
     private @NotNull Dialog<Transaction> transactionDialog() {
         Dialog<Transaction> d = new Dialog<>();
         d.setResizable(true);
-        d.getDialogPane().setPrefSize(960, 460);
+        d.getDialogPane().setPrefSize(1050, 580);
         d.setTitle("Nuevo Egreso");
         ButtonType save = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
         d.getDialogPane().getButtonTypes().addAll(save, ButtonType.CANCEL);
@@ -215,33 +267,63 @@ public class OutcomesController {
         var masterPeople = FXCollections.<Person>observableArrayList();
         var filteredPeople = new FilteredList<>(masterPeople, p -> true);
 
-        // Combos
+        // === PRODUCTO ===
         ComboBox<Product> cmbProduct = new ComboBox<>(filteredProducts);
         cmbProduct.setPromptText("Seleccione producto");
-        cmbProduct.setCellFactory(lv -> new ListCell<>() { @Override protected void updateItem(Product it, boolean empty){ super.updateItem(it,empty); setText(empty||it==null?null: it.getInteger("id")+" - "+it.getString("name")+" (Stock: "+it.getDouble("current_stock")+")"); }});
-        cmbProduct.setButtonCell(new ListCell<>() { @Override protected void updateItem(Product it, boolean empty){ super.updateItem(it,empty); setText(empty||it==null?null: it.getInteger("id")+" - "+it.getString("name")+" (Stock: "+it.getDouble("current_stock")+")"); }});
+        cmbProduct.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(Product it, boolean empty){
+                super.updateItem(it,empty);
+                setText(empty||it==null?null: it.getInteger("id")+" - "+it.getString("name")+" (Stock: "+it.getDouble("current_stock")+")");
+            }
+        });
+        cmbProduct.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(Product it, boolean empty){
+                super.updateItem(it,empty);
+                setText(empty||it==null?null: it.getInteger("id")+" - "+it.getString("name")+" (Stock: "+it.getDouble("current_stock")+")");
+            }
+        });
 
+        // === PERSONA ===
         ComboBox<Person> cmbPerson = new ComboBox<>(filteredPeople);
         cmbPerson.setPromptText("Seleccione persona");
-        cmbPerson.setCellFactory(lv -> new ListCell<>() { @Override protected void updateItem(Person it, boolean empty){ super.updateItem(it,empty); setText(empty||it==null?null: it.getString("dni")+" - "+it.getFullName()); }});
-        cmbPerson.setButtonCell(new ListCell<>() { @Override protected void updateItem(Person it, boolean empty){ super.updateItem(it,empty); setText(empty||it==null?null: it.getString("dni")+" - "+it.getFullName()); }});
+        cmbPerson.setCellFactory(lv -> new ListCell<>() {
+            @Override protected void updateItem(Person it, boolean empty){
+                super.updateItem(it,empty);
+                setText(empty||it==null?null: it.getString("dni")+" - "+it.getFullName());
+            }
+        });
+        cmbPerson.setButtonCell(new ListCell<>() {
+            @Override protected void updateItem(Person it, boolean empty){
+                super.updateItem(it,empty);
+                setText(empty||it==null?null: it.getString("dni")+" - "+it.getFullName());
+            }
+        });
 
         // Campos de búsqueda con debounce
-        TextField txtSearchProduct = new TextField(); txtSearchProduct.setPromptText("Buscar producto por ID o nombre...");
-        TextField txtSearchPerson = new TextField(); txtSearchPerson.setPromptText("Buscar persona por DNI o nombre...");
-        PauseTransition productDebounce = new PauseTransition(Duration.millis(150));
-        PauseTransition personDebounce = new PauseTransition(Duration.millis(150));
+        TextField txtSearchProduct = new TextField();
+        txtSearchProduct.setPromptText("Buscar producto por ID o nombre...");
+        TextField txtSearchPerson = new TextField();
+        txtSearchPerson.setPromptText("Buscar persona por DNI o nombre...");
+        PauseTransition productDebounce = new PauseTransition(Duration.millis(300));
+        PauseTransition personDebounce = new PauseTransition(Duration.millis(300));
 
         txtSearchProduct.textProperty().addListener((obs, old, val) -> {
             productDebounce.stop();
             productDebounce.setOnFinished(e -> {
-                String q = val == null ? "" : val.trim().toLowerCase();
-                filteredProducts.setPredicate(p -> {
-                    if(q.isEmpty()) return true;
-                    String name = p.getString("name"); Integer id = p.getInteger("id");
-                    return (name!=null && name.toLowerCase().contains(q)) || (id!=null && String.valueOf(id).contains(q));
-                });
-                if(!filteredProducts.contains(cmbProduct.getValue())) cmbProduct.getSelectionModel().clearSelection();
+                String query = val == null ? "" : val.trim();
+                if (query.length() >= 2 || query.isEmpty()) {
+                    // Buscar dinámicamente desde BD con límite de 100
+                    new Thread(() -> {
+                        List<Product> results = productService.searchProducts(query, 100);
+                        Platform.runLater(() -> {
+                            Product selected = cmbProduct.getValue();
+                            masterProducts.setAll(results);
+                            if (selected != null && results.contains(selected)) {
+                                cmbProduct.setValue(selected);
+                            }
+                        });
+                    }).start();
+                }
             });
             productDebounce.playFromStart();
         });
@@ -249,24 +331,32 @@ public class OutcomesController {
         txtSearchPerson.textProperty().addListener((obs, old, val) -> {
             personDebounce.stop();
             personDebounce.setOnFinished(e -> {
-                String q = val == null ? "" : val.trim().toLowerCase();
-                filteredPeople.setPredicate(p -> {
-                    if(q.isEmpty()) return true;
-                    String dni=p.getString("dni"); String f=p.getString("first_name"); String l=p.getString("last_name"); String full=p.getFullName();
-                    return (dni!=null && dni.toLowerCase().contains(q)) || (f!=null && f.toLowerCase().contains(q)) || (l!=null && l.toLowerCase().contains(q)) || (full!=null && full.toLowerCase().contains(q));
-                });
-                if(!filteredPeople.contains(cmbPerson.getValue())) cmbPerson.getSelectionModel().clearSelection();
+                String query = val == null ? "" : val.trim();
+                if (query.length() >= 2 || query.isEmpty()) {
+                    // Buscar dinámicamente desde BD con límite de 100
+                    new Thread(() -> {
+                        List<Person> results = personService.searchPeople(query, 100);
+                        Platform.runLater(() -> {
+                            Person selected = cmbPerson.getValue();
+                            masterPeople.setAll(results);
+                            if (selected != null && results.contains(selected)) {
+                                cmbPerson.setValue(selected);
+                            }
+                        });
+                    }).start();
+                }
             });
             personDebounce.playFromStart();
         });
 
-        TextField txtQuantity = new TextField(); txtQuantity.setPromptText("Cantidad");
-        // TextFormatter para permitir solo números decimales o enteros
+        // === DETALLES DE LA TRANSACCIÓN ===
+        TextField txtQuantity = new TextField();
+        txtQuantity.setPromptText("Cantidad");
         TextFormatter<String> quantityFormatter = new TextFormatter<>(change -> {
             String newText = change.getControlNewText();
-            if (newText.isEmpty()) return change; // permitir vacío (se valida luego)
-            if (newText.matches("\\d+(\\.\\d{0,4})?")) return change; // hasta 4 decimales
-            return null; // descartar cambios inválidos
+            if (newText.isEmpty()) return change;
+            if (newText.matches("\\d+(\\.\\d{0,4})?")) return change;
+            return null;
         });
         txtQuantity.setTextFormatter(quantityFormatter);
         txtQuantity.textProperty().addListener((obs, old, val) -> {
@@ -288,7 +378,9 @@ public class OutcomesController {
             }
         });
 
-        TextArea txtNotes = new TextArea(); txtNotes.setPromptText("Notas (opcional)"); txtNotes.setPrefRowCount(3);
+        TextArea txtNotes = new TextArea();
+        txtNotes.setPromptText("Notas (opcional)");
+        txtNotes.setPrefRowCount(3);
 
         // Stock actual
         Label lblStockTitle = new Label("Stock Actual:");
@@ -297,50 +389,71 @@ public class OutcomesController {
         // Estilos
         String lblStyle = "-fx-font-weight: bold; -fx-font-size: 17;";
         String inputStyle = "-fx-font-size: 17;";
-        cmbProduct.setStyle(inputStyle); cmbPerson.setStyle(inputStyle); txtSearchProduct.setStyle(inputStyle); txtSearchPerson.setStyle(inputStyle);
-        txtQuantity.setStyle(inputStyle); dpDate.setStyle(inputStyle); if(dpDate.getEditor()!=null) dpDate.getEditor().setStyle(inputStyle); txtNotes.setStyle(inputStyle);
-        lblStockTitle.setStyle(lblStyle); lblStockValue.setStyle("-fx-font-size: 17;");
+        cmbProduct.setStyle(inputStyle);
+        cmbPerson.setStyle(inputStyle);
+        txtSearchProduct.setStyle(inputStyle);
+        txtSearchPerson.setStyle(inputStyle);
+        txtQuantity.setStyle(inputStyle);
+        dpDate.setStyle(inputStyle);
+        if(dpDate.getEditor()!=null) dpDate.getEditor().setStyle(inputStyle);
+        txtNotes.setStyle(inputStyle);
+        lblStockTitle.setStyle(lblStyle);
+        lblStockValue.setStyle("-fx-font-size: 17;");
 
-        Label lblProduct = new Label("Producto*"); lblProduct.setStyle(lblStyle);
+        Label lblProduct = new Label("Producto*:"); lblProduct.setStyle(lblStyle);
         Label lblSearchProduct = new Label("Filtrar Producto:"); lblSearchProduct.setStyle(lblStyle);
-        Label lblQuantity = new Label("Cantidad*"); lblQuantity.setStyle(lblStyle);
-        Label lblDate = new Label("Fecha*"); lblDate.setStyle(lblStyle);
-        Label lblPerson = new Label("Persona*"); lblPerson.setStyle(lblStyle);
+        Label lblQuantity = new Label("Cantidad*:"); lblQuantity.setStyle(lblStyle);
+        Label lblDate = new Label("Fecha*:"); lblDate.setStyle(lblStyle);
+        Label lblPerson = new Label("Persona*:"); lblPerson.setStyle(lblStyle);
         Label lblSearchPerson = new Label("Filtrar Persona:"); lblSearchPerson.setStyle(lblStyle);
         Label lblNotes = new Label("Notas:"); lblNotes.setStyle(lblStyle);
 
-        // Botón para crear nueva persona
+        // Helper texts
+        Label helperProduct = new Label("Obligatorio");
+        helperProduct.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperQuantity = new Label("Obligatorio");
+        helperQuantity.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperDate = new Label("Obligatorio");
+        helperDate.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperPerson = new Label("Obligatorio");
+        helperPerson.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+
+        // Botón nueva persona
         Button btnNewPerson = new Button("+");
         btnNewPerson.setStyle("-fx-font-size: 17; -fx-font-weight: bold; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-cursor: hand;");
         btnNewPerson.setTooltip(new Tooltip("Crear nueva persona"));
         btnNewPerson.setOnAction(e -> {
             Person newPerson = PersonDialogHelper.showCreatePersonDialog();
             if (newPerson != null) {
-                // Agregar a la lista maestra
                 masterPeople.add(newPerson);
-                // Seleccionar automáticamente
                 cmbPerson.getSelectionModel().select(newPerson);
             }
         });
 
-        // HBox para ComboBox de persona + botón
         HBox personBox = new HBox(5, cmbPerson, btnNewPerson);
         HBox.setHgrow(cmbPerson, Priority.ALWAYS);
 
         GridPane gp = new GridPane();
-        gp.setHgap(12); gp.setVgap(12); gp.setPadding(new Insets(14));
-        // Fila 0 producto
+        gp.setHgap(12);
+        gp.setVgap(8);
+        gp.setPadding(new Insets(14));
+
+        // Fila 0-1 producto
         gp.add(lblProduct,0,0); gp.add(cmbProduct,1,0); gp.add(lblSearchProduct,2,0); gp.add(txtSearchProduct,3,0);
-        // Fila 1 stock
-        gp.add(lblStockTitle,0,1); gp.add(lblStockValue,1,1);
-        // Fila 2 cantidad
-        gp.add(lblQuantity,0,2); gp.add(txtQuantity,1,2);
-        // Fila 3 fecha
-        gp.add(lblDate,0,3); gp.add(dpDate,1,3);
-        // Fila 4 persona con botón
-        gp.add(lblPerson,0,4); gp.add(personBox,1,4); gp.add(lblSearchPerson,2,4); gp.add(txtSearchPerson,3,4);
-        // Fila 5 notas
-        gp.add(lblNotes,0,5); gp.add(txtNotes,1,5,3,1);
+        gp.add(helperProduct,1,1,3,1);
+        // Fila 2 stock
+        gp.add(lblStockTitle,0,2); gp.add(lblStockValue,1,2);
+        // Fila 3-4 cantidad
+        gp.add(lblQuantity,0,3); gp.add(txtQuantity,1,3);
+        gp.add(helperQuantity,1,4);
+        // Fila 5-6 fecha
+        gp.add(lblDate,0,5); gp.add(dpDate,1,5);
+        gp.add(helperDate,1,6);
+        // Fila 7-8 persona con botón
+        gp.add(lblPerson,0,7); gp.add(personBox,1,7); gp.add(lblSearchPerson,2,7); gp.add(txtSearchPerson,3,7);
+        gp.add(helperPerson,1,8,3,1);
+        // Fila 9 notas
+        gp.add(lblNotes,0,9); gp.add(txtNotes,1,9,3,1);
 
         GridPane.setHgrow(cmbProduct, Priority.ALWAYS);
         GridPane.setHgrow(txtSearchProduct, Priority.ALWAYS);
@@ -358,17 +471,29 @@ public class OutcomesController {
         HBox loadingBox = new HBox(10, pi, lblLoading);
         loadingBox.setPadding(new Insets(10));
         loadingBox.setStyle("-fx-background-color: rgba(255,255,255,0.85); -fx-border-color: #ccc; -fx-border-radius: 4; -fx-background-radius: 4;");
+
         StackPane stack = new StackPane(gp, loadingBox);
         StackPane.setMargin(loadingBox, new Insets(0));
         d.getDialogPane().setContent(stack);
 
-        // Deshabilitar controles mientras carga
+        // Deshabilitar campos inicialmente
         cmbProduct.setDisable(true); cmbPerson.setDisable(true); txtSearchProduct.setDisable(true); txtSearchPerson.setDisable(true);
         txtQuantity.setDisable(true); dpDate.setDisable(true); txtNotes.setDisable(true);
 
         // Carga asíncrona de listas
-        var productsTask = new Task<List<Product>>() { @Override protected List<Product> call(){ return productService.findAll(); } };
-        var peopleTask = new Task<List<Person>>() { @Override protected List<Person> call(){ return personService.findAll(); } };
+        // Carga asíncrona de listas OPTIMIZADA - Solo cargar 100 registros iniciales
+        var productsTask = new Task<List<Product>>() {
+            @Override
+            protected List<Product> call() {
+                return productService.searchProducts("", 100); // Límite de 100 productos iniciales
+            }
+        };
+        var peopleTask = new Task<List<Person>>() {
+            @Override
+            protected List<Person> call() {
+                return personService.searchPeople("", 100); // Límite de 100 personas iniciales
+            }
+        };
 
         Runnable tryFinish = () -> {
             if(productsTask.isDone() && peopleTask.isDone()) {

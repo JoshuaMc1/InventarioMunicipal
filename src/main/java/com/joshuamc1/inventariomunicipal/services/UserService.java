@@ -167,4 +167,28 @@ public class UserService {
             return ok;
         });
     }
+
+    /**
+     * Verifica si existe un usuario con el username dado
+     * @param username el nombre de usuario a verificar
+     * @return true si existe, false si no existe
+     */
+    public boolean existsByUsername(String username) {
+        return DatabaseManager.callInConnection(() -> {
+            User user = repo.findByUsername(username);
+            return user != null;
+        });
+    }
+
+    /**
+     * Obtiene el ID de un usuario por su username
+     * @param username el nombre de usuario
+     * @return el ID del usuario o null si no existe
+     */
+    public Integer getIdByUsername(String username) {
+        return DatabaseManager.callInConnection(() -> {
+            User user = repo.findByUsername(username);
+            return user != null ? user.getInteger("id") : null;
+        });
+    }
 }

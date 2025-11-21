@@ -142,10 +142,14 @@ public class AuditController implements AsyncLoadable {
             loadPageAsync(currentPage);
         });
 
-        // search triggers reload
-        txtSearch.textProperty().addListener((obs, oldV, newV) -> {
-            currentPage = 1;
-            loadPageAsync(currentPage);
+        // Búsqueda automática con debounce de 500ms
+        javafx.animation.PauseTransition searchPause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
+        txtSearch.textProperty().addListener((obs, oldV, newVal) -> {
+            searchPause.setOnFinished(event -> {
+                currentPage = 1;
+                loadPageAsync(currentPage);
+            });
+            searchPause.playFromStart();
         });
 
         btnExportCsv.setOnAction(e -> exportCsv());

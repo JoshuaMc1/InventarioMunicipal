@@ -276,7 +276,7 @@ public class RolesController {
         Dialog<Rol> dialog = new Dialog<>();
         dialog.setTitle(base == null ? "Nuevo Rol" : "Editar Rol");
         dialog.setResizable(true);
-        dialog.getDialogPane().setPrefSize(830, 300);
+        dialog.getDialogPane().setPrefSize(830, 380);
         String lblStyle = "-fx-font-weight: bold; -fx-font-size: 17;";
         String inputStyle = "-fx-font-size: 17;";
 
@@ -296,10 +296,65 @@ public class RolesController {
         txtNombre.setStyle(inputStyle);
         txtDescripcion.setStyle(inputStyle);
 
+        // Helper texts para campos obligatorios
+        Label helperNombre = new Label("Obligatorio");
+        helperNombre.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperDescripcion = new Label("Obligatorio");
+        helperDescripcion.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+
+        // Label para validación de nombre duplicado
+        Label helperNombreDuplicado = new Label("");
+        helperNombreDuplicado.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        helperNombreDuplicado.setVisible(false);
+
+        // Validación de nombre duplicado
+        javafx.beans.property.BooleanProperty nombreDuplicado = new javafx.beans.property.SimpleBooleanProperty(false);
+
         if (base != null) {
             txtNombre.setText(base.getString("nombre"));
             txtDescripcion.setText(base.getString("descripcion"));
             chkActivo.setSelected(base.isActivo());
+
+            // Validar al editar (excluir rol actual)
+            Integer currentId = base.getInteger("id");
+            txtNombre.focusedProperty().addListener((obs, was, is) -> {
+                if (!is && !txtNombre.getText().trim().isEmpty()) {
+                    String nombreBuscar = txtNombre.getText().trim().toUpperCase();
+                    try {
+                        Rol existente = Rol.findFirst("nombre = ?", nombreBuscar);
+                        if (existente != null && !existente.getInteger("id").equals(currentId)) {
+                            helperNombreDuplicado.setText("Ya existe un rol con este nombre");
+                            helperNombreDuplicado.setVisible(true);
+                            nombreDuplicado.set(true);
+                        } else {
+                            helperNombreDuplicado.setVisible(false);
+                            nombreDuplicado.set(false);
+                        }
+                    } catch (Exception e) {
+                        Logs.error(getClass(), "Error validando nombre de rol: {}", e.getMessage());
+                    }
+                }
+            });
+        } else {
+            // Validar al crear
+            txtNombre.focusedProperty().addListener((obs, was, is) -> {
+                if (!is && !txtNombre.getText().trim().isEmpty()) {
+                    String nombreBuscar = txtNombre.getText().trim().toUpperCase();
+                    try {
+                        Rol existente = Rol.findFirst("nombre = ?", nombreBuscar);
+                        if (existente != null) {
+                            helperNombreDuplicado.setText("Ya existe un rol con este nombre");
+                            helperNombreDuplicado.setVisible(true);
+                            nombreDuplicado.set(true);
+                        } else {
+                            helperNombreDuplicado.setVisible(false);
+                            nombreDuplicado.set(false);
+                        }
+                    } catch (Exception e) {
+                        Logs.error(getClass(), "Error validando nombre de rol: {}", e.getMessage());
+                    }
+                }
+            });
         }
 
         GridPane grid = new GridPane();
@@ -314,17 +369,44 @@ public class RolesController {
 
         grid.add(lblNombre, 0, 0);
         grid.add(txtNombre, 1, 0);
-        grid.add(lblDescripcion, 0, 1);
-        grid.add(txtDescripcion, 1, 1);
-        grid.add(chkActivo, 1, 2);
+        grid.add(helperNombre, 1, 1);
+        grid.add(helperNombreDuplicado, 1, 2);
+        grid.add(lblDescripcion, 0, 3);
+        grid.add(txtDescripcion, 1, 3);
+        grid.add(helperDescripcion, 1, 4);
+        grid.add(chkActivo, 1, 5);
 
         dialog.getDialogPane().setContent(grid);
 
+        // BooleanBinding para deshabilitar botón guardar si hay errores
+        javafx.scene.Node btnSave = dialog.getDialogPane().lookupButton(saveButton);
+        javafx.beans.binding.BooleanBinding isInvalid =
+            com.joshuamc1.inventariomunicipal.utils.ValidationHelper.isTextFieldEmpty(txtNombre)
+            .or(txtDescripcion.textProperty().isEmpty()) // TextArea no usa ValidationHelper
+            .or(nombreDuplicado);
+
+        btnSave.disableProperty().bind(isInvalid);
+
         dialog.setResultConverter(buttonType -> {
             if (buttonType == saveButton) {
+                // Validación final antes de guardar
+                String nombreFinal = txtNombre.getText().trim().toUpperCase();
+                try {
+                    Rol existente = Rol.findFirst("nombre = ?", nombreFinal);
+                    if (existente != null) {
+                        Integer currentId = base != null ? base.getInteger("id") : null;
+                        if (currentId == null || !existente.getInteger("id").equals(currentId)) {
+                            Platform.runLater(() -> Utils.showAlert("Error", "Ya existe un rol con este nombre"));
+                            return null;
+                        }
+                    }
+                } catch (Exception e) {
+                    Logs.error(getClass(), "Error validando nombre final: {}", e.getMessage());
+                }
+
                 Rol rol = base == null ? new Rol() : base;
-                rol.set("nombre", txtNombre.getText().toUpperCase());
-                rol.set("descripcion", txtDescripcion.getText());
+                rol.set("nombre", nombreFinal);
+                rol.set("descripcion", txtDescripcion.getText().trim());
                 rol.set("activo", chkActivo.isSelected() ? 1 : 0);
                 return rol;
             }

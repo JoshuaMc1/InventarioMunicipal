@@ -26,7 +26,7 @@ public class PersonDialogHelper {
     public static @NotNull Dialog<Person> createPersonDialog(Person base) {
         Dialog<Person> d = new Dialog<>();
         d.setResizable(true);
-        d.getDialogPane().setPrefSize(500, 350);
+        d.getDialogPane().setPrefSize(520, 470);
         d.setTitle(base == null ? "Nueva Persona" : "Editar Persona");
 
         ButtonType save = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
@@ -78,7 +78,11 @@ public class PersonDialogHelper {
         TextField txtLastName = new TextField();
         txtLastName.setPromptText("Apellido");
         TextField txtPhone = new TextField();
-        txtPhone.setPromptText("Teléfono");
+        txtPhone.setPromptText("0000-0000");
+
+        // Aplicar máscara de teléfono 0000-0000
+        txtPhone.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getPhoneFormatter());
+
         TextField txtInternalCode = new TextField();
         txtInternalCode.setPromptText("Código Interno (opcional)");
 
@@ -99,25 +103,80 @@ public class PersonDialogHelper {
         Label lblInternalCode = new Label("Código Interno");
         lblInternalCode.setStyle(lblStyle);
 
+        // Helper texts para campos obligatorios
+        Label helperDni = new Label("Obligatorio");
+        helperDni.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperFirstName = new Label("Obligatorio");
+        helperFirstName.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+        Label helperLastName = new Label("Obligatorio");
+        helperLastName.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
+
+        // Validación de DNI duplicado
+        javafx.beans.property.BooleanProperty dniExists = new javafx.beans.property.SimpleBooleanProperty(false);
+
         if (base != null) {
             txtDni.setText(base.getString("dni"));
             txtFirstName.setText(base.getString("first_name"));
             txtLastName.setText(base.getString("last_name"));
-            txtPhone.setText(base.getString("phone"));
+
+            String phone = base.getString("phone");
+            if (phone != null && !phone.isEmpty()) {
+                txtPhone.setText(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.formatPhone(phone));
+            }
+
             txtInternalCode.setText(base.getString("internal_code"));
+
+            // Validar en edición excluyendo la persona actual
+            Integer currentId = base.getInteger("id");
+            com.joshuamc1.inventariomunicipal.utils.ValidationHelper.validateUniqueFieldWithId(
+                txtDni,
+                currentId,
+                personService::getIdByDni,
+                helperDni,
+                "El DNI ya existe"
+            );
+
+            txtDni.focusedProperty().addListener((obs, was, is) -> {
+                if (!is && !txtDni.getText().trim().isEmpty()) {
+                    Integer foundId = personService.getIdByDni(txtDni.getText().trim());
+                    dniExists.set(foundId != null && !foundId.equals(currentId));
+                }
+            });
+        } else {
+            // Validar en creación
+            com.joshuamc1.inventariomunicipal.utils.ValidationHelper.validateUniqueField(
+                txtDni,
+                personService::existsByDni,
+                helperDni,
+                "El DNI ya existe"
+            );
+
+            txtDni.focusedProperty().addListener((obs, was, is) -> {
+                if (!is && !txtDni.getText().trim().isEmpty()) {
+                    dniExists.set(personService.existsByDni(txtDni.getText().trim()));
+                }
+            });
         }
 
         GridPane gp = new GridPane();
         gp.setHgap(10);
         gp.setVgap(10);
         gp.setPadding(new Insets(10));
-        gp.addRow(0, lblDni, txtDni);
-        gp.addRow(1, lblFirstName, txtFirstName);
-        gp.addRow(2, lblLastName, txtLastName);
-        gp.addRow(3, lblPhone, txtPhone);
-        gp.addRow(4, lblInternalCode, txtInternalCode);
+        gp.add(lblDni, 0, 0);
+        gp.add(txtDni, 1, 0);
+        gp.add(helperDni, 1, 1);
+        gp.add(lblFirstName, 0, 2);
+        gp.add(txtFirstName, 1, 2);
+        gp.add(helperFirstName, 1, 3);
+        gp.add(lblLastName, 0, 4);
+        gp.add(txtLastName, 1, 4);
+        gp.add(helperLastName, 1, 5);
+        gp.add(lblPhone, 0, 6);
+        gp.add(txtPhone, 1, 6);
+        gp.add(lblInternalCode, 0, 7);
+        gp.add(txtInternalCode, 1, 7);
 
-        gp.setPrefWidth(460);
+        gp.setPrefWidth(480);
         GridPane.setHgrow(txtDni, Priority.ALWAYS);
         GridPane.setHgrow(txtFirstName, Priority.ALWAYS);
         GridPane.setHgrow(txtLastName, Priority.ALWAYS);
@@ -129,17 +188,30 @@ public class PersonDialogHelper {
         Node btnSave = d.getDialogPane().lookupButton(save);
         BooleanBinding invalid = txtDni.textProperty().isEmpty()
                 .or(txtFirstName.textProperty().isEmpty())
-                .or(txtLastName.textProperty().isEmpty());
+                .or(txtLastName.textProperty().isEmpty())
+                .or(dniExists);
         btnSave.disableProperty().bind(invalid);
 
         d.setResultConverter(bt -> {
             if (bt == save) {
+                // Verificar una última vez antes de guardar
+                String dni = txtDni.getText().trim();
+                Integer existingId = personService.getIdByDni(dni);
+                if (existingId != null) {
+                    Integer currentId = base != null ? base.getInteger("id") : null;
+                    if (currentId == null || !existingId.equals(currentId)) {
+                        javafx.application.Platform.runLater(() ->
+                            Utils.showAlert("Error", "El DNI ya existe en el sistema"));
+                        return null;
+                    }
+                }
+
                 Person p = new Person();
-                p.set("dni", txtDni.getText());
-                p.set("first_name", txtFirstName.getText());
-                p.set("last_name", txtLastName.getText());
-                p.set("phone", txtPhone.getText());
-                p.set("internal_code", txtInternalCode.getText());
+                p.set("dni", dni);
+                p.set("first_name", txtFirstName.getText().trim());
+                p.set("last_name", txtLastName.getText().trim());
+                p.set("phone", txtPhone.getText().trim());
+                p.set("internal_code", txtInternalCode.getText().trim());
                 return p;
             }
             return null;

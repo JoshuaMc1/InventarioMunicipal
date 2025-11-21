@@ -21,6 +21,7 @@ public class PeopleController {
     @FXML @SuppressWarnings("unused") private Button btnNew;
     @FXML @SuppressWarnings("unused") private Button btnEdit;
     @FXML @SuppressWarnings("unused") private Button btnDelete;
+    @FXML private Button btnRefresh;
     @FXML
     private TableColumn<Person, String> colId;
     @FXML
@@ -111,11 +112,6 @@ public class PeopleController {
         // Este método adicional permite logging y futuras extensiones
     }
 
-    @FXML
-    public void onSearch() {
-        currentPage = 1;
-        loadPageFromRepo(currentPage);
-    }
 
     @FXML
     public void onPrev() {

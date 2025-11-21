@@ -63,5 +63,27 @@ public class PersonRepository {
     public List<Person> findAll() {
         return Person.findAll().orderBy("first_name, last_name");
     }
-}
 
+    /**
+     * Busca personas por DNI, nombre o apellido con límite de resultados
+     * Optimizado para búsqueda en ComboBox con muchas personas
+     */
+    public List<Person> searchPeople(String query, int limit) {
+        if (query == null || query.trim().isEmpty()) {
+            // Sin búsqueda: devolver las primeras N personas ordenadas por nombre
+            return Person.findAll()
+                .orderBy("first_name, last_name")
+                .limit(limit);
+        }
+
+        String searchPattern = "%" + query.trim() + "%";
+
+        // Buscar por DNI, nombre, apellido o código interno
+        return Person.where(
+            "dni LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR internal_code LIKE ?",
+            searchPattern, searchPattern, searchPattern, searchPattern
+        )
+        .orderBy("first_name, last_name")
+        .limit(limit);
+    }
+}

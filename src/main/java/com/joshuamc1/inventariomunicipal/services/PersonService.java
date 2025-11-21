@@ -92,4 +92,38 @@ public class PersonService {
     public List<Person> findAll() {
         return DatabaseManager.callInConnection(repo::findAll);
     }
+
+    /**
+     * Busca personas por DNI o nombre con límite de resultados (optimizado para ComboBox)
+     * @param query Texto a buscar (DNI, nombre o apellido)
+     * @param limit Número máximo de resultados
+     * @return Lista limitada de personas
+     */
+    public List<Person> searchPeople(String query, int limit) {
+        return DatabaseManager.callInConnection(() -> repo.searchPeople(query, limit));
+    }
+
+    /**
+     * Verifica si existe una persona con el DNI dado
+     * @param dni el DNI a verificar
+     * @return true si existe, false si no existe
+     */
+    public boolean existsByDni(String dni) {
+        return DatabaseManager.callInConnection(() -> {
+            Person person = repo.findByDni(dni);
+            return person != null;
+        });
+    }
+
+    /**
+     * Obtiene el ID de una persona por su DNI
+     * @param dni el DNI de la persona
+     * @return el ID de la persona o null si no existe
+     */
+    public Integer getIdByDni(String dni) {
+        return DatabaseManager.callInConnection(() -> {
+            Person person = repo.findByDni(dni);
+            return person != null ? person.getInteger("id") : null;
+        });
+    }
 }
