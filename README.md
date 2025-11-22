@@ -405,6 +405,76 @@ Para actualizar a una nueva versión:
 
 ---
 
+## 🚀 Mejoras Futuras Propuestas
+
+El sistema actual está **completo y funcional** para las necesidades municipales. Sin embargo, se han identificado posibles mejoras para futuras versiones:
+
+### 1. 🛒 Transacciones Multi-Producto
+
+**Estado:** 📋 Propuesta - No Implementado  
+**Prioridad:** Media  
+**Complejidad:** Alta  
+**Tiempo Estimado:** 2-3 semanas
+
+**Descripción:**  
+Actualmente el sistema maneja transacciones mono-producto (1 transacción = 1 producto). Esta mejora permitiría registrar múltiples productos en una sola transacción, similar a una orden de compra o entrega con varios artículos.
+
+**Beneficios:**
+- ✅ Reducción de tiempo para registrar múltiples productos
+- ✅ Mejor organización de transacciones relacionadas
+- ✅ Menos duplicación de datos (fecha, proveedor, notas)
+- ✅ Reportes más completos y detallados
+
+**¿Por qué no está implementado?**  
+El sistema actual de transacciones mono-producto es más apropiado para el contexto municipal donde:
+- Los movimientos son más esporádicos y controlados
+- Mayor trazabilidad individual por producto
+- Más simple para auditorías
+- Menos propenso a errores de usuario
+
+**Documentación completa:** [MEJORA_TRANSACCIONES_MULTIPRODUCTO.md](docs/MEJORA_TRANSACCIONES_MULTIPRODUCTO.md)
+
+**Plan de implementación incluye:**
+- ✅ Nuevas tablas de base de datos (`transaction_items`)
+- ✅ Script de migración de datos existentes
+- ✅ Modificación de modelos, servicios y controladores
+- ✅ Actualización de interfaces de usuario
+- ✅ Actualización de generación de reportes
+- ✅ Plan de testing exhaustivo
+- ✅ Estrategia de rollback
+
+**Cambios principales:**
+```
+Archivos a crear:
+- migrations/migrate_to_multiproduct_transactions.sql
+- models/TransactionItem.java
+- repositories/TransactionItemRepository.java
+- dto/TransactionItemDTO.java
+
+Archivos a modificar:
+- models/Transaction.java (agregar relación HasMany)
+- services/TransactionService.java (nuevo método multi-producto)
+- controllers/IncomesController.java (UI para múltiples productos)
+- controllers/OutcomesController.java (UI para múltiples productos)
+- controllers/LoansController.java (UI para múltiples productos)
+- services/ReportService.java (incluir detalle de items)
+```
+
+**Recomendación:**  
+Esta mejora es apropiada para sistemas con **alto volumen de transacciones** o para contextos comerciales. Para uso municipal estándar, el sistema actual es suficiente y más simple de operar.
+
+### 2. 📱 Otras Mejoras Consideradas
+
+- **Notificaciones por correo**: Alertas automáticas de stock bajo
+- **API REST**: Para integración con otros sistemas municipales
+- **App móvil**: Versión móvil para consultas rápidas
+- **Dashboard avanzado**: Gráficos más sofisticados con JavaFX Charts
+- **Importación masiva**: Carga de productos desde Excel/CSV
+- **Firma digital**: Firma electrónica en reportes oficiales
+- **Multi-sucursal**: Soporte para múltiples ubicaciones físicas
+
+---
+
 ## 📄 Licencia
 
 Este proyecto está bajo la **Licencia MIT**. Ver el archivo [LICENSE.txt](LICENSE.txt) para más detalles.

@@ -111,6 +111,42 @@ Bienvenido a la documentación completa del Sistema de Inventario Municipal. Est
 
 ---
 
+## 🚀 Mejoras Futuras y Decisiones de Diseño
+
+### 🛒 [MEJORA_TRANSACCIONES_MULTIPRODUCTO.md](MEJORA_TRANSACCIONES_MULTIPRODUCTO.md)
+**Plan Detallado: Transacciones Multi-Producto**
+
+- Análisis de la propuesta de mejora
+- Cambios requeridos en base de datos (nueva tabla `transaction_items`)
+- Modificaciones en modelos, repositorios y servicios
+- Actualización de controladores y vistas
+- Cambios en generación de reportes
+- Checklist de implementación por fases (2-3 semanas)
+- Estrategia de migración de datos
+- Plan de rollback
+- Análisis de riesgos
+
+**Estado:** 📋 Propuesta - No Implementado  
+**Ideal para:** Desarrolladores que quieran implementar esta funcionalidad en el futuro
+
+---
+
+### 🎯 [DECISION_MULTIPRODUCTO.md](DECISION_MULTIPRODUCTO.md)
+**Resumen Ejecutivo: Decisión sobre Multi-Producto**
+
+- Justificación de por qué NO implementar ahora
+- Comparación mono-producto vs multi-producto
+- Timeline actual vs propuesto
+- Checklist pre-entrega (21-24 Nov)
+- Respuestas para defensa del proyecto
+- Métricas finales del proyecto
+- Conclusión y recomendación final
+
+**Estado:** ✅ Decisión tomada y documentada  
+**Ideal para:** Presentación del proyecto, defensa académica, justificación de decisiones técnicas
+
+---
+
 ## 🗺️ Guía Rápida de Navegación
 
 ### Para Desarrolladores Nuevos
@@ -145,10 +181,12 @@ Bienvenido a la documentación completa del Sistema de Inventario Municipal. Est
 |---------|--------|----------|
 | **Sistema de Permisos** | ✅ Completado | 100% (12/12 módulos) |
 | **Base de Datos** | ✅ Completado | Todas las migraciones |
-| **Seguridad** | ✅ Implementada | 2 capas activas |
+| **Seguridad** | ✅ Implementada | 4 capas activas |
 | **Auditoría** | ✅ Funcional | Todos los eventos |
-| **Documentación** | ✅ Completa | 5 documentos |
-| **Testing** | ⏳ Pendiente | Manual |
+| **Sistema de Backups** | ✅ Funcional | Automático con compresión |
+| **Documentación** | ✅ Completa | 9 documentos |
+| **Testing** | ⏳ En proceso | Manual |
+| **Mejoras Futuras** | 📋 Documentadas | Multi-producto planeado |
 
 ---
 
@@ -172,12 +210,14 @@ Bienvenido a la documentación completa del Sistema de Inventario Municipal. Est
 
 | Documento | Versión | Última Actualización |
 |-----------|---------|---------------------|
-| README.md | 1.0 | 20/11/2025 |
-| DATABASE.md | 1.0 | 20/11/2025 |
-| SECURITY.md | 1.0 | 20/11/2025 |
-| ARCHITECTURE.md | 1.0 | 20/11/2025 |
+| README.md (índice) | 1.1 | 21/11/2025 |
+| DATABASE.md | 1.1 | 21/11/2025 |
+| SECURITY.md | 1.1 | 21/11/2025 |
+| ARCHITECTURE.md | 1.1 | 21/11/2025 |
 | PROGRESO_FASE*.md | 1.0 | 20/11/2025 |
 | PLAN_COMPLETO_PERMISOS.md | 1.0 | 20/11/2025 |
+| MEJORA_TRANSACCIONES_MULTIPRODUCTO.md | 1.0 | 21/11/2025 |
+| DECISION_MULTIPRODUCTO.md | 1.0 | 21/11/2025 |
 
 ---
 
@@ -188,12 +228,11 @@ Bienvenido a la documentación completa del Sistema de Inventario Municipal. Est
 - [ ] **DEPLOYMENT.md** - Guía de despliegue en producción
 - [ ] **USER_MANUAL.md** - Manual de usuario final
 - [ ] **ADMIN_GUIDE.md** - Guía para administradores
-- [ ] **API.md** - Documentación de API (si aplica)
-- [ ] **CHANGELOG.md** - Registro de cambios
+- [ ] **CHANGELOG.md** - Registro de cambios por versión
 
 ---
 
-**Última actualización:** 20 de Noviembre de 2025  
-**Versión del índice:** 1.0  
+**Última actualización:** 21 de Noviembre de 2025  
+**Versión del índice:** 1.1  
 **Mantenedor:** Joshua MC
 
