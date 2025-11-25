@@ -1,54 +1,245 @@
 # 🏛️ Sistema de Inventario Municipal
 
 [![GitHub](https://img.shields.io/badge/GitHub-JoshuaMc1-blue?logo=github)](https://github.com/JoshuaMc1/InventarioMunicipal)
-[![Java](https://img.shields.io/badge/Java-14+-orange?logo=java)](https://www.oracle.com/java/)
+[![Java](https://img.shields.io/badge/Java-21+-orange?logo=java)](https://www.oracle.com/java/)
 [![JavaFX](https://img.shields.io/badge/JavaFX-25.0.1-brightgreen)](https://openjfx.io/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0+-blue?logo=mysql)](https://www.mysql.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE.txt)
 
-Sistema de gestión de inventario desarrollado en JavaFX con base de datos MySQL para municipalidades. Incluye control de usuarios con sistema de roles y permisos granulares, auditoría completa y generación de reportes.
+Sistema completo de gestión de inventario desarrollado en JavaFX con MySQL para municipalidades. Incluye **transacciones multi-producto**, sistema de **roles y permisos granulares (RBAC)**, **códigos de barras/QR**, **backups automáticos**, **auditoría completa** y **generación de reportes PDF/CSV**.
 
 **🔗 Repositorio**: [https://github.com/JoshuaMc1/InventarioMunicipal](https://github.com/JoshuaMc1/InventarioMunicipal)
 
 ---
 
-## 🚀 Características Principales
+## ✨ Características Destacadas
 
-### Gestión Completa
-- ✅ **Inventario** - Control total de productos con alertas de stock bajo
-- ✅ **Transacciones** - Registro de ingresos, egresos y préstamos
-- ✅ **Personas** - Gestión de personas para préstamos y registros
-- ✅ **Usuarios** - Administración de usuarios del sistema
-- ✅ **Roles y Permisos** - Sistema RBAC con permisos granulares
+### 📦 Gestión de Inventario
+- ✅ Control completo de productos con stock actual y mínimo
+- ✅ **Códigos de barras y QR** únicos por producto (EAN-13, Code128)
+- ✅ Generación automática de códigos o ingreso manual
+- ✅ Descarga de códigos en PNG para impresión
+- ✅ **Compatible con lectores de códigos de barras/QR**
+- ✅ Búsqueda inteligente por ID, nombre o código
+- ✅ Alertas automáticas de stock bajo
 
-### Seguridad y Control
-- 🔐 **Sistema de Roles** - 6 roles predefinidos (ROOT, ADMIN, SUPERVISOR, OPERADOR, CONSULTOR, AUDITOR)
-- 🔒 **Permisos Granulares** - Control de acceso por módulo y acción (CREATE, READ, UPDATE, DELETE)
-- 🔑 **Cifrado** - Contraseñas con BCrypt, credenciales MySQL con AES-256
-- 📝 **Auditoría Completa** - Registro de todas las acciones del sistema
+### 💼 Transacciones Multi-Producto
+- ✅ **Ingresos, Egresos y Préstamos** con múltiples productos por transacción
+- ✅ Asociación con personas (empleados, beneficiarios)
+- ✅ Notas generales y específicas por producto
+- ✅ Actualización automática de stock
+- ✅ Historial completo de movimientos
+- ✅ Búsqueda por ID, producto o persona
 
-### Reportes y Análisis
-- 📊 **Dashboard Interactivo** - Estadísticas en tiempo real
-- 📄 **Generación de Reportes** - Exportación a PDF y CSV
-- 📈 **Análisis de Datos** - Reportes de movimientos, consumo, actividad
-- 🔍 **Auditoría Visible** - Vista de logs para ROOT y AUDITOR
+### 🔐 Seguridad Robusta
+- 🔑 **Sistema RBAC** - 6 roles predefinidos, 84 permisos granulares
+- 🔒 **Autenticación** - Contraseñas con BCrypt (10 rounds)
+- 👤 **Usuario SYSTEM** - Para operaciones automáticas (invisible en UI)
+- 📝 **Auditoría** - Registro completo de acciones del sistema
+- ✅ Validaciones en UI y backend
+- ✅ Control de acceso por módulo y acción
 
-### Tecnología
-- 🎨 **Interfaz Moderna** - JavaFX 25.0.1 con diseño intuitivo
-- 🗄️ **Base de Datos Robusta** - MySQL 8.0+ con migraciones automáticas
-- 🔄 **ORM Eficiente** - ActiveJDBC para acceso a datos
-- 📦 **Fácil Distribución** - Empaquetado en JAR ejecutable
+### 📊 Reportes Profesionales
+- 📄 **Exportación PDF y CSV** para todos los módulos
+- 📈 Reportes de inventario (completo, stock bajo, sin stock)
+- 📋 Reportes de usuarios y roles
+- 📊 Reportes de movimientos por fecha y tipo
+- 🔍 Exportación de auditoría completa o por rango
+- ✅ Encabezado con logo, título y datos del reporte
+
+### 💾 Backups Automáticos
+- ⏰ **Backup al iniciar** la aplicación (una vez por día)
+- 🚪 **Backup al cerrar** siempre que se cierre el sistema
+- 🗜️ Compresión GZIP automática
+- 💽 Gestión completa de backups (crear, restaurar, eliminar)
+- ⚙️ Configuración habilitada/deshabilitada desde UI
+- 📁 Ubicación: `~/.inventario_municipal/backups/`
+
+---
+
+## 🚀 Inicio Rápido
+
+### Requisitos
+- ☑️ Java JDK 21 o superior
+- ☑️ Maven 3.9.11 o superior
+- ☑️ MySQL 8.0 o superior
+- ☑️ mysqldump y gzip configurados
+
+### Instalación
+
+```bash
+# 1. Clonar repositorio
+git clone https://github.com/JoshuaMc1/InventarioMunicipal.git
+cd InventarioMunicipal
+
+# 2. Compilar
+mvn clean compile
+
+# 3. Ejecutar
+mvn javafx:run
+```
+
+### Primera Configuración
+
+1. **Configurar MySQL** (wizard al iniciar):
+   - Host, puerto, base de datos
+   - Usuario y contraseña
+
+2. **Crear usuario root** (admin):
+   - Username, nombre y contraseña
+
+3. **¡Listo!** Ya puedes iniciar sesión
+
+**📖 Guía completa:** [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)
 
 ---
 
 ## 📚 Documentación
 
-### Documentación Técnica
-
 | Documento | Descripción |
 |-----------|-------------|
-| **[DATABASE.md](docs/DATABASE.md)** | Estructura completa de la base de datos, tablas, relaciones, migraciones y consultas útiles |
-| **[SECURITY.md](docs/SECURITY.md)** | Arquitectura de seguridad, autenticación, autorización, validaciones y mejores prácticas |
+| **[📚 README](docs/README.md)** | **Índice principal de documentación** |
+| **[🚀 GETTING_STARTED](docs/GETTING_STARTED.md)** | Guía de inicio rápido y configuración |
+| **[📋 FEATURES](docs/FEATURES.md)** | Lista completa de características |
+| **[🏗️ ARCHITECTURE](docs/ARCHITECTURE.md)** | Arquitectura del sistema (MVC + Service + Repository) |
+| **[🗄️ DATABASE](docs/DATABASE.md)** | Estructura de base de datos y migraciones |
+| **[🔐 SECURITY](docs/SECURITY.md)** | Seguridad, autenticación y autorización (RBAC) |
+| **[📝 PLAN_MEJORAS_BUGS](docs/PLAN_MEJORAS_BUGS.md)** | Plan de mejoras y roadmap |
+
+---
+
+## 🛠️ Tecnologías
+
+### Backend
+- **Java 21** - Lenguaje principal
+- **JavaFX 25.0.1** - Framework de interfaz gráfica
+- **ActiveJDBC 3.5** - ORM para acceso a datos
+- **MySQL 8.0+** - Base de datos relacional
+- **BCrypt** - Hash de contraseñas
+- **Maven 3.9.11** - Gestión de dependencias
+
+### Librerías
+- **Apache PDFBox** - Generación de reportes PDF
+- **ZXing** - Generación de códigos de barras y QR
+- **SLF4J + Logback** - Sistema de logs
+- **JBCrypt** - Cifrado de contraseñas
+
+---
+
+## 📊 Módulos del Sistema
+
+```
+┌─────────────────────────────────────────┐
+│  🏠 Dashboard                           │  Estadísticas en tiempo real
+├─────────────────────────────────────────┤
+│  📦 Inventario                          │  Gestión de productos + Códigos
+│  📥 Ingresos                            │  Registro multi-producto
+│  📤 Egresos                             │  Salidas multi-producto
+│  🤝 Préstamos                           │  Préstamos multi-producto
+├─────────────────────────────────────────┤
+│  👥 Usuarios                            │  Gestión de usuarios
+│  🎭 Roles                               │  Gestión de roles y permisos
+│  👤 Personas                            │  Gestión de personas
+├─────────────────────────────────────────┤
+│  📊 Reportes                            │  Generación PDF/CSV
+│  💾 Backups                             │  Gestión de backups
+│  🔍 Auditoría                           │  Historial de acciones
+│  ⚙️  Configuración                      │  Ajustes del sistema
+│  ℹ️  Acerca de                          │  Información del sistema
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 🔐 Sistema de Roles y Permisos
+
+### Roles Predefinidos
+
+| Rol | Descripción | Acceso |
+|-----|-------------|--------|
+| **ROOT** | Acceso total al sistema | Todo |
+| **ADMIN** | Administración general | Todo excepto configuración crítica |
+| **GESTOR** | Gestión de inventario | Inventario, transacciones, reportes |
+| **EDITOR** | Edición de datos | Productos, personas, transacciones |
+| **OPERADOR** | Operaciones básicas | Registro de transacciones |
+| **CONSULTOR** | Solo lectura | Ver información, exportar |
+
+### Permisos Granulares
+
+**84 permisos** distribuidos en **14 módulos** con **6 acciones cada uno**:
+- CREATE, READ, UPDATE, DELETE, EXPORT, GENERATE
+
+**Ejemplo:**
+- `INVENTARIO.CREATE` - Crear productos
+- `REPORTES.GENERATE` - Generar reportes
+- `BACKUPS.DELETE` - Eliminar backups
+
+**📖 Documentación completa:** [docs/SECURITY.md](docs/SECURITY.md)
+
+---
+
+## 📷 Características Especiales
+
+### Códigos de Barras y QR
+- Generación de códigos EAN-13 automáticos
+- Códigos personalizados manuales
+- Escaneo con lector USB/Bluetooth
+- Descarga en PNG (Code128 y QR)
+- Búsqueda por código en todo el sistema
+
+### Backups Inteligentes
+- Automáticos al iniciar (una vez por día)
+- Automáticos al cerrar (siempre)
+- Usuario SYSTEM como responsable
+- Compresión GZIP
+- Gestión desde UI
+
+### Búsqueda Avanzada
+- Búsqueda mientras escribes (debounce 500ms)
+- Compatible con lectores de códigos
+- Búsqueda por ID, nombre, código, DNI
+- Paginación optimizada
+
+---
+
+## 🎯 Estado del Proyecto
+
+```
+✅ Sistema completo y funcional
+✅ En producción
+✅ Documentación completa
+✅ Pruebas realizadas
+✅ Backups automáticos
+✅ Códigos de barras/QR
+✅ Transacciones multi-producto
+✅ Sistema de permisos robusto
+```
+
+**Versión:** 1.0-SNAPSHOT  
+**Estado:** ✅ **Producción-Ready**  
+**Fecha:** 24 de Noviembre de 2025
+
+---
+
+## 📞 Soporte y Contribución
+
+- **Logs:** `logs/app.log`
+- **Backups:** `~/.inventario_municipal/backups/`
+- **Documentación:** [docs/README.md](docs/README.md)
+- **Issues:** GitHub Issues
+- **Contribuir:** Pull Requests bienvenidos
+
+---
+
+## 📄 Licencia
+
+Este proyecto está bajo la licencia MIT. Ver [LICENSE.txt](LICENSE.txt) para más detalles.
+
+---
+
+**Desarrollado con ❤️ para municipalidades**
+
+**Última actualización:** 24 de Noviembre de 2025
 | **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Arquitectura del proyecto, estructura de paquetes, clases y responsabilidades |
 
 ### Documentación de Desarrollo
@@ -66,8 +257,8 @@ Sistema de gestión de inventario desarrollado en JavaFX con base de datos MySQL
 ## 📋 Requisitos del Sistema
 
 ### Para Desarrollo
-- **Java JDK** 14 o superior
-- **Maven** 3.6+
+- **Java JDK** 21 o superior
+- **Maven** 3.9.11 o superior
 - **MySQL Server** 8.0+
   - **mysqldump** (incluido con MySQL Server)
 - **gzip** (para compresión de backups)
@@ -77,6 +268,7 @@ Sistema de gestión de inventario desarrollado en JavaFX con base de datos MySQL
 - **Git** (para clonar el repositorio)
 
 ### Para Producción/Uso
+- **Java Runtime** 21 o superior
 - **MySQL Server** 8.0+
   - **mysqldump** (incluido con MySQL Server, verificar en PATH)
 - **gzip** (para compresión de backups)
@@ -84,9 +276,8 @@ Sistema de gestión de inventario desarrollado en JavaFX con base de datos MySQL
   - Linux: `sudo apt-get install gzip` (Debian/Ubuntu) o `sudo yum install gzip` (RedHat/CentOS)
   - macOS: Incluido por defecto
 - **Sistema Operativo**: Windows 10/11, Linux, macOS
-- **RAM**: Mínimo 4GB recomendado
+- **RAM**: Mínimo 2GB, recomendado 4GB
 - **Espacio en disco**: 500MB libres (más espacio para backups)
-- **Java Runtime** 14+ (incluido en el instalador)
 
 #### Configuración Adicional para Windows
 
@@ -271,18 +462,46 @@ Ver [SECURITY.md](docs/SECURITY.md) para información detallada.
 
 | Tabla | Descripción |
 |-------|-------------|
-| `roles` | Roles del sistema |
-| `permisos` | Permisos granulares |
-| `rol_permisos` | Relación roles-permisos |
-| `users` | Usuarios del sistema |
-| `people` | Personas (para préstamos) |
-| `products` | Productos del inventario |
+| `roles` | Roles del sistema (ROOT, ADMIN, GESTOR, etc.) |
+| `permisos` | Permisos granulares (84 permisos en total) |
+| `rol_permisos` | Relación roles-permisos (Many-to-Many) |
+| `users` | Usuarios del sistema (incluye usuario SYSTEM) |
+| `people` | Personas (empleados, beneficiarios) |
+| `products` | Productos del inventario (con códigos de barras/QR) |
 | `transactions` | Transacciones (IN/OUT/LOAN) |
-| `audit` | Registro de auditoría |
+| `transaction_items` | **[Nuevo]** Detalles de productos por transacción (multi-producto) |
+| `backups` | Historial de backups realizados |
+| `audit` | Registro de auditoría completa |
+
+### Características de la Base de Datos
+
+- ✅ **Integridad Referencial**: Foreign keys en todas las relaciones
+- ✅ **Índices Optimizados**: Para búsquedas rápidas
+- ✅ **Transacciones ACID**: Consistencia garantizada
+- ✅ **Migraciones Automáticas**: Sistema de versionado
+- ✅ **Charset UTF-8MB4**: Soporte completo Unicode
+- ✅ **InnoDB Engine**: Transacciones y foreign keys
 
 ### Migraciones
 
-Las migraciones se ejecutan automáticamente en orden secuencial. Ver [DATABASE.md](docs/DATABASE.md) para más detalles.
+Las migraciones se ejecutan automáticamente en orden secuencial al iniciar la aplicación. Ver [DATABASE.md](docs/DATABASE.md) para más detalles.
+
+**Migraciones Disponibles:**
+- `20251114112627_create_roles_table.sql`
+- `20251114112628_create_user_table.sql`
+- `20251114112848_create_people_table.sql`
+- `20251114112911_create_product_table.sql`
+- `20251114113444_create_transaction_table.sql`
+- `20251114114102_create_audit_table.sql`
+- `20251114114104_create_indexes_table.sql`
+- `20251114114105_create_permissions_table.sql`
+- `20251114114106_create_role_permissions_table.sql`
+- `20251114114107_seed_roles_and_permissions.sql`
+- `20251120000001_create_backups_table.sql`
+- `20251120000002_add_backup_permissions.sql`
+- **`20251122000001_create_transaction_items_table.sql`** ← Multi-producto
+- **`20251122000002_add_product_code_field.sql`** ← Códigos de barras/QR
+- **`20251124220000_assign_system_to_backups.sql`** ← Usuario SYSTEM
 
 ---
 
@@ -405,73 +624,92 @@ Para actualizar a una nueva versión:
 
 ---
 
-## 🚀 Mejoras Futuras Propuestas
+## 🎯 Estado del Proyecto
 
-El sistema actual está **completo y funcional** para las necesidades municipales. Sin embargo, se han identificado posibles mejoras para futuras versiones:
-
-### 1. 🛒 Transacciones Multi-Producto
-
-**Estado:** 📋 Propuesta - No Implementado  
-**Prioridad:** Media  
-**Complejidad:** Alta  
-**Tiempo Estimado:** 2-3 semanas
-
-**Descripción:**  
-Actualmente el sistema maneja transacciones mono-producto (1 transacción = 1 producto). Esta mejora permitiría registrar múltiples productos en una sola transacción, similar a una orden de compra o entrega con varios artículos.
-
-**Beneficios:**
-- ✅ Reducción de tiempo para registrar múltiples productos
-- ✅ Mejor organización de transacciones relacionadas
-- ✅ Menos duplicación de datos (fecha, proveedor, notas)
-- ✅ Reportes más completos y detallados
-
-**¿Por qué no está implementado?**  
-El sistema actual de transacciones mono-producto es más apropiado para el contexto municipal donde:
-- Los movimientos son más esporádicos y controlados
-- Mayor trazabilidad individual por producto
-- Más simple para auditorías
-- Menos propenso a errores de usuario
-
-**Documentación completa:** [MEJORA_TRANSACCIONES_MULTIPRODUCTO.md](docs/MEJORA_TRANSACCIONES_MULTIPRODUCTO.md)
-
-**Plan de implementación incluye:**
-- ✅ Nuevas tablas de base de datos (`transaction_items`)
-- ✅ Script de migración de datos existentes
-- ✅ Modificación de modelos, servicios y controladores
-- ✅ Actualización de interfaces de usuario
-- ✅ Actualización de generación de reportes
-- ✅ Plan de testing exhaustivo
-- ✅ Estrategia de rollback
-
-**Cambios principales:**
 ```
-Archivos a crear:
-- migrations/migrate_to_multiproduct_transactions.sql
-- models/TransactionItem.java
-- repositories/TransactionItemRepository.java
-- dto/TransactionItemDTO.java
-
-Archivos a modificar:
-- models/Transaction.java (agregar relación HasMany)
-- services/TransactionService.java (nuevo método multi-producto)
-- controllers/IncomesController.java (UI para múltiples productos)
-- controllers/OutcomesController.java (UI para múltiples productos)
-- controllers/LoansController.java (UI para múltiples productos)
-- services/ReportService.java (incluir detalle de items)
+✅ Sistema completo y funcional
+✅ En producción
+✅ Documentación completa
+✅ Pruebas realizadas
+✅ Backups automáticos
+✅ Códigos de barras/QR
+✅ Transacciones multi-producto
+✅ Sistema de permisos robusto
 ```
 
-**Recomendación:**  
-Esta mejora es apropiada para sistemas con **alto volumen de transacciones** o para contextos comerciales. Para uso municipal estándar, el sistema actual es suficiente y más simple de operar.
+**Versión:** 1.0-SNAPSHOT  
+**Estado:** ✅ **Producción-Ready**  
+**Fecha:** 24 de Noviembre de 2025
 
-### 2. 📱 Otras Mejoras Consideradas
+---
 
-- **Notificaciones por correo**: Alertas automáticas de stock bajo
+## 🚀 Mejoras Recientes Implementadas
+
+### ✅ Transacciones Multi-Producto (Implementado)
+- **Estado:** ✅ Completado
+- Registro de múltiples productos en una sola transacción
+- Tabla `transaction_items` para detalles por producto
+- Notas generales y específicas por producto
+- Cálculo automático de totales
+- Actualización automática de stock
+- Interfaz intuitiva para agregar/eliminar productos
+
+### ✅ Códigos de Barras y QR (Implementado)
+- **Estado:** ✅ Completado
+- Generación automática de códigos EAN-13
+- Generación de códigos Code128 y QR
+- Descarga en formato PNG para impresión
+- **Compatible con lectores de códigos de barras/QR**
+- Búsqueda por código en todo el sistema
+- Detección automática de Enter al escanear
+
+### ✅ Búsqueda Avanzada (Implementado)
+- **Estado:** ✅ Completado
+- Búsqueda automática con debounce (500ms)
+- Búsqueda por ID, nombre, código, DNI
+- Compatible con lectores de códigos
+- Paginación optimizada
+- Filtros en tiempo real
+
+### ✅ Validaciones Mejoradas (Implementado)
+- **Estado:** ✅ Completado
+- **Usuarios:** Validación de username único, campos obligatorios, helper text
+- **Personas:** Validación de DNI único, máscara de teléfono (0000-0000)
+- **Productos:** Validación de código único, campos obligatorios
+- **Roles:** Validación preventiva, no eliminar roles en uso
+- **Transacciones:** Validación de stock disponible
+
+### ✅ Módulo "Acerca de" (Implementado)
+- **Estado:** ✅ Completado
+- Información del sistema
+- Versión y fecha de compilación
+- Créditos y licencia
+- Tecnologías utilizadas
+- Diseño mejorado y profesional
+
+### ✅ Optimización de Módulos Transaccionales (Implementado)
+- **Estado:** ✅ Completado
+- Paginación eficiente (10, 25, 50, 100 registros)
+- Carga optimizada de productos y personas
+- Búsqueda con debounce para evitar consultas excesivas
+- Actualización de stock en tiempo real
+
+---
+
+## 🔮 Mejoras Futuras Propuestas
+
+El sistema está **completo y funcional**. Las siguientes son mejoras opcionales para futuras versiones:
+
+### 📱 Propuestas para Consideración
+
+- **Notificaciones por correo**: Alertas automáticas de stock bajo vía email
 - **API REST**: Para integración con otros sistemas municipales
-- **App móvil**: Versión móvil para consultas rápidas
+- **App móvil**: Versión móvil para consultas rápidas en campo
 - **Dashboard avanzado**: Gráficos más sofisticados con JavaFX Charts
 - **Importación masiva**: Carga de productos desde Excel/CSV
 - **Firma digital**: Firma electrónica en reportes oficiales
 - **Multi-sucursal**: Soporte para múltiples ubicaciones físicas
+- **Exportación Excel**: Además de CSV, soporte nativo para .xlsx
 
 ---
 
@@ -509,6 +747,6 @@ in the Software without restriction...
 ---
 
 **Versión:** 1.0-SNAPSHOT  
-**Última actualización:** 21 de Noviembre de 2025  
+**Última actualización:** 24 de Noviembre de 2025  
 **Estado:** Producción Ready
 

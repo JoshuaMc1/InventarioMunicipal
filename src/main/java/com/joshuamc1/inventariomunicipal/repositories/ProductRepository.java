@@ -11,8 +11,9 @@ public class ProductRepository {
     }
 
     /**
-     * Busca productos por nombre o ID con límite de resultados
+     * Busca productos por nombre, ID o código con límite de resultados
      * Optimizado para búsqueda en ComboBox con muchos productos
+     * Compatible con lectores de códigos de barras/QR
      */
     public List<Product> searchProducts(String query, int limit) {
         if (query == null || query.trim().isEmpty()) {
@@ -22,14 +23,28 @@ public class ProductRepository {
 
         String searchPattern = "%" + query.trim() + "%";
 
-        // Buscar por nombre o ID (convertido a String para búsqueda)
-        return Product.where("name LIKE ? OR CAST(id AS CHAR) LIKE ?", searchPattern, searchPattern)
+        // Buscar por código (exacto o parcial), nombre o ID (convertido a String para búsqueda)
+        return Product.where("code LIKE ? OR name LIKE ? OR CAST(id AS CHAR) LIKE ?",
+                searchPattern, searchPattern, searchPattern)
             .limit(limit)
             .orderBy("name");
     }
 
     public Product findById(Integer id) {
         return Product.findById(id);
+    }
+
+    /**
+     * Busca un producto por su código exacto
+     * Útil para lectores de códigos de barras/QR que escanean el código completo
+     */
+    public Product findByCode(String code) {
+        if (code == null || code.trim().isEmpty()) {
+            return null;
+        }
+
+        List<Product> products = Product.where("code = ?", code.trim());
+        return products.isEmpty() ? null : products.get(0);
     }
 
     public Product create(String name, String description, String unit, double currentStock, double minimumStock) {

@@ -65,13 +65,24 @@ public final class PdfAuditExporter {
             cs.beginText(); cs.newLineAtOffset(pageWidth - margin - fechaWidth, y); cs.showText(fechaText); cs.endText();
             y -= 24f;
 
-            // Column widths
+            // Calcular anchos responsivos para Usuario, Accion y Tabla
             float colIdW = 40f;
-            float colUserW = 110f;
-            float colActionW = 70f;
-            float colTableW = 70f;
             float colRegW = 50f;
             float colFechaW = 105f;
+
+            // Calcular anchos mínimos y máximos
+            float minUserW = 80f;
+            float maxUserW = 150f;
+            float minActionW = 60f;
+            float maxActionW = 100f;
+            float minTableW = 60f;
+            float maxTableW = 120f;
+
+            // Calcular ancho necesario basado en contenido
+            float colUserW = calculateOptimalWidth(data, AuditDTO::getUsuarioName, regularFont, 9, minUserW, maxUserW);
+            float colActionW = calculateOptimalWidth(data, AuditDTO::getAccion, regularFont, 9, minActionW, maxActionW);
+            float colTableW = calculateOptimalWidth(data, AuditDTO::getTablaAfectada, regularFont, 9, minTableW, maxTableW);
+
             float tableWidth = pageWidth - margin * 2;
             float colDetailsW = tableWidth - (colIdW + colUserW + colActionW + colTableW + colRegW + colFechaW);
 
@@ -101,10 +112,17 @@ public final class PdfAuditExporter {
                 cs.setFont(regularFont, fontSize);
                 float x = margin;
                 drawCell(cs, String.valueOf(r.getId()==null?"":r.getId()), x, y); x += colIdW;
+
+                // Usuario - adaptativo
                 String uname = r.getUsuarioName() != null ? r.getUsuarioName() : (r.getUsuarioId()==null?"":String.valueOf(r.getUsuarioId()));
-                drawCell(cs, truncate(uname, 40), x, y); x += colUserW;
-                drawCell(cs, truncate(r.getAccion(),20), x, y); x += colActionW;
-                drawCell(cs, truncate(r.getTablaAfectada(),20), x, y); x += colTableW;
+                drawCell(cs, smartTruncate(uname, regularFont, fontSize, colUserW - 4), x, y); x += colUserW;
+
+                // Acción - adaptativo
+                drawCell(cs, smartTruncate(r.getAccion(), regularFont, fontSize, colActionW - 4), x, y); x += colActionW;
+
+                // Tabla - adaptativo
+                drawCell(cs, smartTruncate(r.getTablaAfectada(), regularFont, fontSize, colTableW - 4), x, y); x += colTableW;
+
                 drawCell(cs, r.getRegistroAfectadoId()==null?"":String.valueOf(r.getRegistroAfectadoId()), x, y); x += colRegW;
                 drawCell(cs, truncate(r.getFecha(),25), x, y); x += colFechaW;
                 drawMultiline(cs, r.getDetalles(), x, y, fontSize, regularFont, colDetailsW);
@@ -241,6 +259,55 @@ public final class PdfAuditExporter {
         }
         if (current.length()>0) parts.add(current.toString());
         return parts;
+    }
+
+    private static float calculateOptimalWidth(List<AuditDTO> data,
+                                               java.util.function.Function<AuditDTO, String> getter,
+                                               PDFont font,
+                                               int fontSize,
+                                               float minWidth,
+                                               float maxWidth) {
+        float maxTextWidth = minWidth;
+
+        // Analizar los primeros 100 registros para determinar el ancho óptimo
+        int samplesToCheck = Math.min(100, data.size());
+        for (int i = 0; i < samplesToCheck; i++) {
+            String text = getter.apply(data.get(i));
+            if (text != null && !text.isEmpty()) {
+                try {
+                    float textWidth = font.getStringWidth(text) / 1000 * fontSize + 6; // +6 para padding
+                    if (textWidth > maxTextWidth) {
+                        maxTextWidth = textWidth;
+                    }
+                } catch (IOException e) {
+                    // Ignorar errores y continuar
+                }
+            }
+        }
+
+        // Limitar al rango min-max
+        return Math.min(maxWidth, Math.max(minWidth, maxTextWidth));
+    }
+
+    private static String smartTruncate(String text, PDFont font, int fontSize, float maxWidth) {
+        if (text == null || text.isEmpty()) return "";
+
+        try {
+            float textWidth = font.getStringWidth(text) / 1000 * fontSize;
+            if (textWidth <= maxWidth) {
+                // El texto cabe completo
+                return text;
+            }
+
+            // Necesita truncarse
+            int maxChars = (int) (text.length() * maxWidth / textWidth) - 3; // -3 para los puntos
+            if (maxChars <= 0) return "...";
+            return text.substring(0, maxChars) + "...";
+
+        } catch (IOException e) {
+            // Fallback simple por caracteres
+            return truncate(text, 20);
+        }
     }
 
     private static String sanitize(String s) { return s.replace("\r"," ").replace("\n"," "); }

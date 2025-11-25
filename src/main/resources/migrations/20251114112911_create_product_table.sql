@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS products (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(100) UNIQUE,
     name VARCHAR(100) NOT NULL,
     description TEXT,
     unit VARCHAR(50),

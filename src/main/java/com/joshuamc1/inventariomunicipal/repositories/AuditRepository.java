@@ -7,6 +7,7 @@ import org.javalite.activejdbc.Base;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -100,5 +101,42 @@ public class AuditRepository {
             try { if (rs != null) rs.close(); } catch (Exception ignored) {}
             try { if (ps != null) ps.close(); } catch (Exception ignored) {}
         }
+    }
+
+    public List<AuditDTO> findAllWithUserByDateRange(LocalDate from, LocalDate to) {
+        String sql = "SELECT a.id, a.user_id AS usuario_id, u.name as usuario_name, " +
+                "a.action AS accion, a.table_name AS tabla_afectada, a.record_id AS registro_afectado_id, " +
+                "a.details AS detalles, a.created_at AS fecha " +
+                "FROM audit a LEFT JOIN users u ON u.id = a.user_id " +
+                "WHERE DATE(a.created_at) BETWEEN ? AND ? " +
+                "ORDER BY a.created_at DESC";
+
+        List<AuditDTO> result = new ArrayList<>();
+        PreparedStatement ps = null;
+        ResultSet rs = null;
+        try {
+            ps = Base.connection().prepareStatement(sql);
+            ps.setString(1, from.toString());
+            ps.setString(2, to.toString());
+
+            rs = ps.executeQuery();
+            while (rs.next()) {
+                Integer id = rs.getInt("id");
+                Integer usuarioId = rs.getObject("usuario_id") == null ? null : rs.getInt("usuario_id");
+                String usuarioName = rs.getString("usuario_name");
+                String accion = rs.getString("accion");
+                String tabla = rs.getString("tabla_afectada");
+                Integer registroId = rs.getObject("registro_afectado_id") == null ? null : rs.getInt("registro_afectado_id");
+                String detalles = rs.getString("detalles");
+                String fecha = rs.getString("fecha");
+                result.add(new AuditDTO(id, usuarioId, usuarioName, accion, tabla, registroId, detalles, fecha));
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error executing audit query by date range", e);
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception ignored) {}
+            try { if (ps != null) ps.close(); } catch (Exception ignored) {}
+        }
+        return result;
     }
 }

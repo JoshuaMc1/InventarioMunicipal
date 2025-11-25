@@ -7,6 +7,7 @@ import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
 import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.models.Product;
 import com.joshuamc1.inventariomunicipal.models.Transaction;
+import com.joshuamc1.inventariomunicipal.models.TransactionItem;
 import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.services.ProductService;
 import com.joshuamc1.inventariomunicipal.services.TransactionService;
@@ -210,15 +211,25 @@ public class HomeController implements AsyncLoadable {
     private void setupTableColumns() {
         colFecha.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("created_at")));
         colProducto.setCellValueFactory(c -> {
-            Product p = c.getValue().parent(Product.class);
-            return new SimpleStringProperty(p != null ? p.getString("name") : "N/A");
+            // Obtener items de la transacción
+            var items = transactionService.getTransactionItems(c.getValue().getInteger("id"));
+            if (items.isEmpty()) {
+                return new SimpleStringProperty("Sin productos");
+            }
+            if (items.size() == 1) {
+                var product = items.get(0).getProduct();
+                return new SimpleStringProperty(product != null ? product.getString("name") : "N/A");
+            }
+            return new SimpleStringProperty("Multi-Producto (" + items.size() + ")");
         });
         colTipo.setCellValueFactory(c -> new SimpleStringProperty(
             com.joshuamc1.inventariomunicipal.core.enums.Transaction.fromDbValue(c.getValue().getString("type")).toString()
         ));
         colCantidad.setCellValueFactory(c -> {
-            Double qty = c.getValue().getDouble("quantity");
-            return new ReadOnlyObjectWrapper<>(qty != null ? qty : 0.0);
+            // Calcular suma total de cantidades desde los items
+            var items = transactionService.getTransactionItems(c.getValue().getInteger("id"));
+            double total = items.stream().mapToDouble(item -> item.getDouble("quantity")).sum();
+            return new ReadOnlyObjectWrapper<>(total);
         });
         colUsuario.setCellValueFactory(c -> {
             User u = c.getValue().parent(User.class);

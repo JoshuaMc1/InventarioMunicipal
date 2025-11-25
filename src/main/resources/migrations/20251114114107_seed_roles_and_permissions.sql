@@ -103,3 +103,11 @@ INSERT INTO rol_permisos (rol_id, permiso_id)
 SELECT 6, id FROM permisos
 WHERE accion IN ('READ', 'GENERATE', 'EXPORT')
   AND modulo NOT IN ('AUDITORIA', 'ROLES', 'USUARIOS', 'CONFIGURACION');
+
+-- Crear usuario SYSTEM para backups automáticos y operaciones del sistema
+-- Este usuario NO tiene contraseña y NO puede iniciar sesión
+-- Se usa solo para registrar operaciones automáticas del sistema
+INSERT INTO users (name, username, password_hash, rol_id, activo)
+VALUES ('SYSTEM', 'SYSTEM', '', NULL, 0)
+ON DUPLICATE KEY UPDATE username = username; -- Evitar error si ya existe
+

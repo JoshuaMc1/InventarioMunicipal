@@ -4,6 +4,7 @@ import com.joshuamc1.inventariomunicipal.config.DatabaseConfig;
 import com.joshuamc1.inventariomunicipal.config.InitialSetupDialog;
 import com.joshuamc1.inventariomunicipal.config.MigrationRunner;
 import com.joshuamc1.inventariomunicipal.config.MySQLConfigDialog;
+import com.joshuamc1.inventariomunicipal.core.AutoBackupManager;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import javafx.application.Application;
@@ -113,6 +114,10 @@ public class App extends Application {
                 }
             });
 
+            // Verificar y crear backup automático de inicio (solo una vez por día)
+            // Se ejecuta después del login cuando ya hay sesión activa
+            AutoBackupManager.getInstance().checkStartupBackup();
+
             stage.show();
             Logs.info(App.class, "Interfaz mostrada");
         } catch (IOException e) {
@@ -122,6 +127,10 @@ public class App extends Application {
     }
 
     public void stop() {
+        // Crear backup automático de cierre (siempre que se cierre)
+        Logs.info(App.class, "Aplicación cerrándose, creando backup automático...");
+        AutoBackupManager.getInstance().performShutdownBackup();
+
         DatabaseConfig.closeConnection();
         Logs.info(App.class, "App stopped");
     }

@@ -123,11 +123,29 @@ public class ReportRepository {
 
     // Reporte transacciones
     public Report transactions(String from, String to) {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, u.name as usuario, t.notes, t.created_at " +
-                "FROM transactions t LEFT JOIN products p ON p.id = t.product_id LEFT JOIN users u ON u.id = t.user_id " +
-                "WHERE date(t.created_at) BETWEEN date(?) AND date(?) ORDER BY t.created_at DESC";
+        String sql = "SELECT t.id, " +
+                "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                "       t.type, " +
+                "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                "       t.total_items, " +
+                "       t.date, u.name as usuario, t.notes, t.created_at " +
+                "FROM transactions t " +
+                "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                "LEFT JOIN products p ON p.id = ti.product_id " +
+                "LEFT JOIN users u ON u.id = t.user_id " +
+                "WHERE date(t.created_at) BETWEEN date(?) AND date(?) " +
+                "GROUP BY t.id, t.type, t.date, u.name, t.notes, t.created_at " +
+                "ORDER BY t.created_at DESC";
         Report res = new Report("Transacciones");
-        res.addHeader("ID"); res.addHeader("Producto"); res.addHeader("Tipo"); res.addHeader("Cantidad"); res.addHeader("Fecha"); res.addHeader("Usuario"); res.addHeader("Notas"); res.addHeader("Creado");
+        res.addHeader("ID");
+        res.addHeader("Productos");
+        res.addHeader("Tipo");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
+        res.addHeader("Fecha");
+        res.addHeader("Usuario");
+        res.addHeader("Notas");
+        res.addHeader("Creado");
 
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -139,9 +157,15 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
+
                 row.add(rs.getString("type"));
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
                 row.add(rs.getString("notes"));
@@ -160,11 +184,29 @@ public class ReportRepository {
 
     // Reporte transacciones por tipo
     public Report transactionsByType(String type, String from, String to) {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, u.name as usuario, t.notes, t.created_at " +
-                "FROM transactions t LEFT JOIN products p ON p.id = t.product_id LEFT JOIN users u ON u.id = t.user_id " +
-                "WHERE t.type = ? AND date(t.created_at) BETWEEN date(?) AND date(?) ORDER BY t.created_at DESC";
+        String sql = "SELECT t.id, " +
+                "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                "       t.type, " +
+                "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                "       t.total_items, " +
+                "       t.date, u.name as usuario, t.notes, t.created_at " +
+                "FROM transactions t " +
+                "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                "LEFT JOIN products p ON p.id = ti.product_id " +
+                "LEFT JOIN users u ON u.id = t.user_id " +
+                "WHERE t.type = ? AND date(t.created_at) BETWEEN date(?) AND date(?) " +
+                "GROUP BY t.id, t.type, t.date, u.name, t.notes, t.created_at " +
+                "ORDER BY t.created_at DESC";
         Report res = new Report("Transacciones por tipo: " + type);
-        res.addHeader("ID"); res.addHeader("Producto"); res.addHeader("Tipo"); res.addHeader("Cantidad"); res.addHeader("Fecha"); res.addHeader("Usuario"); res.addHeader("Notas"); res.addHeader("Creado");
+        res.addHeader("ID");
+        res.addHeader("Productos");
+        res.addHeader("Tipo");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
+        res.addHeader("Fecha");
+        res.addHeader("Usuario");
+        res.addHeader("Notas");
+        res.addHeader("Creado");
 
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -177,9 +219,15 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
+
                 row.add(rs.getString("type"));
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
                 row.add(rs.getString("notes"));
@@ -198,11 +246,30 @@ public class ReportRepository {
 
     // Reporte transacciones por persona
     public Report transactionsByPerson(int personId, String from, String to) {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, u.name as usuario, t.person_id, t.notes, t.created_at " +
-                "FROM transactions t LEFT JOIN products p ON p.id = t.product_id LEFT JOIN users u ON u.id = t.user_id " +
-                "WHERE t.person_id = ? AND date(t.created_at) BETWEEN date(?) AND date(?) ORDER BY t.created_at DESC";
+        String sql = "SELECT t.id, " +
+                "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                "       t.type, " +
+                "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                "       t.total_items, " +
+                "       t.date, u.name as usuario, t.person_id, t.notes, t.created_at " +
+                "FROM transactions t " +
+                "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                "LEFT JOIN products p ON p.id = ti.product_id " +
+                "LEFT JOIN users u ON u.id = t.user_id " +
+                "WHERE t.person_id = ? AND date(t.created_at) BETWEEN date(?) AND date(?) " +
+                "GROUP BY t.id, t.type, t.date, u.name, t.person_id, t.notes, t.created_at " +
+                "ORDER BY t.created_at DESC";
         Report res = new Report("Transacciones por persona");
-        res.addHeader("ID"); res.addHeader("Producto"); res.addHeader("Tipo"); res.addHeader("Cantidad"); res.addHeader("Fecha"); res.addHeader("Usuario"); res.addHeader("Person ID"); res.addHeader("Notas"); res.addHeader("Creado");
+        res.addHeader("ID");
+        res.addHeader("Productos");
+        res.addHeader("Tipo");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
+        res.addHeader("Fecha");
+        res.addHeader("Usuario");
+        res.addHeader("Person ID");
+        res.addHeader("Notas");
+        res.addHeader("Creado");
 
         PreparedStatement ps = null;
         ResultSet rs = null;
@@ -215,9 +282,15 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
+
                 row.add(rs.getString("type"));
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
                 row.add(String.valueOf(rs.getObject("person_id")));
@@ -424,20 +497,30 @@ public class ReportRepository {
 
     // Reporte de movimientos de inventario (últimos 30 días)
     public Report inventoryMovements() {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
-                     "       COALESCE(pe.last_name, '') as persona_apellido, t.notes " +
+        String sql = "SELECT t.id, " +
+                     "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                     "       t.type, " +
+                     "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                     "       t.total_items, " +
+                     "       t.date, " +
+                     "       u.username as usuario, " +
+                     "       COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       COALESCE(pe.last_name, '') as persona_apellido, " +
+                     "       t.notes " +
                      "FROM transactions t " +
-                     "LEFT JOIN products p ON p.id = t.product_id " +
+                     "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                     "LEFT JOIN products p ON p.id = ti.product_id " +
                      "LEFT JOIN users u ON u.id = t.user_id " +
                      "LEFT JOIN people pe ON pe.id = t.person_id " +
                      "WHERE t.date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) " +
+                     "GROUP BY t.id, t.type, t.date, u.username, persona_nombre, persona_apellido, t.notes " +
                      "ORDER BY t.date DESC, t.created_at DESC";
         Report res = new Report("Movimientos de Inventario (Últimos 30 días)");
         res.addHeader("ID");
-        res.addHeader("Producto");
+        res.addHeader("Productos");
         res.addHeader("Tipo");
-        res.addHeader("Cantidad");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
         res.addHeader("Fecha");
         res.addHeader("Usuario");
         res.addHeader("Persona");
@@ -448,7 +531,11 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
 
                 // Formatear tipo de transacción
                 String type = rs.getString("type");
@@ -460,7 +547,8 @@ public class ReportRepository {
                 };
                 row.add(typeLabel);
 
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
 
@@ -487,20 +575,29 @@ public class ReportRepository {
 
     // Reporte de movimientos de inventario por rango de fechas
     public Report inventoryMovementsByDateRange(String from, String to) {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
+        String sql = "SELECT t.id, " +
+                     "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                     "       t.type, " +
+                     "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                     "       t.total_items, " +
+                     "       t.date, " +
+                     "       u.username as usuario, " +
+                     "       COALESCE(pe.first_name, '') as persona_nombre, " +
                      "       COALESCE(pe.last_name, '') as persona_apellido " +
                      "FROM transactions t " +
-                     "LEFT JOIN products p ON p.id = t.product_id " +
+                     "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                     "LEFT JOIN products p ON p.id = ti.product_id " +
                      "LEFT JOIN users u ON u.id = t.user_id " +
                      "LEFT JOIN people pe ON pe.id = t.person_id " +
                      "WHERE t.date BETWEEN ? AND ? " +
+                     "GROUP BY t.id, t.type, t.date, u.username, persona_nombre, persona_apellido " +
                      "ORDER BY t.date DESC, t.created_at DESC";
         Report res = new Report("Movimientos de Inventario por Rango de Fechas");
         res.addHeader("ID");
-        res.addHeader("Producto");
+        res.addHeader("Productos");
         res.addHeader("Tipo");
-        res.addHeader("Cantidad");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
         res.addHeader("Fecha");
         res.addHeader("Usuario");
         res.addHeader("Persona");
@@ -515,7 +612,11 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
 
                 // Formatear tipo de transacción
                 String type = rs.getString("type");
@@ -527,7 +628,8 @@ public class ReportRepository {
                 };
                 row.add(typeLabel);
 
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
 
@@ -597,19 +699,29 @@ public class ReportRepository {
 
     // Reporte de historial de transacciones completo
     public Report transactionsAll() {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
-                     "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
+        String sql = "SELECT t.id, " +
+                     "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                     "       t.type, " +
+                     "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                     "       t.total_items, " +
+                     "       t.date, " +
+                     "       u.username as usuario, " +
+                     "       COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       COALESCE(pe.last_name, '') as persona_apellido, " +
+                     "       t.created_at " +
                      "FROM transactions t " +
-                     "LEFT JOIN products p ON p.id = t.product_id " +
+                     "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                     "LEFT JOIN products p ON p.id = ti.product_id " +
                      "LEFT JOIN users u ON u.id = t.user_id " +
                      "LEFT JOIN people pe ON pe.id = t.person_id " +
+                     "GROUP BY t.id, t.type, t.date, u.username, persona_nombre, persona_apellido, t.created_at " +
                      "ORDER BY t.created_at DESC";
         Report res = new Report("Historial Completo de Transacciones");
         res.addHeader("ID");
-        res.addHeader("Producto");
+        res.addHeader("Productos");
         res.addHeader("Tipo");
-        res.addHeader("Cantidad");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
         res.addHeader("Fecha");
         res.addHeader("Usuario");
         res.addHeader("Persona");
@@ -620,7 +732,12 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                // Mostrar productos
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
 
                 // Formatear tipo de transacción
                 String type = rs.getString("type");
@@ -632,7 +749,8 @@ public class ReportRepository {
                 };
                 row.add(typeLabel);
 
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
 
@@ -657,14 +775,23 @@ public class ReportRepository {
 
     // Reporte de transacciones por tipo
     public Report transactionsByTypeReport(@NotNull String type) {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
-                     "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
+        String sql = "SELECT t.id, " +
+                     "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                     "       t.type, " +
+                     "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                     "       t.total_items, " +
+                     "       t.date, " +
+                     "       u.username as usuario, " +
+                     "       COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       COALESCE(pe.last_name, '') as persona_apellido, " +
+                     "       t.created_at " +
                      "FROM transactions t " +
-                     "LEFT JOIN products p ON p.id = t.product_id " +
+                     "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                     "LEFT JOIN products p ON p.id = ti.product_id " +
                      "LEFT JOIN users u ON u.id = t.user_id " +
                      "LEFT JOIN people pe ON pe.id = t.person_id " +
                      "WHERE t.type = ? " +
+                     "GROUP BY t.id, t.type, t.date, u.username, persona_nombre, persona_apellido, t.created_at " +
                      "ORDER BY t.created_at DESC";
 
         String typeName = switch (type) {
@@ -676,9 +803,10 @@ public class ReportRepository {
 
         Report res = new Report("Transacciones: " + typeName);
         res.addHeader("ID");
-        res.addHeader("Producto");
+        res.addHeader("Productos");
         res.addHeader("Tipo");
-        res.addHeader("Cantidad");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
         res.addHeader("Fecha");
         res.addHeader("Usuario");
         res.addHeader("Persona");
@@ -693,7 +821,12 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                // Mostrar productos
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
 
                 String typeValue = rs.getString("type");
                 String typeLabel = switch (typeValue) {
@@ -704,7 +837,8 @@ public class ReportRepository {
                 };
                 row.add(typeLabel);
 
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
 
@@ -731,14 +865,23 @@ public class ReportRepository {
 
     // Reporte de transacciones por tipo y rango de fechas
     public Report transactionsByTypeAndDateRange(@NotNull String type, String from, String to) {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
-                     "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
+        String sql = "SELECT t.id, " +
+                     "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                     "       t.type, " +
+                     "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                     "       t.total_items, " +
+                     "       t.date, " +
+                     "       u.username as usuario, " +
+                     "       COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       COALESCE(pe.last_name, '') as persona_apellido, " +
+                     "       t.created_at " +
                      "FROM transactions t " +
-                     "LEFT JOIN products p ON p.id = t.product_id " +
+                     "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                     "LEFT JOIN products p ON p.id = ti.product_id " +
                      "LEFT JOIN users u ON u.id = t.user_id " +
                      "LEFT JOIN people pe ON pe.id = t.person_id " +
                      "WHERE t.type = ? AND t.date BETWEEN ? AND ? " +
+                     "GROUP BY t.id, t.type, t.date, u.username, persona_nombre, persona_apellido, t.created_at " +
                      "ORDER BY t.date DESC, t.created_at DESC";
 
         String typeName = switch (type) {
@@ -750,9 +893,10 @@ public class ReportRepository {
 
         Report res = new Report(typeName + " por Rango de Fechas");
         res.addHeader("ID");
-        res.addHeader("Producto");
+        res.addHeader("Productos");
         res.addHeader("Tipo");
-        res.addHeader("Cantidad");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
         res.addHeader("Fecha");
         res.addHeader("Usuario");
         res.addHeader("Persona");
@@ -769,7 +913,11 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
 
                 String typeValue = rs.getString("type");
                 String typeLabel = switch (typeValue) {
@@ -780,7 +928,8 @@ public class ReportRepository {
                 };
                 row.add(typeLabel);
 
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
 
@@ -807,21 +956,31 @@ public class ReportRepository {
 
     // Reporte de transacciones por usuario
     public Report transactionsByUserReport(int userId) {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
-                     "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
+        String sql = "SELECT t.id, " +
+                     "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                     "       t.type, " +
+                     "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                     "       t.total_items, " +
+                     "       t.date, " +
+                     "       u.username as usuario, " +
+                     "       COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       COALESCE(pe.last_name, '') as persona_apellido, " +
+                     "       t.created_at " +
                      "FROM transactions t " +
-                     "LEFT JOIN products p ON p.id = t.product_id " +
+                     "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                     "LEFT JOIN products p ON p.id = ti.product_id " +
                      "LEFT JOIN users u ON u.id = t.user_id " +
                      "LEFT JOIN people pe ON pe.id = t.person_id " +
                      "WHERE t.user_id = ? " +
+                     "GROUP BY t.id, t.type, t.date, u.username, persona_nombre, persona_apellido, t.created_at " +
                      "ORDER BY t.created_at DESC";
 
         Report res = new Report("Transacciones por Usuario");
         res.addHeader("ID");
-        res.addHeader("Producto");
+        res.addHeader("Productos");
         res.addHeader("Tipo");
-        res.addHeader("Cantidad");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
         res.addHeader("Fecha");
         res.addHeader("Usuario");
         res.addHeader("Persona");
@@ -836,7 +995,11 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
 
                 String type = rs.getString("type");
                 String typeLabel = switch (type) {
@@ -847,7 +1010,8 @@ public class ReportRepository {
                 };
                 row.add(typeLabel);
 
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
 
@@ -874,21 +1038,31 @@ public class ReportRepository {
 
     // Reporte de transacciones por persona
     public Report transactionsByPersonReport(int personId) {
-        String sql = "SELECT t.id, p.name as producto, t.type, t.quantity, t.date, " +
-                     "       u.username as usuario, COALESCE(pe.first_name, '') as persona_nombre, " +
-                     "       COALESCE(pe.last_name, '') as persona_apellido, t.created_at " +
+        String sql = "SELECT t.id, " +
+                     "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                     "       t.type, " +
+                     "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                     "       t.total_items, " +
+                     "       t.date, " +
+                     "       u.username as usuario, " +
+                     "       COALESCE(pe.first_name, '') as persona_nombre, " +
+                     "       COALESCE(pe.last_name, '') as persona_apellido, " +
+                     "       t.created_at " +
                      "FROM transactions t " +
-                     "LEFT JOIN products p ON p.id = t.product_id " +
+                     "LEFT JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                     "LEFT JOIN products p ON p.id = ti.product_id " +
                      "LEFT JOIN users u ON u.id = t.user_id " +
                      "LEFT JOIN people pe ON pe.id = t.person_id " +
                      "WHERE t.person_id = ? " +
+                     "GROUP BY t.id, t.type, t.date, u.username, persona_nombre, persona_apellido, t.created_at " +
                      "ORDER BY t.created_at DESC";
 
         Report res = new Report("Transacciones por Persona");
         res.addHeader("ID");
-        res.addHeader("Producto");
+        res.addHeader("Productos");
         res.addHeader("Tipo");
-        res.addHeader("Cantidad");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
         res.addHeader("Fecha");
         res.addHeader("Usuario");
         res.addHeader("Persona");
@@ -903,7 +1077,11 @@ public class ReportRepository {
             while (rs.next()) {
                 List<String> row = new ArrayList<>();
                 row.add(String.valueOf(rs.getInt("id")));
-                row.add(rs.getString("producto"));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
 
                 String type = rs.getString("type");
                 String typeLabel = switch (type) {
@@ -914,7 +1092,8 @@ public class ReportRepository {
                 };
                 row.add(typeLabel);
 
-                row.add(String.valueOf(rs.getObject("quantity")));
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(rs.getString("usuario"));
 
@@ -944,12 +1123,13 @@ public class ReportRepository {
     // Reporte de productos más movidos
     public Report productsMostMoved(String from, String to) {
         String sql = "SELECT p.id, p.name, p.unit, " +
-                     "       COUNT(t.id) as total_movimientos, " +
-                     "       SUM(CASE WHEN t.type='out' THEN t.quantity ELSE 0 END) as total_egresos, " +
-                     "       SUM(CASE WHEN t.type='in' THEN t.quantity ELSE 0 END) as total_ingresos, " +
-                     "       SUM(CASE WHEN t.type='loan' THEN t.quantity ELSE 0 END) as total_prestamos " +
+                     "       COUNT(DISTINCT t.id) as total_movimientos, " +
+                     "       SUM(CASE WHEN t.type='out' THEN ti.quantity ELSE 0 END) as total_egresos, " +
+                     "       SUM(CASE WHEN t.type='in' THEN ti.quantity ELSE 0 END) as total_ingresos, " +
+                     "       SUM(CASE WHEN t.type='loan' THEN ti.quantity ELSE 0 END) as total_prestamos " +
                      "FROM products p " +
-                     "LEFT JOIN transactions t ON p.id = t.product_id AND t.date BETWEEN ? AND ? " +
+                     "LEFT JOIN transaction_items ti ON p.id = ti.product_id " +
+                     "LEFT JOIN transactions t ON ti.transaction_id = t.id AND t.date BETWEEN ? AND ? " +
                      "GROUP BY p.id " +
                      "ORDER BY total_movimientos DESC " +
                      "LIMIT 20";
@@ -994,12 +1174,17 @@ public class ReportRepository {
     // Reporte de personas con préstamos activos
     public Report peopleWithActiveLoans() {
         String sql = "SELECT pe.id, pe.dni, pe.first_name, pe.last_name, " +
-                     "       p.name as producto, t.quantity, t.date, t.created_at, " +
+                     "       GROUP_CONCAT(DISTINCT p.name SEPARATOR ', ') as productos, " +
+                     "       (SELECT SUM(ti.quantity) FROM transaction_items ti WHERE ti.transaction_id = t.id) as cantidad_total, " +
+                     "       t.total_items, " +
+                     "       t.date, t.created_at, " +
                      "       DATEDIFF(CURDATE(), t.date) as dias_prestamo " +
                      "FROM transactions t " +
                      "JOIN people pe ON t.person_id = pe.id " +
-                     "JOIN products p ON t.product_id = p.id " +
+                     "JOIN transaction_items ti ON ti.transaction_id = t.id " +
+                     "JOIN products p ON ti.product_id = p.id " +
                      "WHERE t.type = 'loan' " +
+                     "GROUP BY t.id, pe.id, pe.dni, pe.first_name, pe.last_name, t.date, t.created_at " +
                      "ORDER BY t.created_at DESC";
 
         Report res = new Report("Personas con Préstamos Activos");
@@ -1007,8 +1192,9 @@ public class ReportRepository {
         res.addHeader("DNI");
         res.addHeader("Nombre");
         res.addHeader("Apellido");
-        res.addHeader("Producto");
-        res.addHeader("Cantidad");
+        res.addHeader("Productos");
+        res.addHeader("Cantidad Total");
+        res.addHeader("Items");
         res.addHeader("Fecha Préstamo");
         res.addHeader("Días Transcurridos");
 
@@ -1020,8 +1206,14 @@ public class ReportRepository {
                 row.add(rs.getString("dni"));
                 row.add(rs.getString("first_name"));
                 row.add(rs.getString("last_name"));
-                row.add(rs.getString("producto"));
-                row.add(String.valueOf(rs.getObject("quantity")));
+
+                String productos = rs.getString("productos");
+                int totalItems = rs.getInt("total_items");
+                // Siempre mostrar nombres de productos
+                row.add(productos != null ? productos : "N/A");
+
+                row.add(String.format("%.2f", rs.getDouble("cantidad_total")));
+                row.add(String.valueOf(totalItems));
                 row.add(rs.getString("date"));
                 row.add(String.valueOf(rs.getInt("dias_prestamo")));
                 res.addRow(row);
@@ -1037,9 +1229,10 @@ public class ReportRepository {
     public Report monthlyConsumption(int months) {
         String sql = "SELECT p.name as producto, p.unit, " +
                      "       DATE_FORMAT(t.date, '%Y-%m') as mes, " +
-                     "       SUM(t.quantity) as total_consumido " +
+                     "       SUM(ti.quantity) as total_consumido " +
                      "FROM products p " +
-                     "JOIN transactions t ON p.id = t.product_id " +
+                     "JOIN transaction_items ti ON p.id = ti.product_id " +
+                     "JOIN transactions t ON ti.transaction_id = t.id " +
                      "WHERE t.type = 'out' AND t.date >= DATE_SUB(CURDATE(), INTERVAL ? MONTH) " +
                      "GROUP BY p.id, mes " +
                      "ORDER BY mes DESC, total_consumido DESC";
@@ -1081,7 +1274,8 @@ public class ReportRepository {
                      "       COALESCE(MAX(t.date), 'Sin movimientos') as ultimo_movimiento, " +
                      "       COALESCE(DATEDIFF(CURDATE(), MAX(t.date)), DATEDIFF(CURDATE(), p.created_at)) as dias_sin_movimiento " +
                      "FROM products p " +
-                     "LEFT JOIN transactions t ON p.id = t.product_id " +
+                     "LEFT JOIN transaction_items ti ON p.id = ti.product_id " +
+                     "LEFT JOIN transactions t ON ti.transaction_id = t.id " +
                      "GROUP BY p.id " +
                      "HAVING dias_sin_movimiento >= ? OR ultimo_movimiento = 'Sin movimientos' " +
                      "ORDER BY dias_sin_movimiento DESC";
@@ -1233,3 +1427,5 @@ public class ReportRepository {
         return res;
     }
 }
+
+

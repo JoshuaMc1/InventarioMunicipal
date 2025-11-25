@@ -44,6 +44,7 @@ public class BackupController {
     @FXML private Button btnRefresh;
     @FXML private Button btnDelete;
     @FXML private Button btnCleanOld;
+    @FXML private Button btnAutoBackupSettings;
 
     @FXML private Button btnPrev;
     @FXML private Button btnNext;
@@ -98,8 +99,14 @@ public class BackupController {
         colSize.setCellValueFactory(data ->
             new SimpleStringProperty(data.getValue().getSizeFormatted()));
 
-        colUsuario.setCellValueFactory(data ->
-            new SimpleStringProperty(data.getValue().getUsuarioNombre()));
+        colUsuario.setCellValueFactory(data -> {
+            String usuario = data.getValue().getUsuarioNombre();
+            // Si el usuario es SYSTEM o está vacío, mostrar como automático
+            if (usuario == null || usuario.isEmpty() || "SYSTEM".equals(usuario)) {
+                return new SimpleStringProperty("SYSTEM (Automático)");
+            }
+            return new SimpleStringProperty(usuario);
+        });
 
         colMensaje.setCellValueFactory(data ->
             new SimpleStringProperty(data.getValue().getString("error_message")));
@@ -432,6 +439,7 @@ public class BackupController {
                         loadPage(currentPage);
                     });
                 } catch (Exception e) {
+                    com.joshuamc1.inventariomunicipal.config.DatabaseConfig.closeConnection();
                     Logs.error(getClass(), "Error limpiando backups antiguos", e);
                     Platform.runLater(() ->
                         Utils.showAlert("Error", "No se pudo limpiar backups: " + e.getMessage())
@@ -441,6 +449,71 @@ public class BackupController {
 
         } catch (NumberFormatException e) {
             Utils.showAlert("Error", "Ingrese un número válido");
+        }
+    }
+
+    @FXML
+    public void onAutoBackupSettings() {
+        com.joshuamc1.inventariomunicipal.core.AutoBackupManager autoBackup =
+            com.joshuamc1.inventariomunicipal.core.AutoBackupManager.getInstance();
+
+        boolean currentlyEnabled = autoBackup.isAutoBackupEnabled();
+        String lastStartup = autoBackup.getLastStartupBackupInfo();
+        String lastShutdown = autoBackup.getLastShutdownBackupInfo();
+
+        // Crear diálogo con información y opciones
+        Alert dialog = new Alert(Alert.AlertType.INFORMATION);
+        dialog.setTitle("Configuración de Backups Automáticos");
+        dialog.setHeaderText("Estado de Backups Automáticos");
+
+        String statusText = String.format(
+            "Estado actual: %s\n\n" +
+            "Funcionamiento:\n" +
+            "• Backup al iniciar: Se crea automáticamente una vez por día\n" +
+            "  la primera vez que se inicia la aplicación.\n\n" +
+            "• Backup al cerrar: Se crea automáticamente cada vez que\n" +
+            "  se cierra la aplicación (mantiene el más reciente del día).\n\n" +
+            "Últimos backups automáticos:\n" +
+            "• Inicio: %s\n" +
+            "• Cierre: %s\n\n" +
+            "¿Desea cambiar el estado de los backups automáticos?",
+            currentlyEnabled ? "✅ HABILITADO" : "❌ DESHABILITADO",
+            lastStartup,
+            lastShutdown
+        );
+
+        dialog.setContentText(statusText);
+        dialog.getDialogPane().setMinWidth(550);
+        dialog.getDialogPane().setMinHeight(Region.USE_PREF_SIZE);
+
+        // Botones
+        ButtonType btnToggle = new ButtonType(
+            currentlyEnabled ? "Deshabilitar" : "Habilitar",
+            ButtonBar.ButtonData.OK_DONE
+        );
+        ButtonType btnCancel = new ButtonType("Cerrar", ButtonBar.ButtonData.CANCEL_CLOSE);
+
+        dialog.getButtonTypes().setAll(btnToggle, btnCancel);
+
+        Optional<ButtonType> result = dialog.showAndWait();
+        if (result.isPresent() && result.get() == btnToggle) {
+            // Cambiar estado
+            boolean newState = !currentlyEnabled;
+            autoBackup.setAutoBackupEnabled(newState);
+
+            Utils.showAlert(
+                "Configuración Actualizada",
+                String.format(
+                    "Backups automáticos %s exitosamente.\n\n" +
+                    "%s",
+                    newState ? "habilitados" : "deshabilitados",
+                    newState
+                        ? "• Al iniciar la app por primera vez cada día se creará un backup.\n" +
+                          "• Al cerrar la app siempre se creará un backup."
+                        : "• No se crearán backups automáticos.\n" +
+                          "• Puede crear backups manualmente cuando lo necesite."
+                )
+            );
         }
     }
 

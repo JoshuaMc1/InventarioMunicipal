@@ -63,11 +63,13 @@
             <TableView fx:id="tblProducts">
                 <columns>
                     <TableColumn fx:id="colId" prefWidth="60" text="ID" />
-                    <TableColumn fx:id="colName" prefWidth="260" text="Nombre" />
-                    <TableColumn fx:id="colDescription" prefWidth="360" text="Descripción" />
+                    <TableColumn fx:id="colCode" prefWidth="140" text="Código" />
+                    <TableColumn fx:id="colName" prefWidth="220" text="Nombre" />
+                    <TableColumn fx:id="colDescription" prefWidth="280" text="Descripción" />
                     <TableColumn fx:id="colUnit" prefWidth="100" text="Unidad" />
                     <TableColumn fx:id="colStock" prefWidth="100" text="Stock" />
                     <TableColumn fx:id="colMinStock" prefWidth="120" text="Stock Mínimo" />
+                    <TableColumn fx:id="colActions" prefWidth="150" text="Acciones" />
                 </columns>
             </TableView>
         </center>

@@ -290,6 +290,15 @@ public class UsersController {
                 int pageToLoad = Math.min(Math.max(1, p), pages);
                 int offset = (pageToLoad - 1) * pageSize;
                 List<User> pageItems = userService.listPaged(offset, pageSize, q);
+
+                // Filtrar usuario SYSTEM (no debe aparecer en la lista)
+                if (pageItems != null) {
+                    pageItems.removeIf(user -> {
+                        String username = user.getString("username");
+                        return username != null && username.equalsIgnoreCase("SYSTEM");
+                    });
+                }
+
                 Platform.runLater(() -> {
                     totalItems = total;
                     totalPages = pages;
@@ -482,9 +491,20 @@ public class UsersController {
 
         d.setResultConverter(bt -> {
             if (bt == save) {
+                String username = txtUsername.getText().trim();
+
+                // Validar que no se intente crear/editar un usuario con nombre SYSTEM
+                if (username.equalsIgnoreCase("SYSTEM")) {
+                    Platform.runLater(() ->
+                        Utils.showAlert("Error",
+                            "El nombre de usuario 'SYSTEM' está reservado y no puede ser utilizado.\n\n" +
+                            "Este usuario es exclusivo del sistema para operaciones automáticas.")
+                    );
+                    return null;
+                }
+
                 // Verificar una última vez antes de guardar
                 if (!txtUsername.isDisabled()) {
-                    String username = txtUsername.getText().trim();
                     Integer existingId = userService.getIdByUsername(username);
                     if (existingId != null) {
                         Integer currentId = base != null ? base.getInteger("id") : null;
@@ -497,7 +517,7 @@ public class UsersController {
 
                 User u = new User();
                 u.set("name", txtName.getText());
-                u.set("username", txtUsername.getText());
+                u.set("username", username);
                 com.joshuamc1.inventariomunicipal.models.Rol selectedRole = cmbRole.getValue();
                 if (selectedRole != null) {
                     u.set("rol_id", selectedRole.getId());

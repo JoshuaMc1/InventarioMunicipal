@@ -31,6 +31,16 @@ public class ProductService {
         return DatabaseManager.callInConnection(() -> repo.findById(id));
     }
 
+    /**
+     * Busca un producto por su código exacto
+     * Útil para lectores de códigos de barras/QR
+     * @param code Código del producto
+     * @return Producto encontrado o null
+     */
+    public Product findByCode(String code) {
+        return DatabaseManager.callInConnection(() -> repo.findByCode(code));
+    }
+
     public Product createProduct(String name, String desc, String unit, double minStock) {
         return DatabaseManager.callInConnection(() ->
                 repo.create(name, desc, unit, 0.0, minStock)

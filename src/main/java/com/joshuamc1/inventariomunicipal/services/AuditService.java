@@ -6,6 +6,7 @@ import com.joshuamc1.inventariomunicipal.models.Audit;
 import com.joshuamc1.inventariomunicipal.models.dto.AuditDTO;
 import com.joshuamc1.inventariomunicipal.repositories.AuditRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public class AuditService {
@@ -39,5 +40,9 @@ public class AuditService {
 
     public int countWithFilter(String search) {
         return DatabaseManager.callInConnection(() -> repo.countWithFilter(search));
+    }
+
+    public List<AuditDTO> getAllWithUserByDateRange(LocalDate from, LocalDate to) {
+        return DatabaseManager.callInConnection(() -> repo.findAllWithUserByDateRange(from, to));
     }
 }

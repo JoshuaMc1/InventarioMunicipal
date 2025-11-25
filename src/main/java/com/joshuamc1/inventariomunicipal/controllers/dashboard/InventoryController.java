@@ -1,5 +1,6 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
+import com.joshuamc1.inventariomunicipal.core.BarcodeGenerator;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
 import com.joshuamc1.inventariomunicipal.core.Session;
@@ -9,6 +10,7 @@ import com.joshuamc1.inventariomunicipal.models.Product;
 import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.services.ProductService;
 import com.joshuamc1.inventariomunicipal.config.DatabaseConfig;
+import javafx.application.Platform;
 import javafx.beans.property.SimpleDoubleProperty;
 import javafx.beans.property.SimpleIntegerProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -16,9 +18,14 @@ import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
+import javafx.stage.FileChooser;
+import org.jetbrains.annotations.NotNull;
 
+import java.io.File;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,11 +34,13 @@ public class InventoryController {
 
     @FXML private TableView<Product> tblProducts;
     @FXML private TableColumn<Product, Integer> colId;
+    @FXML private TableColumn<Product, String> colCode;
     @FXML private TableColumn<Product, String> colName;
     @FXML private TableColumn<Product, String> colDescription;
     @FXML private TableColumn<Product, String> colUnit;
     @FXML private TableColumn<Product, Double> colStock;
     @FXML private TableColumn<Product, Double> colMinStock;
+    @FXML private TableColumn<Product, Void> colActions;
 
     @FXML private Button btnRefresh;
     @FXML private Button btnNew;
@@ -144,6 +153,7 @@ public class InventoryController {
             return new SimpleIntegerProperty(id == null ? 0 : id).asObject();
         });
 
+        colCode.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("code")));
         colName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("name")));
         colDescription.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("description")));
         colUnit.setCellValueFactory(c -> new SimpleStringProperty(Units.fromDbValue(c.getValue().getString("unit")).getDisplayName()));
@@ -156,7 +166,50 @@ public class InventoryController {
             return new SimpleDoubleProperty(v == null ? 0.0 : v).asObject();
         });
 
+        // Configurar columna de acciones con botones
+        colActions.setCellFactory(col -> new TableCell<>() {
+            private final Button btnBarcode = new Button("Bc");
+            private final Button btnQR = new Button("Qr");
+            private final HBox pane = new HBox(5, btnBarcode, btnQR);
+
+            {
+                pane.setAlignment(Pos.CENTER);
+                btnBarcode.setStyle("-fx-font-size: 16; -fx-cursor: hand;");
+                btnQR.setStyle("-fx-font-size: 16; -fx-cursor: hand;");
+                btnBarcode.setTooltip(new Tooltip("Descargar Código de Barras"));
+                btnQR.setTooltip(new Tooltip("Descargar Código QR"));
+
+                btnBarcode.setOnAction(e -> {
+                    Product p = getTableView().getItems().get(getIndex());
+                    downloadBarcode(p);
+                });
+
+                btnQR.setOnAction(e -> {
+                    Product p = getTableView().getItems().get(getIndex());
+                    downloadQRCode(p);
+                });
+            }
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    Product p = getTableView().getItems().get(getIndex());
+                    String code = p.getString("code");
+                    // Solo mostrar botones si hay código
+                    if (code != null && !code.trim().isEmpty()) {
+                        setGraphic(pane);
+                    } else {
+                        setGraphic(null);
+                    }
+                }
+            }
+        });
+
         colId.setStyle("-fx-font-size: 17;");
+        colCode.setStyle("-fx-font-size: 17;");
         colName.setStyle("-fx-font-size: 17;");
         colDescription.setStyle("-fx-font-size: 17;");
         colUnit.setStyle("-fx-font-size: 17;");
@@ -207,7 +260,10 @@ public class InventoryController {
                 .filter(p -> {
                     String name = p.getString("name");
                     String id = String.valueOf(p.getInteger("id"));
-                    return (name != null && name.toLowerCase().contains(search)) || (id.contains(search));
+                    String code = p.getString("code");
+                    return (name != null && name.toLowerCase().contains(search))
+                        || (id.contains(search))
+                        || (code != null && code.toLowerCase().contains(search));
                 })
                 .collect(java.util.stream.Collectors.toList());
         }
@@ -240,6 +296,18 @@ public class InventoryController {
         ButtonType createBtn = new ButtonType("Crear", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(createBtn, ButtonType.CANCEL);
 
+        TextField txtCode = new TextField();
+        txtCode.setPromptText("Ingrese o escanee el código");
+        // Generar código automáticamente al abrir el diálogo
+        txtCode.setText(BarcodeGenerator.generateRandomCode());
+        Button btnGenerateCode = new Button("🎲");
+        btnGenerateCode.setTooltip(new Tooltip("Generar código aleatorio"));
+        btnGenerateCode.setOnAction(e -> txtCode.setText(BarcodeGenerator.generateRandomCode()));
+
+        HBox hboxCode = new HBox(5, txtCode, btnGenerateCode);
+        hboxCode.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        txtCode.prefWidthProperty().bind(hboxCode.widthProperty().subtract(btnGenerateCode.widthProperty()).subtract(10));
+
         TextField txtName = new TextField();
         TextArea txtDesc = new TextArea();
         ComboBox<Units> cbUnit = new ComboBox<>(FXCollections.observableArrayList(Units.values()));
@@ -253,19 +321,23 @@ public class InventoryController {
 
         txtDesc.setPrefRowCount(3);
 
-        // Agregar estilos a los labels y campos de entrada
+        // Aplicar estilos a los labels y campos de entrada
+        txtCode.setStyle("-fx-font-size: 17;");
+        btnGenerateCode.setStyle("-fx-font-size: 14;");
         txtName.setStyle("-fx-font-size: 17;");
         txtDesc.setStyle("-fx-font-size: 17;");
         cbUnit.setStyle("-fx-font-size: 17;");
         txtCurrentStock.setStyle("-fx-font-size: 17;");
         txtMinStock.setStyle("-fx-font-size: 17;");
 
+        Label lblCode = new Label("Código:");
         Label lblName = new Label("Nombre:");
         Label lblDescription = new Label("Descripción:");
         Label lblUnit = new Label("Unidad:");
         Label lblCurrentStock = new Label("Stock actual:");
         Label lblMinStock = new Label("Stock mínimo:");
 
+        lblCode.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
         lblName.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
         lblDescription.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
         lblUnit.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
@@ -285,20 +357,22 @@ public class InventoryController {
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
-        grid.add(lblName, 0, 0);
-        grid.add(txtName, 1, 0);
-        grid.add(helperName, 1, 1);
-        grid.add(lblDescription, 0, 2);
-        grid.add(txtDesc, 1, 2);
-        grid.add(lblUnit, 0, 3);
-        grid.add(cbUnit, 1, 3);
-        grid.add(helperUnit, 1, 4);
-        grid.add(lblCurrentStock, 0, 5);
-        grid.add(txtCurrentStock, 1, 5);
-        grid.add(helperCurrentStock, 1, 6);
-        grid.add(lblMinStock, 0, 7);
-        grid.add(txtMinStock, 1, 7);
-        grid.add(helperMinStock, 1, 8);
+        grid.add(lblCode, 0, 0);
+        grid.add(hboxCode, 1, 0);
+        grid.add(lblName, 0, 1);
+        grid.add(txtName, 1, 1);
+        grid.add(helperName, 1, 2);
+        grid.add(lblDescription, 0, 3);
+        grid.add(txtDesc, 1, 3);
+        grid.add(lblUnit, 0, 4);
+        grid.add(cbUnit, 1, 4);
+        grid.add(helperUnit, 1, 5);
+        grid.add(lblCurrentStock, 0, 6);
+        grid.add(txtCurrentStock, 1, 6);
+        grid.add(helperCurrentStock, 1, 7);
+        grid.add(lblMinStock, 0, 8);
+        grid.add(txtMinStock, 1, 8);
+        grid.add(helperMinStock, 1, 9);
 
         dialog.getDialogPane().setContent(grid);
 
@@ -314,11 +388,18 @@ public class InventoryController {
 
         dialog.setResultConverter(btn -> {
             if (btn == createBtn) {
+                String code = txtCode.getText().trim();
                 String name = txtName.getText().trim();
                 String desc = txtDesc.getText().trim();
                 Units unit = cbUnit.getValue();
                 double min = 0.0;
                 double current = 0.0;
+
+                // Validar código si se proporcionó
+                if (!code.isEmpty() && !BarcodeGenerator.isValidCode(code)) {
+                    Utils.showAlert("Error", "El código debe contener solo letras, números, guiones y guiones bajos (3-100 caracteres)");
+                    return null;
+                }
 
                 try {
                     current = Double.parseDouble(txtCurrentStock.getText().trim());
@@ -334,7 +415,13 @@ public class InventoryController {
                     return null;
                 }
 
-                return productService.createProduct(name, desc, unit.getDbValue(), current, min);
+                Product product = productService.createProduct(name, desc, unit.getDbValue(), current, min);
+                // Asignar código si se proporcionó
+                if (!code.isEmpty()) {
+                    product.set("code", code);
+                    productService.save(product);
+                }
+                return product;
             }
             return null;
         });
@@ -361,9 +448,21 @@ public class InventoryController {
 
         Dialog<Product> dialog = new Dialog<>();
         dialog.setTitle("Editar producto");
+        dialog.setResizable(true);
 
         ButtonType saveBtn = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(saveBtn, ButtonType.CANCEL);
+
+        String currentCode = sel.getString("code");
+        TextField txtCode = new TextField(currentCode != null ? currentCode : "");
+        txtCode.setPromptText("Ingrese o escanee el código");
+        Button btnGenerateCode = new Button("🎲");
+        btnGenerateCode.setTooltip(new Tooltip("Generar código aleatorio"));
+        btnGenerateCode.setOnAction(e -> txtCode.setText(BarcodeGenerator.generateRandomCode()));
+
+        HBox hboxCode = new HBox(5, txtCode, btnGenerateCode);
+        hboxCode.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        txtCode.prefWidthProperty().bind(hboxCode.widthProperty().subtract(btnGenerateCode.widthProperty()).subtract(10));
 
         TextField txtName = new TextField(sel.getString("name"));
         TextArea txtDesc = new TextArea(sel.getString("description"));
@@ -376,18 +475,22 @@ public class InventoryController {
         txtCurrentStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());
         txtMinStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());
 
+        txtCode.setStyle("-fx-font-size: 17;");
+        btnGenerateCode.setStyle("-fx-font-size: 14;");
         txtName.setStyle("-fx-font-size: 17;");
         txtDesc.setStyle("-fx-font-size: 17;");
         cbUnit.setStyle("-fx-font-size: 17;");
         txtCurrentStock.setStyle("-fx-font-size: 17;");
         txtMinStock.setStyle("-fx-font-size: 17;");
 
+        Label lblCode = new Label("Código:");
         Label lblName = new Label("Nombre:");
         Label lblDescription = new Label("Descripción:");
         Label lblUnit = new Label("Unidad:");
         Label lblCurrentStock = new Label("Stock actual:");
         Label lblMinStock = new Label("Stock mínimo:");
 
+        lblCode.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
         lblName.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
         lblDescription.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
         lblUnit.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
@@ -407,20 +510,22 @@ public class InventoryController {
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
-        grid.add(lblName, 0, 0);
-        grid.add(txtName, 1, 0);
-        grid.add(helperName, 1, 1);
-        grid.add(lblDescription, 0, 2);
-        grid.add(txtDesc, 1, 2);
-        grid.add(lblUnit, 0, 3);
-        grid.add(cbUnit, 1, 3);
-        grid.add(helperUnit, 1, 4);
-        grid.add(lblCurrentStock, 0, 5);
-        grid.add(txtCurrentStock, 1, 5);
-        grid.add(helperCurrentStock, 1, 6);
-        grid.add(lblMinStock, 0, 7);
-        grid.add(txtMinStock, 1, 7);
-        grid.add(helperMinStock, 1, 8);
+        grid.add(lblCode, 0, 0);
+        grid.add(hboxCode, 1, 0);
+        grid.add(lblName, 0, 1);
+        grid.add(txtName, 1, 1);
+        grid.add(helperName, 1, 2);
+        grid.add(lblDescription, 0, 3);
+        grid.add(txtDesc, 1, 3);
+        grid.add(lblUnit, 0, 4);
+        grid.add(cbUnit, 1, 4);
+        grid.add(helperUnit, 1, 5);
+        grid.add(lblCurrentStock, 0, 6);
+        grid.add(txtCurrentStock, 1, 6);
+        grid.add(helperCurrentStock, 1, 7);
+        grid.add(lblMinStock, 0, 8);
+        grid.add(txtMinStock, 1, 8);
+        grid.add(helperMinStock, 1, 9);
 
         dialog.getDialogPane().setContent(grid);
 
@@ -436,12 +541,19 @@ public class InventoryController {
 
         dialog.setResultConverter(btn -> {
             if (btn == saveBtn) {
+                String code = txtCode.getText().trim();
                 String name = txtName.getText().trim();
                 String desc = txtDesc.getText().trim();
                 Units unit = cbUnit.getValue();
 
                 double min = 0.0;
                 double current = 0.0;
+
+                // Validar código si se proporcionó
+                if (!code.isEmpty() && !BarcodeGenerator.isValidCode(code)) {
+                    Utils.showAlert("Error", "El código debe contener solo letras, números, guiones y guiones bajos (3-100 caracteres)");
+                    return null;
+                }
 
                 try {
                     current = Double.parseDouble(txtCurrentStock.getText().trim());
@@ -457,6 +569,7 @@ public class InventoryController {
                     return null;
                 }
 
+                sel.set("code", code.isEmpty() ? null : code);
                 sel.set("name", name);
                 sel.set("description", desc);
                 sel.set("unit", unit.getDbValue());
@@ -493,5 +606,59 @@ public class InventoryController {
         productService.delete(sel);
 
         loadProducts();
+    }
+
+    private void downloadBarcode(@NotNull Product product) {
+        String code = product.getString("code");
+        if (code == null || code.trim().isEmpty()) {
+            Utils.showAlert("Error", "El producto no tiene código asignado");
+            return;
+        }
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Guardar Código de Barras");
+        fileChooser.setInitialFileName("barcode_" + code + ".png");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("PNG Image", "*.png")
+        );
+
+        File file = fileChooser.showSaveDialog(tblProducts.getScene().getWindow());
+        if (file != null) {
+            try {
+                BarcodeGenerator.generateBarcode(code, file);
+                Utils.showAlert("Éxito", "Código de barras generado: " + file.getAbsolutePath());
+            } catch (Exception e) {
+                Logs.error(getClass(), "Error generando código de barras", e);
+                Utils.showAlert("Error", "No se pudo generar el código de barras: " + e.getMessage());
+            }
+        }
+    }
+
+    private void downloadQRCode(@NotNull Product product) {
+        String code = product.getString("code");
+        String name = product.getString("name");
+
+        if (code == null || code.trim().isEmpty()) {
+            Utils.showAlert("Error", "El producto no tiene código asignado");
+            return;
+        }
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Guardar Código QR");
+        fileChooser.setInitialFileName("qr_" + code + ".png");
+        fileChooser.getExtensionFilters().add(
+            new FileChooser.ExtensionFilter("PNG Image", "*.png")
+        );
+
+        File file = fileChooser.showSaveDialog(tblProducts.getScene().getWindow());
+        if (file != null) {
+            try {
+                BarcodeGenerator.generateQRCode(code, name, file);
+                Utils.showAlert("Éxito", "Código QR generado: " + file.getAbsolutePath());
+            } catch (Exception e) {
+                Logs.error(getClass(), "Error generando código QR", e);
+                Utils.showAlert("Error", "No se pudo generar el código QR: " + e.getMessage());
+            }
+        }
     }
 }

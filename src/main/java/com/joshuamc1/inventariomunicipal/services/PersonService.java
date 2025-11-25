@@ -14,7 +14,7 @@ public class PersonService {
 
     public Person create(String dni, String firstName, String lastName, String phone, String internalCode) {
         // Validación de permisos en la capa de servicio
-        if (!PermissionHelper.canAccess("PEOPLE", "CREATE")) {
+        if (!PermissionHelper.canAccess("PERSONAS", "CREATE")) {
             throw new IllegalStateException("Acceso denegado: no tiene permiso para crear personas");
         }
         return DatabaseManager.callInConnection(() -> {
@@ -35,7 +35,7 @@ public class PersonService {
 
     public boolean update(Integer id, String dni, String firstName, String lastName, String phone, String internalCode) {
         // Validación de permisos
-        if (!PermissionHelper.canAccess("PEOPLE", "UPDATE")) {
+        if (!PermissionHelper.canAccess("PERSONAS", "UPDATE")) {
             throw new IllegalStateException("Acceso denegado: no tiene permiso para actualizar personas");
         }
         return DatabaseManager.callInConnection(() -> {
@@ -55,7 +55,7 @@ public class PersonService {
 
     public boolean delete(Integer id) {
         // Validación de permisos
-        if (!PermissionHelper.canAccess("PEOPLE", "DELETE")) {
+        if (!PermissionHelper.canAccess("PERSONAS", "DELETE")) {
             throw new IllegalStateException("Acceso denegado: no tiene permiso para eliminar personas");
         }
         return DatabaseManager.callInConnection(() -> {

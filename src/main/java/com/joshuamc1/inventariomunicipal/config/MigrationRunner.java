@@ -106,7 +106,7 @@ public class MigrationRunner {
         files.add("20251114112628_create_user_table.sql");
         files.add("20251114112848_create_people_table.sql");
         files.add("20251114112911_create_product_table.sql");
-        files.add("20251114113444_create_transaction_table.sql");
+        files.add("20251124120000_migrate_to_multiproduct_transactions.sql");
         files.add("20251114114102_create_audit_table.sql");
         files.add("20251114114104_create_indexes_table.sql");
         files.add("20251114114105_create_permissions_table.sql");

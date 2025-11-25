@@ -66,15 +66,17 @@ public class TransactionRepository {
     }
 
     public java.util.Map<String, Long> getMostMovedProducts(int limit) {
-        // Obtener productos con más transacciones usando conteo por producto
+        // Obtener productos con más transacciones usando conteo desde transaction_items
         java.util.Map<String, Long> result = new java.util.LinkedHashMap<>();
 
-        // Obtener todas las transacciones y contar por producto
-        List<Transaction> allTransactions = Transaction.findAll();
+        // Contar movimientos por producto desde transaction_items
+        List<com.joshuamc1.inventariomunicipal.models.TransactionItem> allItems =
+            com.joshuamc1.inventariomunicipal.models.TransactionItem.findAll();
+
         java.util.Map<Integer, Long> countByProductId = new java.util.HashMap<>();
 
-        for (Transaction t : allTransactions) {
-            Integer productId = t.getInteger("product_id");
+        for (var item : allItems) {
+            Integer productId = item.getInteger("product_id");
             if (productId != null) {
                 countByProductId.merge(productId, 1L, Long::sum);
             }

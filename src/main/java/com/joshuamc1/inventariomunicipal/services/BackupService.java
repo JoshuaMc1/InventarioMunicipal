@@ -1,9 +1,11 @@
 package com.joshuamc1.inventariomunicipal.services;
 
+import com.joshuamc1.inventariomunicipal.config.DatabaseConfig;
 import com.joshuamc1.inventariomunicipal.config.MySQLConfigManager;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.models.Backup;
+import com.joshuamc1.inventariomunicipal.models.User;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
@@ -44,11 +46,21 @@ public class BackupService {
     }
 
     /**
-     * Crea un backup de la base de datos
+     * Crea un backup de la base de datos (manual, con auditoría)
      * @return Path del archivo de backup creado
      * @throws Exception si hay un error
      */
     public Path createBackup() throws Exception {
+        return createBackup(false);
+    }
+
+    /**
+     * Crea un backup de la base de datos
+     * @param isAutomatic true si es backup automático, false si es manual
+     * @return Path del archivo de backup creado
+     * @throws Exception si hay un error
+     */
+    public Path createBackup(boolean isAutomatic) throws Exception {
         if (!MySQLConfigManager.hasConfig()) {
             throw new Exception("Configuración de MySQL no encontrada");
         }
@@ -64,7 +76,7 @@ public class BackupService {
         String filename = String.format("backup_%s_%s.sql.gz", database, timestamp);
         Path backupFile = getBackupDirectory().resolve(filename);
 
-        Logs.info(getClass(), "Iniciando backup: {}", filename);
+        Logs.info(getClass(), "Iniciando backup {}: {}", isAutomatic ? "(automático)" : "(manual)", filename);
 
         // Construir comando mysqldump con compresión
         ProcessBuilder pb = new ProcessBuilder();
@@ -111,11 +123,15 @@ public class BackupService {
             String error = output.toString();
             Logs.error(getClass(), "Error en mysqldump: {}", error);
 
-            // Registrar backup fallido (abrir conexión para guardar en BD)
+            // Registrar backup fallido
             try {
-                com.joshuamc1.inventariomunicipal.config.DatabaseConfig.openConnection();
-                registrarBackup(filename, backupFile.toString(), 0L, "FAILED", error);
-                com.joshuamc1.inventariomunicipal.config.DatabaseConfig.closeConnection();
+                DatabaseConfig.openConnection();
+                if (isAutomatic) {
+                    registrarBackupAutomatico(filename, backupFile.toString(), 0L, "FAILED", error);
+                } else {
+                    registrarBackupManual(filename, backupFile.toString(), 0L, "FAILED", error);
+                }
+                DatabaseConfig.closeConnection();
             } catch (Exception e) {
                 Logs.error(getClass(), "Error registrando backup fallido en BD", e);
             }
@@ -130,25 +146,25 @@ public class BackupService {
 
         long fileSize = Files.size(backupFile);
 
-        // Los archivos .gz pueden ser muy pequeños si la BD está vacía o tiene pocos datos
-        // Validar que al menos tenga el header gzip (mínimo ~100 bytes)
+        // Validar tamaño mínimo
         if (fileSize < 100) {
             Logs.warn(getClass(), "Backup muy pequeño ({}), posible error", fileSize);
             throw new Exception("Backup demasiado pequeño, posible error en la compresión");
         }
 
-        // Registrar backup exitoso (abrir conexión para guardar en BD)
-        com.joshuamc1.inventariomunicipal.config.DatabaseConfig.openConnection();
+        // Registrar backup exitoso
+        DatabaseConfig.openConnection();
         try {
-            registrarBackup(filename, backupFile.toString(), fileSize, "SUCCESS", null);
+            if (isAutomatic) {
+                registrarBackupAutomatico(filename, backupFile.toString(), fileSize, "SUCCESS", null);
+            } else {
+                registrarBackupManual(filename, backupFile.toString(), fileSize, "SUCCESS", null);
+            }
 
-            // Auditoría
-            auditService.logAction(Session.getCurrentUserId(), "create_backup", "backups", null,
-                String.format("{\"filename\":\"%s\",\"size\":%d}", filename, fileSize));
-
-            Logs.info(getClass(), "Backup completado exitosamente: {} ({} bytes)", filename, fileSize);
+            Logs.info(getClass(), "Backup {} completado exitosamente: {} ({} bytes)",
+                isAutomatic ? "automático" : "manual", filename, fileSize);
         } finally {
-            com.joshuamc1.inventariomunicipal.config.DatabaseConfig.closeConnection();
+            DatabaseConfig.closeConnection();
         }
 
         return backupFile;
@@ -183,19 +199,21 @@ public class BackupService {
     }
 
     /**
-     * Registra el backup en la base de datos
+     * Registra un backup MANUAL en la base de datos (con usuario de sesión y auditoría)
      */
-    private void registrarBackup(String filename, String filepath, long size, String status, String errorMessage) {
+    private void registrarBackupManual(String filename, String filepath, long size, String status, String errorMessage) {
         try {
-            Logs.info(getClass(), "Registrando backup en BD: filename={}, size={} bytes, status={}",
+            Logs.info(getClass(), "Registrando backup manual en BD: filename={}, size={} bytes, status={}",
                 filename, size, status);
 
             Backup backup = new Backup();
             backup.set("filename", filename);
             backup.set("filepath", filepath);
-            backup.set("size_bytes", Long.valueOf(size)); // Asegurar que es Long
-            backup.set("usuario_id", Session.getCurrentUserId());
+            backup.set("size_bytes", size); // No necesita boxing
+            backup.set("usuario_id", Session.getCurrentUserId()); // Usuario de sesión
             backup.set("status", status);
+            backup.set("error_message", "Copia de seguridad creada manualmente");
+
             if (errorMessage != null) {
                 backup.set("error_message", errorMessage);
             }
@@ -203,15 +221,61 @@ public class BackupService {
             boolean saved = backup.saveIt();
 
             if (saved) {
-                Logs.info(getClass(), "Backup registrado exitosamente con ID: {}", backup.getId());
-                // Verificar que se guardó correctamente
-                Long savedSize = backup.getLong("size_bytes");
-                Logs.info(getClass(), "Tamaño guardado verificado: {} bytes", savedSize);
+                Logs.info(getClass(), "Backup manual registrado exitosamente con ID: {}", backup.getId());
+
+                // Auditoría solo para backups manuales
+                auditService.logAction(Session.getCurrentUserId(), "create_backup", "backups", backup.getInteger("id"),
+                    String.format("{\"filename\":\"%s\",\"size\":%d}", filename, size));
             } else {
-                Logs.error(getClass(), "No se pudo guardar el backup en BD");
+                Logs.error(getClass(), "No se pudo guardar el backup manual en BD");
             }
         } catch (Exception e) {
-            Logs.error(getClass(), "Error registrando backup en BD", e);
+            Logs.error(getClass(), "Error registrando backup manual en BD", e);
+        }
+    }
+
+    /**
+     * Registra un backup AUTOMÁTICO en la base de datos (con usuario SYSTEM, sin auditoría)
+     */
+    private void registrarBackupAutomatico(String filename, String filepath, long size, String status, String errorMessage) {
+        try {
+            Logs.info(getClass(), "Registrando backup automático en BD: filename={}, size={} bytes, status={}",
+                filename, size, status);
+
+            // Buscar usuario SYSTEM
+            User systemUser = User.findFirst("username = ?", "SYSTEM");
+
+            if (systemUser == null) {
+                Logs.error(getClass(), "Usuario SYSTEM no encontrado en la base de datos");
+                throw new RuntimeException("Usuario SYSTEM no encontrado");
+            }
+
+            Integer systemUserId = systemUser.getInteger("id");
+            Logs.info(getClass(), "Usuario SYSTEM encontrado con ID: {}", systemUserId);
+
+            Backup backup = new Backup();
+            backup.set("filename", filename);
+            backup.set("filepath", filepath);
+            backup.set("size_bytes", size); // No necesita boxing
+            backup.set("usuario_id", systemUserId); // Usuario SYSTEM
+            backup.set("status", status);
+            backup.set("error_message", "Copia de seguridad creada por el sistema");
+
+            if (errorMessage != null) {
+                backup.set("error_message", errorMessage);
+            }
+
+            boolean saved = backup.saveIt();
+
+            if (saved) {
+                Logs.info(getClass(), "Backup automático registrado exitosamente con ID: {}", backup.getId());
+                // NO se registra auditoría para backups automáticos
+            } else {
+                Logs.error(getClass(), "No se pudo guardar el backup automático en BD");
+            }
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error registrando backup automático en BD", e);
+            throw new RuntimeException("Error registrando backup automático: " + e.getMessage());
         }
     }
 

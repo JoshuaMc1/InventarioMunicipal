@@ -217,6 +217,27 @@ public class AuditController implements AsyncLoadable {
             return;
         }
 
+        // Mostrar diálogo de opciones
+        var options = com.joshuamc1.inventariomunicipal.core.dialog.AuditExportDialog.showDialog();
+        if (options.isEmpty()) {
+            return;
+        }
+
+        var exportOpts = options.get();
+
+        // Obtener datos según la opción seleccionada
+        List<AuditDTO> dataToExport;
+        if (exportOpts.isExportAll()) {
+            dataToExport = auditService.getAllWithUser();
+        } else {
+            dataToExport = auditService.getAllWithUserByDateRange(exportOpts.getFromDate(), exportOpts.getToDate());
+        }
+
+        if (dataToExport.isEmpty()) {
+            showInfo("Sin datos", "No hay registros para exportar con los criterios seleccionados");
+            return;
+        }
+
         FileChooser fc = new FileChooser();
         fc.setTitle("Exportar auditoría a CSV");
         fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV files", "*.csv"));
@@ -226,7 +247,7 @@ public class AuditController implements AsyncLoadable {
         try (BufferedWriter bw = Files.newBufferedWriter(f.toPath(), StandardCharsets.UTF_8)) {
             // header
             bw.write("id,usuario_id,usuario_name,accion,tabla_afectada,registro_afectado_id,detalles,fecha\n");
-            for (AuditDTO r : data) {
+            for (AuditDTO r : dataToExport) {
                 String line = String.format("%d,%s,%s,%s,%s,%s,%s,%s\n",
                         r.getId() != null ? r.getId() : 0,
                         r.getUsuarioId() != null ? r.getUsuarioId() : "",
@@ -240,7 +261,8 @@ public class AuditController implements AsyncLoadable {
                 bw.write(line);
             }
             bw.flush();
-            showInfo("Exportado", "CSV exportado: " + f.getAbsolutePath());
+            showInfo("Exportado", String.format("CSV exportado: %s%n%d registros exportados",
+                f.getAbsolutePath(), dataToExport.size()));
         } catch (IOException ex) {
             Logs.error(this.getClass(), "Error exportando CSV", ex);
             showError("No se pudo exportar CSV: " + ex.getMessage());
@@ -259,6 +281,27 @@ public class AuditController implements AsyncLoadable {
     private void exportPdf() {
         // Validar permiso de auditoría para exportar
         if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("AUDITORIA", "READ")) {
+            return;
+        }
+
+        // Mostrar diálogo de opciones
+        var options = com.joshuamc1.inventariomunicipal.core.dialog.AuditExportDialog.showDialog();
+        if (options.isEmpty()) {
+            return;
+        }
+
+        var exportOpts = options.get();
+
+        // Obtener datos según la opción seleccionada
+        List<AuditDTO> dataToExport;
+        if (exportOpts.isExportAll()) {
+            dataToExport = auditService.getAllWithUser();
+        } else {
+            dataToExport = auditService.getAllWithUserByDateRange(exportOpts.getFromDate(), exportOpts.getToDate());
+        }
+
+        if (dataToExport.isEmpty()) {
+            showInfo("Sin datos", "No hay registros para exportar con los criterios seleccionados");
             return;
         }
 
@@ -288,12 +331,13 @@ public class AuditController implements AsyncLoadable {
 
         // Task de exportación
         final boolean[] cancelled = {false};
+        final List<AuditDTO> finalDataToExport = dataToExport;
         Task<Void> task = new Task<>() {
             @Override
             protected Void call() {
                 try {
                     updateMessage("Preparando documento...");
-                    PdfAuditExporter.export(data, f, p -> {
+                    PdfAuditExporter.export(finalDataToExport, f, p -> {
                         updateProgress(p, 1.0);
                         updateMessage(String.format("Procesando %.0f%%", p * 100));
                         if (cancelled[0]) {
@@ -313,7 +357,8 @@ public class AuditController implements AsyncLoadable {
 
         task.setOnSucceeded(ev -> {
             if (!cancelled[0]) {
-                showInfo("Exportado", "PDF exportado: " + f.getAbsolutePath());
+                showInfo("Exportado", String.format("PDF exportado: %s%n%d registros exportados",
+                    f.getAbsolutePath(), finalDataToExport.size()));
             }
             progressDialog.close();
         });

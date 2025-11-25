@@ -1,12 +1,16 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
+import com.joshuamc1.inventariomunicipal.config.DatabaseConfig;
 import com.joshuamc1.inventariomunicipal.core.Logs;
+import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
 import com.joshuamc1.inventariomunicipal.core.dialog.PersonDialogHelper;
 import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.Person;
 import com.joshuamc1.inventariomunicipal.models.Product;
 import com.joshuamc1.inventariomunicipal.models.Transaction;
+import com.joshuamc1.inventariomunicipal.models.TransactionItem;
+import com.joshuamc1.inventariomunicipal.models.dto.TransactionItemDTO;
 import com.joshuamc1.inventariomunicipal.services.PersonService;
 import com.joshuamc1.inventariomunicipal.services.ProductService;
 import com.joshuamc1.inventariomunicipal.services.TransactionService;
@@ -26,6 +30,7 @@ import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import org.jetbrains.annotations.NotNull;
 
@@ -45,6 +50,8 @@ public class IncomesController {
     @FXML
     private TableColumn<Transaction, String> colQuantity;
     @FXML
+    private TableColumn<Transaction, String> colItems;
+    @FXML
     private TableColumn<Transaction, String> colDate;
     @FXML
     private TableColumn<Transaction, String> colDni;
@@ -52,6 +59,8 @@ public class IncomesController {
     private TableColumn<Transaction, String> colPerson;
     @FXML
     private TableColumn<Transaction, String> colNotes;
+    @FXML
+    private TableColumn<Transaction, Void> colActions;
 
     // Controles de paginación (agregados)
     @FXML private Button btnPrev;
@@ -75,12 +84,28 @@ public class IncomesController {
     public void initialize() {
         colId.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getInteger("id"))));
         colProduct.setCellValueFactory(data -> {
-            Integer productId = data.getValue().getInteger("product_id");
-            Product product = productService.findById(productId);
-            return new SimpleStringProperty(product != null ? product.getString("name") : "N/A");
+            // Obtener items de la transacción
+            List<TransactionItem> items = transactionService.getTransactionItems(data.getValue().getInteger("id"));
+            if (items.isEmpty()) {
+                return new SimpleStringProperty("Sin productos");
+            }
+            if (items.size() == 1) {
+                Product product = items.get(0).getProduct();
+                return new SimpleStringProperty(product != null ? product.getString("name") : "N/A");
+            }
+            // Si hay múltiples items, mostrar "Multi-Producto"
+            return new SimpleStringProperty("Multi-Producto (" + items.size() + ")");
         });
 
-        colQuantity.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getDouble("quantity"))));
+        colQuantity.setCellValueFactory(data -> {
+            List<TransactionItem> items = transactionService.getTransactionItems(data.getValue().getInteger("id"));
+            if (items.isEmpty()) {
+                return new SimpleStringProperty("0");
+            }
+            // Calcular suma total de cantidades
+            double total = items.stream().mapToDouble(item -> item.getDouble("quantity")).sum();
+            return new SimpleStringProperty(String.format("%.2f", total));
+        });
         colDate.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getString("date")));
 
         colDni.setCellValueFactory(data -> {
@@ -101,13 +126,45 @@ public class IncomesController {
         });
         colNotes.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getString("notes")));
 
+        // Columna de items
+        colItems.setCellValueFactory(data -> {
+            Integer totalItems = data.getValue().getInteger("total_items");
+            if (totalItems != null && totalItems > 1) {
+                return new SimpleStringProperty(totalItems + " items");
+            }
+            return new SimpleStringProperty("1 item");
+        });
+
+        // Columna de acciones (botón Ver Items)
+        colActions.setCellFactory(col -> new TableCell<>() {
+            private final Button btnViewItems = new Button("Ver Items");
+            {
+                btnViewItems.setStyle("-fx-font-size: 16; -fx-background-color: #2196F3; -fx-text-fill: white;");
+                btnViewItems.setOnAction(e -> {
+                    Transaction transaction = getTableView().getItems().get(getIndex());
+                    showTransactionItemsDialog(transaction);
+                });
+            }
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                } else {
+                    setGraphic(btnViewItems);
+                }
+            }
+        });
+
         colId.setStyle("-fx-font-size: 17;");
         colProduct.setStyle("-fx-font-size: 17;");
         colQuantity.setStyle("-fx-font-size: 17;");
+        colItems.setStyle("-fx-font-size: 17;");
         colDate.setStyle("-fx-font-size: 17;");
         colDni.setStyle("-fx-font-size: 17;");
         colPerson.setStyle("-fx-font-size: 17;");
         colNotes.setStyle("-fx-font-size: 17;");
+        colActions.setStyle("-fx-font-size: 17;");
 
         // Inicializar paginación (similar a InventoryController)
         choicePageSize.setItems(FXCollections.observableArrayList(10,25,50,100));
@@ -156,94 +213,88 @@ public class IncomesController {
 
     private void configurePermissions() {
         if (btnNewIncome != null) {
-            com.joshuamc1.inventariomunicipal.core.PermissionHelper.hideIfNoPermission(btnNewIncome, "INGRESOS", "CREATE");
+            PermissionHelper.hideIfNoPermission(btnNewIncome, "INGRESOS", "CREATE");
         }
     }
 
-    @FXML
-    public void onNew() {
-        // Validar permiso específico del módulo INGRESOS antes de crear
-        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("INGRESOS", "CREATE")) {
-            return;
-        }
-        Dialog<Transaction> dialog = transactionDialog();
-        dialog.showAndWait().ifPresent(t -> {
-            try {
-                transactionService.createTransaction(
-                        t.getInteger("product_id"),
-                        Transaction.TYPE_IN,
-                        t.getDouble("quantity"),
-                        t.getString("date"),
-                        t.getInteger("person_id"),
-                        t.getString("notes")
-                );
-                loadPageFromRepo(currentPage);
-                Utils.showAlert("Éxito", "Ingreso registrado exitosamente");
-            } catch (Exception e) {
-                Logs.error(getClass(), "Error creando ingreso: {}", e.getMessage());
-                Utils.showAlert("Error", "No se pudo registrar el ingreso: " + e.getMessage());
-            }
-        });
-    }
 
     private void loadPageFromRepo(int page) {
         final int p = page;
         final String searchText = txtSearch != null ? txtSearch.getText() : "";
-        new Thread(() -> {
-            try {
-                long count;
-                List<Transaction> pageItems;
-                int offset = (Math.max(1, p) - 1) * pageSize;
 
-                if (searchText == null || searchText.trim().isEmpty()) {
-                    count = transactionService.countByType(Transaction.TYPE_IN);
-                    pageItems = transactionService.findByTypePage(Transaction.TYPE_IN, pageSize, offset);
-                } else {
-                    // Búsqueda filtrada
-                    String search = searchText.trim().toLowerCase();
-                    List<Transaction> allTransactions = transactionService.findByType(Transaction.TYPE_IN);
-                    List<Transaction> filtered = allTransactions.stream()
-                        .filter(t -> {
-                            // Buscar por ID
-                            if (String.valueOf(t.getInteger("id")).contains(search)) return true;
-                            // Buscar por producto
-                            Product product = productService.findById(t.getInteger("product_id"));
-                            if (product != null && product.getString("name").toLowerCase().contains(search)) return true;
-                            // Buscar por persona
-                            Integer personId = t.getInteger("person_id");
-                            if (personId != null) {
-                                Person person = personService.findById(personId);
-                                if (person != null) {
-                                    if (person.getString("dni").toLowerCase().contains(search)) return true;
-                                    if (person.getFullName().toLowerCase().contains(search)) return true;
+        Task<Void> task = new Task<>() {
+            @Override
+            protected Void call() {
+                try {
+                    DatabaseConfig.openConnection();
+
+                    long count;
+                    List<Transaction> pageItems;
+                    int offset = (Math.max(1, p) - 1) * pageSize;
+
+                    if (searchText == null || searchText.trim().isEmpty()) {
+                        count = transactionService.countByType(Transaction.TYPE_IN);
+                        pageItems = transactionService.findByTypePage(Transaction.TYPE_IN, pageSize, offset);
+                    } else {
+                        // Búsqueda filtrada
+                        String search = searchText.trim().toLowerCase();
+                        List<Transaction> allTransactions = transactionService.findByType(Transaction.TYPE_IN);
+                        List<Transaction> filtered = allTransactions.stream()
+                            .filter(t -> {
+                                // Buscar por ID de transacción
+                                if (String.valueOf(t.getInteger("id")).contains(search)) return true;
+
+                                // Buscar por productos en los items
+                                List<TransactionItem> items = transactionService.getTransactionItems(t.getInteger("id"));
+                                for (TransactionItem item : items) {
+                                    Product product = item.getProduct();
+                                    if (product != null && product.getString("name").toLowerCase().contains(search)) {
+                                        return true;
+                                    }
                                 }
-                            }
-                            return false;
-                        })
-                        .collect(java.util.stream.Collectors.toList());
-                    count = filtered.size();
-                    int fromIndex = Math.min(offset, filtered.size());
-                    int toIndex = Math.min(offset + pageSize, filtered.size());
-                    pageItems = fromIndex < toIndex ? filtered.subList(fromIndex, toIndex) : List.of();
+
+                                // Buscar por persona
+                                Integer personId = t.getInteger("person_id");
+                                if (personId != null) {
+                                    Person person = personService.findById(personId);
+                                    if (person != null) {
+                                        if (person.getString("dni").toLowerCase().contains(search)) return true;
+                                        if (person.getFullName().toLowerCase().contains(search)) return true;
+                                    }
+                                }
+                                return false;
+                            })
+                            .collect(java.util.stream.Collectors.toList());
+                        count = filtered.size();
+                        int fromIndex = Math.min(offset, filtered.size());
+                        int toIndex = Math.min(offset + pageSize, filtered.size());
+                        pageItems = fromIndex < toIndex ? filtered.subList(fromIndex, toIndex) : List.of();
+                    }
+
+                    int total = (int) count;
+                    int pages = Math.max(1, (int) Math.ceil(total / (double) pageSize));
+                    int pageToLoad = Math.min(Math.max(1, p), pages);
+
+                    final List<Transaction> finalPageItems = pageItems;
+                    Platform.runLater(() -> {
+                        totalItems = total;
+                        totalPages = pages;
+                        currentPage = pageToLoad;
+                        currentPageItems.setAll(finalPageItems == null ? java.util.List.of() : finalPageItems);
+                        tblTransactions.setItems(currentPageItems);
+                        updatePaginationControls();
+                    });
+                } catch (Throwable t) {
+                    Logs.error(getClass(), "Error cargando página de ingresos: {}", t.getMessage());
+                    Platform.runLater(() -> Utils.showAlert("Error", "No se pudo cargar ingresos: " + t.getMessage()));
+                } finally {
+                    DatabaseConfig.closeConnection();
                 }
-
-                int total = (int) count;
-                int pages = Math.max(1, (int) Math.ceil(total / (double) pageSize));
-                int pageToLoad = Math.min(Math.max(1, p), pages);
-
-                Platform.runLater(() -> {
-                    totalItems = total;
-                    totalPages = pages;
-                    currentPage = pageToLoad;
-                    currentPageItems.setAll(pageItems == null ? java.util.List.of() : pageItems);
-                    tblTransactions.setItems(currentPageItems);
-                    updatePaginationControls();
-                });
-            } catch (Throwable t) {
-                Logs.error(getClass(), "Error cargando página de ingresos: {}", t.getMessage());
-                Platform.runLater(() -> Utils.showAlert("Error", "No se pudo cargar ingresos: " + t.getMessage()));
+                return null;
             }
-        }, "incomes-pager").start();
+        };
+
+        new Thread(task, "incomes-pager").start();
     }
 
     private void updatePaginationControls() {
@@ -252,96 +303,95 @@ public class IncomesController {
         if (btnNext != null) btnNext.setDisable(currentPage >= totalPages);
     }
 
-    private @NotNull Dialog<Transaction> transactionDialog() {
-        Dialog<Transaction> d = new Dialog<>();
+
+    @FXML
+    public void onNewMultiProduct() {
+        // Validar permiso específico del módulo INGRESOS antes de crear
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("INGRESOS", "CREATE")) {
+            return;
+        }
+
+        Dialog<List<TransactionItemDTO>> dialog = createMultiProductDialog();
+        dialog.showAndWait().ifPresent(items -> {
+            try {
+                // Obtener datos comunes del diálogo
+                Person selectedPerson = (Person) dialog.getDialogPane().getUserData();
+                String date = LocalDate.now().toString(); // Se puede obtener del diálogo si se necesita
+                String notes = ""; // Se puede obtener del diálogo si se necesita
+
+                transactionService.createMultiProductTransaction(
+                        Transaction.TYPE_IN,
+                        date,
+                        Session.getCurrentUserId(),
+                        selectedPerson != null ? selectedPerson.getInteger("id") : null,
+                        notes,
+                        items
+                );
+
+                loadPageFromRepo(currentPage);
+                Utils.showAlert("Éxito", "Ingreso multi-producto registrado exitosamente con " + items.size() + " productos");
+            } catch (Exception e) {
+                Logs.error(getClass(), "Error creando ingreso multi-producto: {}", e.getMessage());
+                Utils.showAlert("Error", "No se pudo registrar el ingreso: " + e.getMessage());
+            }
+        });
+    }
+
+    private @NotNull Dialog<List<TransactionItemDTO>> createMultiProductDialog() {
+        Dialog<List<TransactionItemDTO>> d = new Dialog<>();
         d.setResizable(true);
-        d.getDialogPane().setPrefSize(1050, 620);
-        d.setTitle("📥 Nuevo Ingreso");
-        d.setHeaderText("Registrar entrada de producto al inventario");
-        ButtonType save = new ButtonType("💾 Guardar", ButtonBar.ButtonData.OK_DONE);
+        d.getDialogPane().setPrefSize(1200, 700);
+        d.setTitle("Nuevo Ingreso Multi-Producto");
+        d.setHeaderText("Registrar entrada de múltiples productos al inventario");
+        ButtonType save = new ButtonType("Guardar Ingreso", ButtonBar.ButtonData.OK_DONE);
         d.getDialogPane().getButtonTypes().addAll(save, ButtonType.CANCEL);
 
-        // Listas observables inicialmente vacías (se llenan asíncronamente)
-        var masterProducts = FXCollections.<Product>observableArrayList();
-        var filteredProducts = new FilteredList<>(masterProducts, p -> true);
+        // ObservableList para los items que se van agregando
+        ObservableList<TransactionItemDTO> items = FXCollections.observableArrayList();
+
+        // === SECCIÓN 1: INFORMACIÓN GENERAL ===
+        Label lblGeneral = new Label("Información General");
+        lblGeneral.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2196F3;");
+
+        DatePicker dpDate = new DatePicker(LocalDate.now());
+        dpDate.setStyle("-fx-font-size: 17;");
+
+        // ComboBox de persona con búsqueda
         var masterPeople = FXCollections.<Person>observableArrayList();
         var filteredPeople = new FilteredList<>(masterPeople, p -> true);
-
-        // === SECCIÓN 1: PRODUCTO ===
-        javafx.scene.control.Separator sep1 = new javafx.scene.control.Separator();
-        Label lblSeccion1 = new Label("📦 Información del Producto");
-        lblSeccion1.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2196F3;");
-
-        ComboBox<Product> cmbProduct = new ComboBox<>(filteredProducts);
-        cmbProduct.setPromptText("Seleccione el producto a ingresar");
-        cmbProduct.setCellFactory(lv -> new ListCell<>() {
-            @Override protected void updateItem(Product it, boolean empty){
-                super.updateItem(it,empty);
-                setText(empty||it==null?null: "🏷️ " + it.getInteger("id")+" - "+it.getString("name")+" (📊 Stock: "+it.getDouble("current_stock")+")");
-            }
-        });
-        cmbProduct.setButtonCell(new ListCell<>() {
-            @Override protected void updateItem(Product it, boolean empty){
-                super.updateItem(it,empty);
-                setText(empty||it==null?null: "🏷️ " + it.getInteger("id")+" - "+it.getString("name")+" (📊 Stock: "+it.getDouble("current_stock")+")");
-            }
-        });
-
         ComboBox<Person> cmbPerson = new ComboBox<>(filteredPeople);
-        cmbPerson.setPromptText("Seleccione la persona (opcional)");
+        cmbPerson.setPromptText("Seleccione la persona");
+        cmbPerson.setStyle("-fx-font-size: 17;");
         cmbPerson.setCellFactory(lv -> new ListCell<>() {
-            @Override protected void updateItem(Person it, boolean empty){
-                super.updateItem(it,empty);
-                setText(empty||it==null?null: "👤 " + it.getString("dni")+" - "+it.getFullName());
+            @Override
+            protected void updateItem(Person it, boolean empty) {
+                super.updateItem(it, empty);
+                setText(empty || it == null ? null : it.getString("dni") + " - " + it.getFullName());
             }
         });
         cmbPerson.setButtonCell(new ListCell<>() {
-            @Override protected void updateItem(Person it, boolean empty){
-                super.updateItem(it,empty);
-                setText(empty||it==null?null: "👤 " + it.getString("dni")+" - "+it.getFullName());
+            @Override
+            protected void updateItem(Person it, boolean empty) {
+                super.updateItem(it, empty);
+                setText(empty || it == null ? null : it.getString("dni") + " - " + it.getFullName());
             }
         });
 
-        // Campos de búsqueda con debounce - OPTIMIZADO con búsqueda dinámica desde BD
-        TextField txtSearchProduct = new TextField(); txtSearchProduct.setPromptText("Buscar producto por ID o nombre...");
-        TextField txtSearchPerson = new TextField(); txtSearchPerson.setPromptText("Buscar persona por DNI o nombre...");
-        PauseTransition productDebounce = new PauseTransition(Duration.millis(300));
+        TextField txtSearchPerson = new TextField();
+        txtSearchPerson.setPromptText("Buscar persona por DNI o nombre...");
+        txtSearchPerson.setStyle("-fx-font-size: 17;");
+
         PauseTransition personDebounce = new PauseTransition(Duration.millis(300));
-
-        txtSearchProduct.textProperty().addListener((obs, old, val) -> {
-            productDebounce.stop();
-            productDebounce.setOnFinished(e -> {
-                String query = val == null ? "" : val.trim();
-                if (query.length() >= 2 || query.isEmpty()) {
-                    // Buscar dinámicamente desde BD con límite de 100
-                    new Thread(() -> {
-                        List<Product> results = productService.searchProducts(query, 100);
-                        Platform.runLater(() -> {
-                            Product selected = cmbProduct.getValue();
-                            masterProducts.setAll(results);
-                            // Re-seleccionar si estaba seleccionado y aún está en resultados
-                            if (selected != null && results.contains(selected)) {
-                                cmbProduct.setValue(selected);
-                            }
-                        });
-                    }).start();
-                }
-            });
-            productDebounce.playFromStart();
-        });
-
         txtSearchPerson.textProperty().addListener((obs, old, val) -> {
             personDebounce.stop();
             personDebounce.setOnFinished(e -> {
                 String query = val == null ? "" : val.trim();
                 if (query.length() >= 2 || query.isEmpty()) {
-                    // Buscar dinámicamente desde BD con límite de 100
                     new Thread(() -> {
                         List<Person> results = personService.searchPeople(query, 100);
                         Platform.runLater(() -> {
                             Person selected = cmbPerson.getValue();
                             masterPeople.setAll(results);
-                            // Re-seleccionar si estaba seleccionado y aún está en resultados
                             if (selected != null && results.contains(selected)) {
                                 cmbPerson.setValue(selected);
                             }
@@ -352,233 +402,396 @@ public class IncomesController {
             personDebounce.playFromStart();
         });
 
-        TextField txtQuantity = new TextField(); txtQuantity.setPromptText("Cantidad");
-        // TextFormatter para permitir solo números decimales o enteros
-        TextFormatter<String> quantityFormatter = new TextFormatter<>(change -> {
-            String newText = change.getControlNewText();
-            if (newText.isEmpty()) return change; // permitir vacío (se valida luego)
-            if (newText.matches("\\d+(\\.\\d{0,4})?")) return change; // hasta 4 decimales
-            return null; // descartar cambios inválidos
-        });
-        txtQuantity.setTextFormatter(quantityFormatter);
-        // Marcar visualmente si inválido
-        txtQuantity.textProperty().addListener((obs, old, val) -> {
-            if(val == null || val.isBlank()) {
-                txtQuantity.setStyle("-fx-font-size: 17; -fx-border-color: #d60000; -fx-border-width: 1; -fx-border-radius: 4;");
-            } else if(!val.matches("\\d+(\\.\\d{0,4})?")) {
-                txtQuantity.setStyle("-fx-font-size: 17; -fx-border-color: #d60000; -fx-border-width: 1; -fx-border-radius: 4;");
-            } else {
-                txtQuantity.setStyle("-fx-font-size: 17;");
-            }
-        });
-        DatePicker dpDate = new DatePicker(LocalDate.now());
-        dpDate.valueProperty().addListener((obs, old, val) -> {
-            if(val == null) {
-                if(dpDate.getEditor()!=null) dpDate.getEditor().setStyle("-fx-font-size: 17; -fx-border-color: #d60000; -fx-border-width: 1; -fx-border-radius: 4;");
-            } else {
-                if(dpDate.getEditor()!=null) dpDate.getEditor().setStyle("-fx-font-size: 17;");
-            }
-        });
-        TextArea txtNotes = new TextArea(); txtNotes.setPromptText("Notas (opcional)"); txtNotes.setPrefRowCount(3);
-
-        // Stock actual
-        Label lblStockTitle = new Label("Stock Actual:");
-        Label lblStockValue = new Label("-");
-
-        // Estilos
-        String lblStyle = "-fx-font-weight: bold; -fx-font-size: 17;";
-        String inputStyle = "-fx-font-size: 17;";
-        cmbProduct.setStyle(inputStyle); cmbPerson.setStyle(inputStyle); txtSearchProduct.setStyle(inputStyle); txtSearchPerson.setStyle(inputStyle);
-        txtQuantity.setStyle(inputStyle); dpDate.setStyle(inputStyle); if(dpDate.getEditor()!=null) dpDate.getEditor().setStyle(inputStyle); txtNotes.setStyle(inputStyle);
-        lblStockTitle.setStyle(lblStyle); lblStockValue.setStyle("-fx-font-size: 17;");
-
-        Label lblProduct = new Label("Producto:"); lblProduct.setStyle(lblStyle);
-        Label lblSearchProduct = new Label("Filtrar Producto:"); lblSearchProduct.setStyle(lblStyle);
-        Label lblQuantity = new Label("Cantidad:"); lblQuantity.setStyle(lblStyle);
-        Label lblDate = new Label("Fecha:"); lblDate.setStyle(lblStyle);
-        Label lblPerson = new Label("Persona:"); lblPerson.setStyle(lblStyle);
-        Label lblSearchPerson = new Label("Filtrar Persona:"); lblSearchPerson.setStyle(lblStyle);
-        Label lblNotes = new Label("Notas:"); lblNotes.setStyle(lblStyle);
-
-        // Helper texts obligatorios
-        Label helperProduct = new Label("Obligatorio");
-        helperProduct.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
-        Label helperQuantity = new Label("Obligatorio");
-        helperQuantity.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
-        Label helperDate = new Label("Obligatorio");
-        helperDate.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
-        Label helperPerson = new Label("Obligatorio");
-        helperPerson.setStyle("-fx-text-fill: #d60000; -fx-font-size: 12px;");
-
-        // Botón para crear nueva persona
         Button btnNewPerson = new Button("+");
         btnNewPerson.setStyle("-fx-font-size: 17; -fx-font-weight: bold; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-cursor: hand;");
         btnNewPerson.setTooltip(new Tooltip("Crear nueva persona"));
         btnNewPerson.setOnAction(e -> {
             Person newPerson = PersonDialogHelper.showCreatePersonDialog();
             if (newPerson != null) {
-                // Agregar a la lista maestra
                 masterPeople.add(newPerson);
-                // Seleccionar automáticamente
                 cmbPerson.getSelectionModel().select(newPerson);
             }
         });
 
-        // HBox para ComboBox de persona + botón
         HBox personBox = new HBox(5, cmbPerson, btnNewPerson);
         HBox.setHgrow(cmbPerson, Priority.ALWAYS);
 
-        GridPane gp = new GridPane();
-        gp.setHgap(12); gp.setVgap(8); gp.setPadding(new Insets(14));
-        // Fila 0-1 producto
-        gp.add(lblProduct,0,0); gp.add(cmbProduct,1,0); gp.add(lblSearchProduct,2,0); gp.add(txtSearchProduct,3,0);
-        gp.add(helperProduct,1,1,3,1);
-        // Fila 2 stock
-        gp.add(lblStockTitle,0,2); gp.add(lblStockValue,1,2);
-        // Fila 3-4 cantidad
-        gp.add(lblQuantity,0,3); gp.add(txtQuantity,1,3);
-        gp.add(helperQuantity,1,4);
-        // Fila 5-6 fecha
-        gp.add(lblDate,0,5); gp.add(dpDate,1,5);
-        gp.add(helperDate,1,6);
-        // Fila 7-8 persona con botón
-        gp.add(lblPerson,0,7); gp.add(personBox,1,7); gp.add(lblSearchPerson,2,7); gp.add(txtSearchPerson,3,7);
-        gp.add(helperPerson,1,8,3,1);
-        // Fila 9 notas
-        gp.add(lblNotes,0,9); gp.add(txtNotes,1,9,3,1);
+        TextArea txtNotes = new TextArea();
+        txtNotes.setPromptText("Notas generales del ingreso (opcional)");
+        txtNotes.setPrefRowCount(2);
+        txtNotes.setStyle("-fx-font-size: 17;");
 
-        GridPane.setHgrow(cmbProduct, Priority.ALWAYS);
-        GridPane.setHgrow(txtSearchProduct, Priority.ALWAYS);
-        GridPane.setHgrow(personBox, Priority.ALWAYS);
-        GridPane.setHgrow(txtSearchPerson, Priority.ALWAYS);
-        GridPane.setHgrow(txtQuantity, Priority.ALWAYS);
-        GridPane.setHgrow(dpDate, Priority.ALWAYS);
-        GridPane.setHgrow(txtNotes, Priority.ALWAYS);
+        // === SECCIÓN 2: PRODUCTOS ===
+        Label lblProducts = new Label("Productos");
+        lblProducts.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2196F3;");
 
-        // Indicador de carga
-        ProgressIndicator pi = new ProgressIndicator();
-        pi.setPrefSize(40,40);
-        Label lblLoading = new Label("Cargando listas (productos y personas)...");
-        lblLoading.setStyle("-fx-font-size: 14; -fx-font-weight: bold;");
-        HBox loadingBox = new HBox(10, pi, lblLoading);
-        loadingBox.setPadding(new Insets(10));
-        loadingBox.setStyle("-fx-background-color: rgba(255,255,255,0.85); -fx-border-color: #ccc; -fx-border-radius: 4; -fx-background-radius: 4;");
-        StackPane stack = new StackPane(gp, loadingBox);
-        StackPane.setMargin(loadingBox, new Insets(0));
-        d.getDialogPane().setContent(stack);
+        // Tabla de items
+        TableView<TransactionItemDTO> tblItems = new TableView<>(items);
+        tblItems.setPrefHeight(200);
 
-        // Deshabilitar controles mientras carga
-        cmbProduct.setDisable(true); cmbPerson.setDisable(true); txtSearchProduct.setDisable(true); txtSearchPerson.setDisable(true);
-        txtQuantity.setDisable(true); dpDate.setDisable(true); txtNotes.setDisable(true);
+        TableColumn<TransactionItemDTO, String> colItemProduct = new TableColumn<>("Producto");
+        colItemProduct.setPrefWidth(300);
+        colItemProduct.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getProductName()));
 
-        // Carga asíncrona de listas OPTIMIZADA - Solo cargar 100 registros iniciales
-        var productsTask = new Task<List<Product>>() {
-            @Override
-            protected List<Product> call() {
-                return productService.searchProducts("", 100); // Límite de 100 productos iniciales
-            }
-        };
-        var peopleTask = new Task<List<Person>>() {
-            @Override
-            protected List<Person> call() {
-                return personService.searchPeople("", 100); // Límite de 100 personas iniciales
-            }
-        };
+        TableColumn<TransactionItemDTO, String> colItemQuantity = new TableColumn<>("Cantidad");
+        colItemQuantity.setPrefWidth(100);
+        colItemQuantity.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getQuantity())));
 
-        Runnable tryFinish = () -> {
-            if(productsTask.isDone() && peopleTask.isDone()) {
-                Platform.runLater(() -> {
-                    loadingBox.setVisible(false);
-                    cmbProduct.setDisable(false); cmbPerson.setDisable(false); txtSearchProduct.setDisable(false); txtSearchPerson.setDisable(false);
-                    txtQuantity.setDisable(false); dpDate.setDisable(false); txtNotes.setDisable(false);
+        TableColumn<TransactionItemDTO, String> colItemNotes = new TableColumn<>("Notas");
+        colItemNotes.setPrefWidth(250);
+        colItemNotes.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getNotes()));
+
+        TableColumn<TransactionItemDTO, Void> colItemActions = new TableColumn<>("Acciones");
+        colItemActions.setPrefWidth(100);
+        colItemActions.setCellFactory(col -> new TableCell<>() {
+            private final Button btnRemove = new Button("Quitar");
+            {
+                btnRemove.setStyle("-fx-background-color: #f44336; -fx-text-fill: white;");
+                btnRemove.setOnAction(e -> {
+                    TransactionItemDTO item = getTableView().getItems().get(getIndex());
+                    items.remove(item);
                 });
             }
-        };
-
-        productsTask.setOnSucceeded(ev -> {
-            masterProducts.setAll(productsTask.getValue());
-            tryFinish.run();
-        });
-        peopleTask.setOnSucceeded(ev -> {
-            masterPeople.setAll(peopleTask.getValue());
-            tryFinish.run();
-        });
-        productsTask.setOnFailed(ev -> {
-            Logs.error(getClass(), "Error cargando productos: {}", productsTask.getException().getMessage());
-            Platform.runLater(() -> Utils.showAlert("Error", "No se pudieron cargar productos: " + productsTask.getException().getMessage()));
-            tryFinish.run();
-        });
-        peopleTask.setOnFailed(ev -> {
-            Logs.error(getClass(), "Error cargando personas: {}", peopleTask.getException().getMessage());
-            Platform.runLater(() -> Utils.showAlert("Error", "No se pudieron cargar personas: " + peopleTask.getException().getMessage()));
-            tryFinish.run();
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                setGraphic(empty ? null : btnRemove);
+            }
         });
 
-        new Thread(productsTask, "products-loader").start();
-        new Thread(peopleTask, "people-loader").start();
+        tblItems.getColumns().addAll(colItemProduct, colItemQuantity, colItemNotes, colItemActions);
 
-        // Actualizar stock cuando cambia producto
+        colItemProduct.setStyle("-fx-font-size: 17;");
+        colItemQuantity.setStyle("-fx-font-size: 17;");
+        colItemNotes.setStyle("-fx-font-size: 17;");
+        colItemActions.setStyle("-fx-font-size: 17;");
+
+        // Botón para agregar producto
+        Button btnAddProduct = new Button("+ Agregar Producto");
+        btnAddProduct.setStyle("-fx-font-size: 14; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;");
+        btnAddProduct.setOnAction(e -> {
+            showAddProductDialog().ifPresent(items::add);
+        });
+
+        // Layout
+        GridPane gp = new GridPane();
+        gp.setHgap(12);
+        gp.setVgap(10);
+        gp.setPadding(new Insets(15));
+
+        String lblStyle = "-fx-font-weight: bold; -fx-font-size: 17;";
+        Label lblDate = new Label("Fecha:");
+        lblDate.setStyle(lblStyle);
+        Label lblPerson = new Label("Persona:");
+        lblPerson.setStyle(lblStyle);
+        Label lblSearchPerson = new Label("Buscar:");
+        lblSearchPerson.setStyle(lblStyle);
+        Label lblNotesGen = new Label("Notas:");
+        lblNotesGen.setStyle(lblStyle);
+
+        int row = 0;
+        gp.add(lblGeneral, 0, row++, 4, 1);
+        gp.add(lblDate, 0, row);
+        gp.add(dpDate, 1, row++);
+        gp.add(lblPerson, 0, row);
+        gp.add(personBox, 1, row);
+        gp.add(lblSearchPerson, 2, row);
+        gp.add(txtSearchPerson, 3, row++);
+        gp.add(lblNotesGen, 0, row);
+        gp.add(txtNotes, 1, row++, 3, 1);
+
+        gp.add(new javafx.scene.control.Separator(), 0, row++, 4, 1);
+        gp.add(lblProducts, 0, row++, 4, 1);
+        gp.add(tblItems, 0, row++, 4, 1);
+        gp.add(btnAddProduct, 0, row++, 4, 1);
+
+        GridPane.setHgrow(dpDate, Priority.ALWAYS);
+        GridPane.setHgrow(personBox, Priority.ALWAYS);
+        GridPane.setHgrow(txtSearchPerson, Priority.ALWAYS);
+        GridPane.setHgrow(txtNotes, Priority.ALWAYS);
+        GridPane.setHgrow(tblItems, Priority.ALWAYS);
+        GridPane.setHgrow(btnAddProduct, Priority.ALWAYS);
+
+        ScrollPane scroll = new ScrollPane(gp);
+        scroll.setFitToWidth(true);
+        d.getDialogPane().setContent(scroll);
+
+        // Cargar personas inicialmente
+        new Thread(() -> {
+            List<Person> people = personService.searchPeople("", 100);
+            Platform.runLater(() -> masterPeople.setAll(people));
+        }).start();
+
+        // Deshabilitar guardar si no hay items
+        Node btnSave = d.getDialogPane().lookupButton(save);
+        btnSave.disableProperty().bind(javafx.beans.binding.Bindings.isEmpty(items));
+
+        d.setResultConverter(bt -> {
+            if (bt == save && !items.isEmpty()) {
+                // Guardar persona seleccionada en UserData para usarla después
+                d.getDialogPane().setUserData(cmbPerson.getValue());
+                return new java.util.ArrayList<>(items);
+            }
+            return null;
+        });
+
+        return d;
+    }
+
+    private java.util.Optional<TransactionItemDTO> showAddProductDialog() {
+        Dialog<TransactionItemDTO> d = new Dialog<>();
+        d.setTitle("Agregar Producto");
+        d.setHeaderText("Seleccione el producto y la cantidad");
+        ButtonType add = new ButtonType("Agregar", ButtonBar.ButtonData.OK_DONE);
+        d.getDialogPane().getButtonTypes().addAll(add, ButtonType.CANCEL);
+
+        var masterProducts = FXCollections.<Product>observableArrayList();
+        var filteredProducts = new FilteredList<>(masterProducts, p -> true);
+
+        ComboBox<Product> cmbProduct = new ComboBox<>(filteredProducts);
+        cmbProduct.setPromptText("Seleccione el producto");
+        cmbProduct.setStyle("-fx-font-size: 17;");
+        cmbProduct.setCellFactory(lv -> new ListCell<>() {
+            @Override
+            protected void updateItem(Product it, boolean empty) {
+                super.updateItem(it, empty);
+                setText(empty || it == null ? null : it.getString("code") + " - " + it.getString("name") + " (Stock: " + it.getDouble("current_stock") + ")");
+            }
+        });
+        cmbProduct.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(Product it, boolean empty) {
+                super.updateItem(it, empty);
+                setText(empty || it == null ? null : it.getString("code") + " - " + it.getString("name") + " (Stock: " + it.getDouble("current_stock") + ")");
+            }
+        });
+
+        TextField txtSearchProduct = new TextField();
+        txtSearchProduct.setPromptText("Buscar producto por nombre, ID o código (soporta escáner)...");
+        txtSearchProduct.setStyle("-fx-font-size: 17;");
+
+        // Búsqueda automática mientras escribe (debounce)
+        PauseTransition productDebounce = new PauseTransition(Duration.millis(300));
+        txtSearchProduct.textProperty().addListener((obs, old, val) -> {
+            productDebounce.stop();
+            productDebounce.setOnFinished(e -> {
+                String query = val == null ? "" : val.trim();
+                if (query.length() >= 2 || query.isEmpty()) {
+                    new Thread(() -> {
+                        List<Product> results = productService.searchProducts(query, 100);
+                        Platform.runLater(() -> {
+                            Product selected = cmbProduct.getValue();
+                            masterProducts.setAll(results);
+                            if (selected != null && results.contains(selected)) {
+                                cmbProduct.setValue(selected);
+                            }
+                        });
+                    }).start();
+                }
+            });
+            productDebounce.playFromStart();
+        });
+
+        TextField txtQuantity = new TextField();
+        txtQuantity.setPromptText("Cantidad");
+        txtQuantity.setStyle("-fx-font-size: 17;");
+        TextFormatter<String> quantityFormatter = new TextFormatter<>(change -> {
+            String newText = change.getControlNewText();
+            if (newText.isEmpty()) return change;
+            if (newText.matches("\\d+(\\.\\d{0,4})?")) return change;
+            return null;
+        });
+        txtQuantity.setTextFormatter(quantityFormatter);
+
+        // Detectar Enter (lectores de códigos de barras envían Enter al final)
+        txtSearchProduct.setOnKeyPressed(event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ENTER) {
+                String query = txtSearchProduct.getText().trim();
+                if (!query.isEmpty()) {
+                    // Buscar primero por código exacto (para escáneres)
+                    new Thread(() -> {
+                        Product exactMatch = productService.findByCode(query);
+                        if (exactMatch != null) {
+                            // Encontrado por código exacto
+                            Platform.runLater(() -> {
+                                masterProducts.setAll(List.of(exactMatch));
+                                cmbProduct.setValue(exactMatch);
+                                txtSearchProduct.clear();
+                                txtQuantity.requestFocus(); // Mover foco a cantidad
+                            });
+                        } else {
+                            // Buscar por nombre o ID
+                            List<Product> results = productService.searchProducts(query, 100);
+                            Platform.runLater(() -> {
+                                masterProducts.setAll(results);
+                                if (results.size() == 1) {
+                                    // Solo un resultado, seleccionarlo automáticamente
+                                    cmbProduct.setValue(results.get(0));
+                                    txtSearchProduct.clear();
+                                    txtQuantity.requestFocus();
+                                } else if (!results.isEmpty()) {
+                                    // Múltiples resultados, abrir ComboBox para elegir
+                                    cmbProduct.show();
+                                }
+                            });
+                        }
+                    }).start();
+                }
+                event.consume(); // Prevenir que el Enter haga otra acción
+            }
+        });
+
+        TextArea txtNotes = new TextArea();
+        txtNotes.setPromptText("Notas específicas del producto (opcional)");
+        txtNotes.setPrefRowCount(2);
+        txtNotes.setStyle("-fx-font-size: 17;");
+
+        Label lblStockTitle = new Label("Stock Actual:");
+        lblStockTitle.setStyle("-fx-font-weight: bold; -fx-font-size: 17;");
+        Label lblStockValue = new Label("-");
+        lblStockValue.setStyle("-fx-font-size: 17;");
+
         cmbProduct.valueProperty().addListener((obs, old, val) -> {
-            if(val == null) { lblStockValue.setText("-"); lblStockValue.setStyle("-fx-font-size: 17;"); return; }
+            if (val == null) {
+                lblStockValue.setText("-");
+                lblStockValue.setStyle("-fx-font-size: 17;");
+                return;
+            }
             try {
                 Double stock = val.getDouble("current_stock");
                 lblStockValue.setText(stock == null ? "-" : String.format("%.2f", stock));
-                // Resaltar si está en bajo stock
-                if(val.isLowStock()) {
+                if (val.isLowStock()) {
                     lblStockValue.setStyle("-fx-font-size: 17; -fx-text-fill: #d60000; -fx-font-weight: bold;");
                 } else {
                     lblStockValue.setStyle("-fx-font-size: 17; -fx-text-fill: #1a1a1a;");
                 }
-            } catch (Exception ex){
+            } catch (Exception ex) {
                 lblStockValue.setText("-");
                 lblStockValue.setStyle("-fx-font-size: 17;");
             }
         });
 
-        // Actualizar binding de botón Guardar para incluir persona y fecha
-        Node btnSave = d.getDialogPane().lookupButton(save);
+        GridPane gp = new GridPane();
+        gp.setHgap(10);
+        gp.setVgap(10);
+        gp.setPadding(new Insets(15));
+
+        String lblStyle = "-fx-font-weight: bold; -fx-font-size: 17;";
+        Label lblProduct = new Label("Producto:");
+        lblProduct.setStyle(lblStyle);
+        Label lblSearch = new Label("Buscar:");
+        lblSearch.setStyle(lblStyle);
+        Label lblQuantity = new Label("Cantidad:");
+        lblQuantity.setStyle(lblStyle);
+        Label lblNotes = new Label("Notas:");
+        lblNotes.setStyle(lblStyle);
+
+        int row = 0;
+        gp.add(lblProduct, 0, row);
+        gp.add(cmbProduct, 1, row);
+        gp.add(lblSearch, 2, row);
+        gp.add(txtSearchProduct, 3, row++);
+        gp.add(lblStockTitle, 0, row);
+        gp.add(lblStockValue, 1, row++);
+        gp.add(lblQuantity, 0, row);
+        gp.add(txtQuantity, 1, row++);
+        gp.add(lblNotes, 0, row);
+        gp.add(txtNotes, 1, row++, 3, 1);
+
+        GridPane.setHgrow(cmbProduct, Priority.ALWAYS);
+        GridPane.setHgrow(txtSearchProduct, Priority.ALWAYS);
+        GridPane.setHgrow(txtQuantity, Priority.ALWAYS);
+        GridPane.setHgrow(txtNotes, Priority.ALWAYS);
+
+        d.getDialogPane().setContent(gp);
+
+        // Cargar productos inicialmente
+        new Thread(() -> {
+            List<Product> products = productService.searchProducts("", 100);
+            Platform.runLater(() -> masterProducts.setAll(products));
+        }).start();
+
+        Node btnAdd = d.getDialogPane().lookupButton(add);
         BooleanBinding invalid = cmbProduct.valueProperty().isNull()
-                .or(cmbPerson.valueProperty().isNull())
-                .or(txtQuantity.textProperty().isEmpty())
-                .or(dpDate.valueProperty().isNull());
-        btnSave.disableProperty().bind(invalid.or(loadingBox.visibleProperty()));
+                .or(txtQuantity.textProperty().isEmpty());
+        btnAdd.disableProperty().bind(invalid);
 
         d.setResultConverter(bt -> {
-            if(bt==save){
+            if (bt == add) {
                 try {
-                    if(cmbProduct.getValue()==null){ Utils.showAlert("Validación","Debe seleccionar un producto"); return null; }
-                    if(cmbPerson.getValue()==null){ Utils.showAlert("Validación","Debe seleccionar una persona"); return null; }
-                    if(dpDate.getValue()==null){ Utils.showAlert("Validación","Debe seleccionar una fecha"); return null; }
-
-                    String qText = txtQuantity.getText();
-
-                    if(qText == null || qText.isBlank()) { Utils.showAlert("Validación","Debe ingresar la cantidad"); return null; }
-                    if(!qText.matches("\\d+(\\.\\d{0,4})?")) { Utils.showAlert("Validación","Formato de cantidad inválido"); return null; }
-
-                    double qty = Double.parseDouble(qText);
-
-                    if(qty <= 0){ Utils.showAlert("Validación", "La cantidad debe ser mayor que cero"); return null; }
-
                     Product p = cmbProduct.getValue();
-                    Transaction t = new Transaction();
-
-                    t.set("product_id", p.getInteger("id"));
-                    t.set("quantity", qty);
-                    t.set("date", dpDate.getValue().toString());
-                    t.set("person_id", cmbPerson.getValue().getInteger("id"));
-                    t.set("notes", txtNotes.getText());
-                    t.set("user_id", Session.getCurrentUserId());
-
-                    return t;
-                } catch(NumberFormatException nf){
+                    String qText = txtQuantity.getText();
+                    if (p == null || qText == null || qText.isBlank()) {
+                        return null;
+                    }
+                    double qty = Double.parseDouble(qText);
+                    if (qty <= 0) {
+                        Utils.showAlert("Validación", "La cantidad debe ser mayor que cero");
+                        return null;
+                    }
+                    return new TransactionItemDTO(
+                            p.getInteger("id"),
+                            qty,
+                            txtNotes.getText(),
+                            p.getString("name")
+                    );
+                } catch (NumberFormatException ex) {
                     Utils.showAlert("Error", "La cantidad debe ser un número válido");
-                } catch(Exception ex){
-                    Logs.error(getClass(), "Error inesperado diálogo ingreso (validaciones): {}", ex.getMessage());
-                    Utils.showAlert("Error inesperado", "Se produjo un error: "+ex.getMessage());
                 }
             }
             return null;
         });
-        return d;
+
+        return d.showAndWait();
+    }
+
+    private void showTransactionItemsDialog(@NotNull Transaction transaction) {
+        Dialog<Void> d = new Dialog<>();
+        d.setTitle("Items de la Transacción #" + transaction.getId());
+        d.setHeaderText("Productos incluidos en esta transacción");
+        d.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+
+        List<TransactionItem> transactionItems = transactionService.getTransactionItems(transaction.getInteger("id"));
+
+        TableView<TransactionItem> tblItems = new TableView<>();
+        ObservableList<TransactionItem> items = FXCollections.observableArrayList(transactionItems);
+        tblItems.setItems(items);
+
+        TableColumn<TransactionItem, String> colCode = new TableColumn<>("#Codigo");
+        colCode.setPrefWidth(150);
+        colCode.setCellValueFactory(data -> {
+            Product product = data.getValue().getProduct();
+            return new SimpleStringProperty(product != null ? product.getString("code") : "N/A");
+        });
+
+        TableColumn<TransactionItem, String> colProduct = new TableColumn<>("Producto");
+        colProduct.setPrefWidth(300);
+        colProduct.setCellValueFactory(data -> {
+            Product product = data.getValue().getProduct();
+            return new SimpleStringProperty(product != null ? product.getString("name") : "N/A");
+        });
+
+        TableColumn<TransactionItem, String> colQuantity = new TableColumn<>("Cantidad");
+        colQuantity.setPrefWidth(100);
+        colQuantity.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getDouble("quantity"))));
+
+        TableColumn<TransactionItem, String> colNotes = new TableColumn<>("Notas");
+        colNotes.setPrefWidth(300);
+        colNotes.setCellValueFactory(data -> new SimpleStringProperty(data.getValue().getString("notes")));
+
+        colCode.setStyle("-fx-font-size: 17;");
+        colProduct.setStyle("-fx-font-size: 17;");
+        colQuantity.setStyle("-fx-font-size: 17;");
+        colNotes.setStyle("-fx-font-size: 17;");
+
+        tblItems.getColumns().addAll(colCode, colProduct, colQuantity, colNotes);
+        tblItems.setPrefHeight(400);
+
+        VBox vbox = new VBox(10, tblItems);
+        vbox.setPadding(new Insets(15));
+        d.getDialogPane().setContent(vbox);
+        d.getDialogPane().setPrefSize(750, 500);
+
+        d.showAndWait();
     }
 }

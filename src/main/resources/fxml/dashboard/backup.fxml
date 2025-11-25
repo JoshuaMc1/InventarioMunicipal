@@ -36,11 +36,17 @@
                     <Label text="🔄" style="-fx-font-size: 16px;"/>
                 </graphic>
             </Button>
+
+            <Button fx:id="btnAutoBackupSettings" text="Backups Automáticos" onAction="#onAutoBackupSettings"
+                    style="-fx-background-color: #9C27B0; -fx-text-fill: white; -fx-font-size: 14px; -fx-padding: 10 20;">
+                <graphic>
+                    <Label text="🤖" style="-fx-font-size: 16px;"/>
+                </graphic>
+            </Button>
         </HBox>
 
         <!-- Información -->
         <HBox spacing="10" style="-fx-background-color: #E3F2FD; -fx-padding: 15; -fx-background-radius: 5;">
-            <Label text="ℹ️" style="-fx-font-size: 20px;"/>
             <VBox spacing="5">
                 <Label text="Los backups se guardan en un directorio seguro en tu perfil de usuario"
                        style="-fx-font-size: 14px; -fx-font-weight: bold;"/>

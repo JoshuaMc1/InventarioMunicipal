@@ -11,7 +11,8 @@ module com.joshuamc1.inventariomunicipal {
     requires org.slf4j;
     requires org.apache.pdfbox;
     requires org.apache.fontbox;
-
+    requires com.google.zxing;
+    requires com.google.zxing.javase;
 
     opens com.joshuamc1.inventariomunicipal.controllers to javafx.fxml;
     opens com.joshuamc1.inventariomunicipal.controllers.dashboard to javafx.fxml;
