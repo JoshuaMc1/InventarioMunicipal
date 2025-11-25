@@ -1,5 +1,6 @@
 package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
+import com.joshuamc1.inventariomunicipal.config.DatabaseConfig;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Utils;
 import com.joshuamc1.inventariomunicipal.models.User;
@@ -283,6 +284,7 @@ public class UsersController {
         final int p = page;
         new Thread(() -> {
             try {
+                DatabaseConfig.openConnection();
                 String q = txtSearch == null ? null : txtSearch.getText();
                 long count = userService.countUsers();
                 int total = (int) count;
@@ -310,6 +312,8 @@ public class UsersController {
             } catch (Throwable t) {
                 Logs.error(getClass(), "Error listando usuarios: {}", t.getMessage());
                 Platform.runLater(() -> Utils.showAlert("Error", "No se pudo cargar usuarios: " + t.getMessage()));
+            } finally {
+                DatabaseConfig.closeConnection();
             }
         }).start();
     }

@@ -330,6 +330,23 @@ public class MainController {
         projectInfo.getChildren().addAll(lblProject, lblMunicipality, lblDeliveredTo);
         rightColumn.getChildren().add(projectInfo);
 
+
+        // Separador
+        javafx.scene.control.Separator separator3 = new javafx.scene.control.Separator();
+        rightColumn.getChildren().add(separator3);
+
+        Label lblDocumentationTitle = new Label("Documentación:");
+        lblDocumentationTitle.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #2196F3;");
+        rightColumn.getChildren().add(lblDocumentationTitle);
+
+        // Abrir pdf de la documentación del sistema
+        Label lblDocumentation = new Label("Ver Documentación del Sistema");
+        lblDocumentation.setStyle("-fx-font-size: 12px; -fx-text-fill: #0000EE; -fx-underline: true; -fx-cursor: hand; -fx-padding: 10 0 0 15;");
+        rightColumn.getChildren().add(lblDocumentation);
+        lblDocumentation.setOnMouseClicked(event -> {
+            Utils.openDocument("/docs/documentation.pdf");
+        });
+
         // Separador
         javafx.scene.control.Separator separator2 = new javafx.scene.control.Separator();
         rightColumn.getChildren().add(separator2);

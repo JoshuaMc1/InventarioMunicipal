@@ -58,7 +58,9 @@ Name: "custom"; Description: "Instalación personalizada"; Flags: iscustom
 Name: "core"; Description: "Archivos principales de {#MyAppName}"; Types: full compact custom; Flags: fixed
 Name: "jdk"; Description: "Java Development Kit 25"; Types: full compact custom; Flags: fixed
 Name: "javafx"; Description: "JavaFX Runtime"; Types: full compact custom; Flags: fixed
+Name: "gzip"; Description: "GZIP (requerido para backups)"; Types: full compact custom; Flags: fixed
 Name: "shortcuts"; Description: "Accesos directos"; Types: full compact; Flags: checkablealone
+Name: "vcredist"; Description: "Visual C++ Redistributable (requerido para MySQL)"; Types: full custom
 Name: "mysql"; Description: "MySQL (herramienta de gestión de BD)"; Types: full custom
 
 ; ----------------------------------------------------------------
@@ -80,6 +82,13 @@ Source: "D:\Java\InventarioMunicipal\{#MyAppLauncher}"; DestDir: "{app}"; DestNa
 ; Archivos de documentación
 Source: "D:\Java\InventarioMunicipal\README.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
 Source: "D:\Java\InventarioMunicipal\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "D:\Java\InventarioMunicipal\docs\*"; DestDir: "{app}\docs"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: core
+
+; GZIP (obligatorio para backups)
+Source: "D:\Instaladores\gzip-1.3.12-1\*"; DestDir: "{app}\gzip"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: gzip
+
+; Visual C++ Redistributable (necesario para MySQL)
+Source: "D:\Instaladores\VC_redist.x64.exe"; DestDir: "{app}\vcredist"; Flags: ignoreversion; Components: vcredist
 
 ; MySQL Workbench (opcional)
 Source: "D:\Instaladores\mysql-installer-community-8.0.msi"; DestDir: "{app}\mysql"; Flags: ignoreversion; Components: mysql
@@ -108,14 +117,21 @@ Name: "quicklaunchicon"; Description: "Crear icono en la barra de &inicio rápid
 [Registry]
 Root: HKLM; Subkey: "Software\{#MyAppPublisher}\{#MyAppName}"; ValueType: string; ValueName: "InstallPath"; ValueData: "{app}"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\{#MyAppPublisher}\{#MyAppName}"; ValueType: string; ValueName: "Version"; ValueData: "{#MyAppVersion}"; Flags: uninsdeletekey
+Root: HKLM; Subkey: "Software\{#MyAppPublisher}\{#MyAppName}"; ValueType: string; ValueName: "GzipPath"; ValueData: "{app}\gzip"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppLauncher}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppLauncher}"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppLauncher}"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Flags: uninsdeletekey
+
+; Agregar gzip al PATH del sistema
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\gzip\bin"; Check: NeedsAddPath('{app}\gzip\bin'); Flags: uninsdeletevalue
 
 ; ----------------------------------------------------------------
 ; Ejecutar al finalizar instalación
 [Run]
-; Instalar MySQL Workbench si fue seleccionado
-Filename: "msiexec.exe"; Parameters: "/i ""{app}\mysql\mysql-installer-community-8.0.msi"" /quiet"; Components: mysql; Flags: postinstall skipifsilent waituntilterminated; Description: "Instalar MySQL"
+; Instalar Visual C++ Redistributable si fue seleccionado y no está instalado
+Filename: "{app}\vcredist\VC_redist.x64.exe"; Parameters: "/install /passive /norestart"; Components: vcredist; Flags: postinstall skipifsilent waituntilterminated; Description: "Instalar Visual C++ Redistributable"; Check: not IsVCRedistInstalled
+
+; Instalar MySQL Workbench si fue seleccionado (modo interactivo)
+Filename: "msiexec.exe"; Parameters: "/i ""{app}\mysql\mysql-installer-community-8.0.msi"""; Components: mysql; Flags: postinstall skipifsilent waituntilterminated; Description: "Instalar MySQL"; Check: CheckMySQLRequirements
 
 ; Ejecutar la aplicación
 Filename: "{app}\{#MyAppLauncher}"; Flags: postinstall skipifsilent shellexec; Description: "Ejecutar {#MyAppName} ahora"; WorkingDir: "{app}"
@@ -130,10 +146,59 @@ Type: files; Name: "{app}\*.log"
 Type: files; Name: "{app}\logs\*.log"
 Type: dirifempty; Name: "{app}\logs"
 Type: files; Name: "{app}\*.tmp"
+Type: dirifempty; Name: "{app}\gzip"
+Type: dirifempty; Name: "{app}\vcredist"
+Type: dirifempty; Name: "{app}\mysql"
 
 ; ----------------------------------------------------------------
 ; Funciones de código Pascal para validaciones
 [Code]
+// Función para verificar si Visual C++ Redistributable está instalado
+function IsVCRedistInstalled(): Boolean;
+var
+  Version: String;
+begin
+  // Verificar si está instalado VC++ Redistributable 2015-2022 x64
+  Result := RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Version', Version);
+  if not Result then
+    Result := RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Version', Version);
+  
+  if Result then
+    Log('Visual C++ Redistributable detectado: ' + Version)
+  else
+    Log('Visual C++ Redistributable no encontrado');
+end;
+
+// Función para verificar si una ruta ya existe en PATH
+function NeedsAddPath(Param: string): Boolean;
+var
+  OrigPath: string;
+begin
+  if not RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', OrigPath) then
+  begin
+    Result := True;
+    Exit;
+  end;
+  // Buscar si la ruta ya existe en PATH
+  Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+end;
+
+// Función para verificar requisitos antes de instalar MySQL
+function CheckMySQLRequirements(): Boolean;
+begin
+  Result := True;
+  
+  // Verificar si VC++ Redistributable está instalado
+  if not IsVCRedistInstalled() then
+  begin
+    MsgBox('ADVERTENCIA: MySQL requiere Visual C++ Redistributable x64.' + #13#10 + 
+           'Se recomienda instalarlo primero seleccionando el componente correspondiente.' + #13#10 + #13#10 +
+           'Si continúa sin instalarlo, MySQL podría no funcionar correctamente.', 
+           mbInformation, MB_OK);
+    Result := MsgBox('¿Desea continuar con la instalación de MySQL de todos modos?', mbConfirmation, MB_YESNO) = IDYES;
+  end;
+end;
+
 function InitializeSetup(): Boolean;
 begin
   Result := True;

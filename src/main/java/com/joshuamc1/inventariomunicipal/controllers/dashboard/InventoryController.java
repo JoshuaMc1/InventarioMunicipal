@@ -168,8 +168,8 @@ public class InventoryController {
 
         // Configurar columna de acciones con botones
         colActions.setCellFactory(col -> new TableCell<>() {
-            private final Button btnBarcode = new Button("Bc");
-            private final Button btnQR = new Button("Qr");
+            private final Button btnBarcode = new Button("⬇ Br");
+            private final Button btnQR = new Button("⬇ Qr");
             private final HBox pane = new HBox(5, btnBarcode, btnQR);
 
             {
@@ -215,6 +215,7 @@ public class InventoryController {
         colUnit.setStyle("-fx-font-size: 17;");
         colStock.setStyle("-fx-font-size: 17;");
         colMinStock.setStyle("-fx-font-size: 17;");
+        colActions.setStyle("-fx-font-size: 17;");
 
         tblProducts.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
     }

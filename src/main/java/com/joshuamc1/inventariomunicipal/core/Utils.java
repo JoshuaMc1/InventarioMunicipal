@@ -1,10 +1,13 @@
 package com.joshuamc1.inventariomunicipal.core;
 
+import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.mindrot.jbcrypt.BCrypt;
 
+import javax.swing.text.html.ImageView;
 import java.awt.*;
 import java.security.SecureRandom;
 import java.time.LocalDate;
@@ -191,6 +194,14 @@ public class Utils {
             Desktop.getDesktop().browse(new java.net.URI(s));
         } catch (Exception e) {
             Logs.error(Utils.class, "No se pudo abrir la página web: {}", e.getMessage());
+        }
+    }
+
+    public static void openDocument(String s) {
+        try {
+            Desktop.getDesktop().open(new java.io.File(s));
+        } catch (Exception e) {
+            Logs.error(Utils.class, "No se pudo abrir el documento: {}", e.getMessage());
         }
     }
 }

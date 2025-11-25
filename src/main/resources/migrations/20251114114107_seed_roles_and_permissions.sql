@@ -107,7 +107,7 @@ WHERE accion IN ('READ', 'GENERATE', 'EXPORT')
 -- Crear usuario SYSTEM para backups automáticos y operaciones del sistema
 -- Este usuario NO tiene contraseña y NO puede iniciar sesión
 -- Se usa solo para registrar operaciones automáticas del sistema
-INSERT INTO users (name, username, password_hash, rol_id, activo)
+INSERT INTO users (name, username, password, rol_id, must_change_password)
 VALUES ('SYSTEM', 'SYSTEM', '', NULL, 0)
 ON DUPLICATE KEY UPDATE username = username; -- Evitar error si ya existe
 
