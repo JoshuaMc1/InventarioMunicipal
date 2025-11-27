@@ -732,6 +732,15 @@ public class LoansController {
                         Utils.showAlert("Validación", "La cantidad debe ser mayor que cero");
                         return null;
                     }
+                    // Validar que la cantidad no exceda el stock disponible
+                    Double currentStock = p.getDouble("current_stock");
+                    if (currentStock == null) currentStock = 0.0;
+                    if (qty > currentStock) {
+                        Utils.showAlert("Stock Insuficiente",
+                            String.format("No hay suficiente stock del producto '%s'.\n\nCantidad solicitada: %.2f\nStock disponible: %.2f\n\nPor favor, ajuste la cantidad.",
+                                p.getString("name"), qty, currentStock));
+                        return null;
+                    }
                     return new TransactionItemDTO(
                             p.getInteger("id"),
                             qty,
