@@ -13,10 +13,13 @@ module com.joshuamc1.inventariomunicipal {
     requires org.apache.fontbox;
     requires com.google.zxing;
     requires com.google.zxing.javase;
+    requires escpos.coffee;
+    requires io;
+    requires kernel;
+    requires layout;
 
     opens com.joshuamc1.inventariomunicipal.controllers to javafx.fxml;
     opens com.joshuamc1.inventariomunicipal.controllers.dashboard to javafx.fxml;
-
     opens com.joshuamc1.inventariomunicipal.models to javafx.fxml, activejdbc;
 
     exports com.joshuamc1.inventariomunicipal;

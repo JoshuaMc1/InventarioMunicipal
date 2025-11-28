@@ -31,11 +31,13 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public class LoansController {
     @FXML
@@ -235,11 +237,14 @@ public class LoansController {
             private final Button btnViewItems = new Button("Ver");
             private final Button btnInvalidate = new Button("Invalidar");
             private final Button btnRestore = new Button("Restaurar");
+            private final Button btnPrintReceipt = new Button("Recibo");
 
             {
                 btnViewItems.setStyle("-fx-font-size: 12; -fx-background-color: #9C27B0; -fx-text-fill: white;");
                 btnInvalidate.setStyle("-fx-font-size: 12; -fx-background-color: #f44336; -fx-text-fill: white;");
                 btnRestore.setStyle("-fx-font-size: 12; -fx-background-color: #4CAF50; -fx-text-fill: white;");
+                btnPrintReceipt.setStyle("-fx-font-size: 12; -fx-background-color: #2196F3; -fx-text-fill: white;");
+                btnPrintReceipt.setTooltip(new Tooltip("Emitir recibo del préstamo"));
 
                 btnViewItems.setOnAction(e -> {
                     Transaction transaction = getTableView().getItems().get(getIndex());
@@ -255,6 +260,14 @@ public class LoansController {
                     Transaction transaction = getTableView().getItems().get(getIndex());
                     onRestoreLoan(transaction);
                 });
+
+                btnPrintReceipt.setOnAction(e -> {
+                    Transaction transaction = getTableView().getItems().get(getIndex());
+                    com.joshuamc1.inventariomunicipal.utils.PrintReceiptDialog.showPrintDialog(
+                        transaction,
+                        (Stage) getTableView().getScene().getWindow()
+                    );
+                });
             }
 
             @Override
@@ -268,6 +281,9 @@ public class LoansController {
 
                     container.getChildren().clear();
                     container.getChildren().add(btnViewItems);
+
+                    // Botón de recibo siempre visible (se puede emitir tanto para activos como inactivos)
+                    container.getChildren().add(btnPrintReceipt);
 
                     // Mostrar botón invalidar solo si está activo y tiene permiso
                     if (isActive && canInvalidate) {
@@ -526,14 +542,30 @@ public class LoansController {
                 Logs.info(getClass(), "Préstamo creado con código: {}", loanCode);
 
                 loadPageFromRepo(currentPage);
-                String message = "Préstamo multi-producto registrado exitosamente";
-                if (loanCode != null) {
-                    message += "\n\nCódigo del préstamo: " + loanCode;
-                }
+
+                // Mostrar mensaje de éxito y preguntar si desea emitir recibo
+                Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+                successAlert.setTitle("Éxito");
+                successAlert.setHeaderText("Préstamo registrado exitosamente");
+
+                String message = "Código del préstamo: " + loanCode;
                 if (expectedReturnDate != null) {
                     message += "\nFecha esperada de devolución: " + expectedReturnDate.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
                 }
-                Utils.showAlert("Éxito", message);
+                successAlert.setContentText(message);
+
+                ButtonType emitReceiptButton = new ButtonType("Emitir Recibo");
+                ButtonType closeButton = new ButtonType("Cerrar", ButtonBar.ButtonData.CANCEL_CLOSE);
+                successAlert.getButtonTypes().setAll(emitReceiptButton, closeButton);
+
+                Optional<ButtonType> result = successAlert.showAndWait();
+                if (result.isPresent() && result.get() == emitReceiptButton) {
+                    // Mostrar diálogo de impresión
+                    com.joshuamc1.inventariomunicipal.utils.PrintReceiptDialog.showPrintDialog(
+                        loan,
+                        (Stage) tblTransactions.getScene().getWindow()
+                    );
+                }
             } catch (Exception e) {
                 Logs.error(getClass(), "Error creando préstamo multi-producto: {}", e.getMessage());
                 e.printStackTrace();
@@ -1030,7 +1062,7 @@ public class LoansController {
     /**
      * Crea un badge visual según el estado del préstamo
      */
-    private Label createStatusBadge(Transaction tx) {
+    private @NotNull Label createStatusBadge(Transaction tx) {
         Label badge = new Label();
         badge.setPadding(new Insets(3, 10, 3, 10));
         badge.setStyle("-fx-background-radius: 3; -fx-font-size: 12px; -fx-font-weight: bold;");
