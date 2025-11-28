@@ -34,6 +34,7 @@ public class InventoryController {
 
     @FXML private TableView<Product> tblProducts;
     @FXML private TableColumn<Product, Integer> colId;
+    @FXML private TableColumn<Product, String> colStatus;
     @FXML private TableColumn<Product, String> colCode;
     @FXML private TableColumn<Product, String> colName;
     @FXML private TableColumn<Product, String> colDescription;
@@ -60,13 +61,19 @@ public class InventoryController {
     private int totalItems = 0;
     private int totalPages = 1;
 
+    // Permisos
+    private boolean canRestore = false;
+
     private List<Product> allProducts = FXCollections.observableArrayList();
     private final ObservableList<Product> currentPageItems = FXCollections.observableArrayList();
 
     @FXML
     public void initialize() {
+        // Configurar permisos primero
+        canRestore = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INVENTARIO", "RESTORE");
+
         setupTable();
-        configurePermissions(); // Agregar configuración de permisos
+        configurePermissions();
         loadProducts();
 
         btnRefresh.setOnAction(e -> loadProducts());
@@ -153,6 +160,27 @@ public class InventoryController {
             return new SimpleIntegerProperty(id == null ? 0 : id).asObject();
         });
 
+        // Columna de estado con badge visual
+        colStatus.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    Product product = getTableView().getItems().get(getIndex());
+                    boolean isActive = product.isActive();
+                    Label badge = new Label(isActive ? "Activo" : "Inactivo");
+                    badge.setStyle(isActive
+                        ? "-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;"
+                        : "-fx-background-color: #9E9E9E; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
+                    setGraphic(badge);
+                    setText(null);
+                }
+            }
+        });
+
         colCode.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("code")));
         colName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("name")));
         colDescription.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("description")));
@@ -166,16 +194,20 @@ public class InventoryController {
             return new SimpleDoubleProperty(v == null ? 0.0 : v).asObject();
         });
 
-        // Configurar columna de acciones con botones
+        // Configurar columna de acciones con botones de código y restaurar
         colActions.setCellFactory(col -> new TableCell<>() {
             private final Button btnBarcode = new Button("⬇ Br");
             private final Button btnQR = new Button("⬇ Qr");
-            private final HBox pane = new HBox(5, btnBarcode, btnQR);
+            private final Button btnRestore = new Button("Restaurar");
+            private final HBox paneActive = new HBox(5, btnBarcode, btnQR);
+            private final HBox paneDeleted = new HBox(5, btnRestore);
 
             {
-                pane.setAlignment(Pos.CENTER);
+                paneActive.setAlignment(Pos.CENTER);
+                paneDeleted.setAlignment(Pos.CENTER);
                 btnBarcode.setStyle("-fx-font-size: 16; -fx-cursor: hand;");
                 btnQR.setStyle("-fx-font-size: 16; -fx-cursor: hand;");
+                btnRestore.setStyle("-fx-font-size: 12; -fx-background-color: #4CAF50; -fx-text-fill: white;");
                 btnBarcode.setTooltip(new Tooltip("Descargar Código de Barras"));
                 btnQR.setTooltip(new Tooltip("Descargar Código QR"));
 
@@ -188,6 +220,11 @@ public class InventoryController {
                     Product p = getTableView().getItems().get(getIndex());
                     downloadQRCode(p);
                 });
+
+                btnRestore.setOnAction(e -> {
+                    Product p = getTableView().getItems().get(getIndex());
+                    restoreProduct(p);
+                });
             }
 
             @Override
@@ -197,10 +234,19 @@ public class InventoryController {
                     setGraphic(null);
                 } else {
                     Product p = getTableView().getItems().get(getIndex());
-                    String code = p.getString("code");
-                    // Solo mostrar botones si hay código
-                    if (code != null && !code.trim().isEmpty()) {
-                        setGraphic(pane);
+                    boolean isDeleted = p.get("deleted_at") != null;
+
+                    // Si está eliminado y tiene permiso de restaurar, mostrar botón restaurar
+                    if (isDeleted && canRestore) {
+                        setGraphic(paneDeleted);
+                    } else if (!isDeleted) {
+                        // Si está activo, mostrar botones de código si hay código
+                        String code = p.getString("code");
+                        if (code != null && !code.trim().isEmpty()) {
+                            setGraphic(paneActive);
+                        } else {
+                            setGraphic(null);
+                        }
                     } else {
                         setGraphic(null);
                     }
@@ -209,6 +255,7 @@ public class InventoryController {
         });
 
         colId.setStyle("-fx-font-size: 17;");
+        colStatus.setStyle("-fx-font-size: 17;");
         colCode.setStyle("-fx-font-size: 17;");
         colName.setStyle("-fx-font-size: 17;");
         colDescription.setStyle("-fx-font-size: 17;");
@@ -224,11 +271,18 @@ public class InventoryController {
         Task<List<Product>> task = new Task<>() {
             @Override
             protected java.util.List<Product> call() {
-                // Asegurar que el hilo que ejecuta la tarea tenga una conexión abierta
-                // para operaciones ActiveJDBC que puedan no usar DatabaseManager internamente.
                 DatabaseConfig.openConnection();
                 try {
-                    return productService.findAll();
+                    List<Product> products = productService.findAll();
+
+                    // Si tiene permiso de restaurar, incluir eliminados
+                    if (canRestore) {
+                        List<Product> deleted = productService.findDeleted();
+                        products = new java.util.ArrayList<>(products);
+                        products.addAll(deleted);
+                    }
+
+                    return products;
                 } finally {
                     DatabaseConfig.closeConnection();
                 }
@@ -601,13 +655,110 @@ public class InventoryController {
             return;
         }
 
-        boolean ok = Utils.confirmAction("Confirmar", "¿Desea eliminar el producto: " + sel.getString("name") + "?");
+        // Mostrar dialog con opciones según permisos
+        boolean canHardDelete = PermissionHelper.canAccess("SISTEMA", "DESTRUCTIVE_OPERATIONS");
+
+        if (canHardDelete) {
+            // ROOT puede elegir entre soft delete y hard delete
+            showDeleteOptionsDialog(sel);
+        } else {
+            // Usuario normal: solo soft delete
+            boolean ok = Utils.confirmAction("Confirmar Eliminación",
+                "¿Desea eliminar el producto: " + sel.getString("name") + "?");
+            if (!ok) return;
+
+            try {
+                productService.softDelete(sel);
+                Utils.showAlert("Éxito", "Producto eliminado correctamente");
+                loadProducts();
+            } catch (Exception e) {
+                Logs.error(getClass(), "Error eliminando producto", e);
+                Utils.showAlert("Error", "No se pudo eliminar el producto: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Muestra dialog con opciones de eliminación (solo para ROOT)
+     */
+    private void showDeleteOptionsDialog(Product product) {
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Opciones de Eliminación");
+        dialog.setHeaderText("Producto: " + product.getString("name"));
+
+        ButtonType softDeleteBtn = new ButtonType("Eliminación Reversible", ButtonBar.ButtonData.OK_DONE);
+        ButtonType hardDeleteBtn = new ButtonType("Eliminación Permanente", ButtonBar.ButtonData.OTHER);
+        dialog.getDialogPane().getButtonTypes().addAll(softDeleteBtn, hardDeleteBtn, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(15);
+        grid.setPadding(new javafx.geometry.Insets(20));
+
+        Label lblInfo = new Label("Seleccione el tipo de eliminación:");
+        lblInfo.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+
+        Label lblSoft = new Label("• Eliminación Reversible: Se puede restaurar posteriormente");
+        lblSoft.setStyle("-fx-font-size: 13px;");
+        Label lblHard = new Label("• Eliminación Permanente: No se puede deshacer");
+        lblHard.setStyle("-fx-font-size: 13px; -fx-text-fill: #d60000;");
+
+        grid.add(lblInfo, 0, 0);
+        grid.add(lblSoft, 0, 1);
+        grid.add(lblHard, 0, 2);
+
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(btn -> {
+            if (btn == softDeleteBtn) return "soft";
+            if (btn == hardDeleteBtn) return "hard";
+            return null;
+        });
+
+        Optional<String> result = dialog.showAndWait();
+        result.ifPresent(type -> {
+            try {
+                if ("soft".equals(type)) {
+                    productService.softDelete(product);
+                    Utils.showAlert("Éxito", "Producto eliminado correctamente");
+                } else if ("hard".equals(type)) {
+                    boolean confirm = Utils.confirmAction("⚠️ CONFIRMACIÓN FINAL",
+                        "¿Está COMPLETAMENTE SEGURO de eliminar permanentemente?\n\n" +
+                        "Esta acción NO SE PUEDE DESHACER.\n\n" +
+                        "Producto: " + product.getString("name"));
+                    if (confirm) {
+                        productService.hardDelete(product);
+                        Utils.showAlert("Éxito", "Producto eliminado permanentemente");
+                    } else {
+                        return;
+                    }
+                }
+                loadProducts();
+            } catch (Exception e) {
+                Logs.error(getClass(), "Error eliminando producto", e);
+                Utils.showAlert("Error", "No se pudo eliminar el producto: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Restaura un producto eliminado (desde columna de acciones)
+     */
+    private void restoreProduct(Product product) {
+        boolean ok = Utils.confirmAction("Confirmar Restauración",
+            "¿Desea restaurar el producto: " + product.getString("name") + "?");
         if (!ok) return;
 
-        productService.delete(sel);
-
-        loadProducts();
+        try {
+            productService.restore(product);
+            Utils.showAlert("Éxito", "Producto restaurado correctamente");
+            loadProducts();
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error restaurando producto", e);
+            Utils.showAlert("Error", "No se pudo restaurar el producto: " + e.getMessage());
+        }
     }
+
 
     private void downloadBarcode(@NotNull Product product) {
         String code = product.getString("code");

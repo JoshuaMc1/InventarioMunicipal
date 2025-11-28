@@ -41,9 +41,12 @@ public class OutcomesController {
     private TableView<Transaction> tblTransactions;
     @FXML private Button btnNewOutcome;
     @FXML private Button btnRefresh;
+    @FXML private Button btnViewInvalidated;
     @FXML private TextField txtSearch;
     @FXML
     private TableColumn<Transaction, String> colId;
+    @FXML
+    private TableColumn<Transaction, String> colStatus;
     @FXML
     private TableColumn<Transaction, String> colProduct;
     @FXML
@@ -61,17 +64,23 @@ public class OutcomesController {
     @FXML
     private TableColumn<Transaction, Void> colActions;
 
-    // Controles de paginación (agregados)
+    // Controles de paginación
     @FXML private Button btnPrev;
     @FXML private Button btnNext;
     @FXML private Label lblPage;
     @FXML private ChoiceBox<Integer> choicePageSize;
 
     // Estado de paginación
-    private int currentPage = 1; // 1-based
+    private int currentPage = 1;
     private int pageSize = 25;
     private int totalItems = 0;
     private int totalPages = 1;
+    private boolean showingInvalidated = false;
+
+    // Permisos del usuario
+    private boolean canInvalidate = false;
+    private boolean canRestore = false;
+    private boolean canViewDeleted = false;
 
     private final ObservableList<Transaction> currentPageItems = FXCollections.observableArrayList();
 
@@ -81,9 +90,33 @@ public class OutcomesController {
 
     @FXML
     public void initialize() {
+        // Configurar permisos
+        setupPermissions();
+
         colId.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getInteger("id"))));
+
+        // Columna de estado
+        colStatus.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    Transaction tx = getTableView().getItems().get(getIndex());
+                    boolean isActive = tx.isActive();
+                    Label badge = new Label(isActive ? "Activo" : "Inactivo");
+                    badge.setStyle(isActive
+                        ? "-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;"
+                        : "-fx-background-color: #9E9E9E; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
+                    setGraphic(badge);
+                    setText(null);
+                }
+            }
+        });
+
         colProduct.setCellValueFactory(data -> {
-            // Obtener items de la transacción
             List<TransactionItem> items = transactionService.getTransactionItems(data.getValue().getInteger("id"));
             if (items.isEmpty()) {
                 return new SimpleStringProperty("Sin productos");
@@ -92,7 +125,6 @@ public class OutcomesController {
                 Product product = items.get(0).getProduct();
                 return new SimpleStringProperty(product != null ? product.getString("name") : "N/A");
             }
-            // Si hay múltiples items, mostrar "Multi-Producto"
             return new SimpleStringProperty("Multi-Producto (" + items.size() + ")");
         });
 
@@ -134,23 +166,57 @@ public class OutcomesController {
             return new SimpleStringProperty("1 item");
         });
 
-        // Columna de acciones (botón Ver Items)
+        // Columna de acciones con botones según permisos y estado
         colActions.setCellFactory(col -> new TableCell<>() {
-            private final Button btnViewItems = new Button("Ver Items");
+            private final HBox container = new HBox(5);
+            private final Button btnViewItems = new Button("Ver");
+            private final Button btnInvalidate = new Button("Invalidar");
+            private final Button btnRestore = new Button("Restaurar");
+
             {
-                btnViewItems.setStyle("-fx-font-size: 16; -fx-background-color: #FF9800; -fx-text-fill: white;");
+                btnViewItems.setStyle("-fx-font-size: 12; -fx-background-color: #FF9800; -fx-text-fill: white;");
+                btnInvalidate.setStyle("-fx-font-size: 12; -fx-background-color: #f44336; -fx-text-fill: white;");
+                btnRestore.setStyle("-fx-font-size: 12; -fx-background-color: #4CAF50; -fx-text-fill: white;");
+
                 btnViewItems.setOnAction(e -> {
                     Transaction transaction = getTableView().getItems().get(getIndex());
                     showTransactionItemsDialog(transaction);
                 });
+
+                btnInvalidate.setOnAction(e -> {
+                    Transaction transaction = getTableView().getItems().get(getIndex());
+                    onInvalidateOutcome(transaction);
+                });
+
+                btnRestore.setOnAction(e -> {
+                    Transaction transaction = getTableView().getItems().get(getIndex());
+                    onRestoreOutcome(transaction);
+                });
             }
+
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty) {
                     setGraphic(null);
                 } else {
-                    setGraphic(btnViewItems);
+                    Transaction transaction = getTableView().getItems().get(getIndex());
+                    boolean isActive = transaction.isActive();
+
+                    container.getChildren().clear();
+                    container.getChildren().add(btnViewItems);
+
+                    // Mostrar botón invalidar solo si está activo y tiene permiso
+                    if (isActive && canInvalidate) {
+                        container.getChildren().add(btnInvalidate);
+                    }
+
+                    // Mostrar botón restaurar solo si está inactivo y tiene permiso
+                    if (!isActive && canRestore) {
+                        container.getChildren().add(btnRestore);
+                    }
+
+                    setGraphic(container);
                 }
             }
         });
@@ -805,5 +871,116 @@ public class OutcomesController {
         d.getDialogPane().setPrefSize(750, 500);
 
         d.showAndWait();
+    }
+
+    /**
+     * Configurar permisos del usuario actual
+     */
+    private void setupPermissions() {
+        canInvalidate = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("EGRESOS", "DELETE");
+        canRestore = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("EGRESOS", "RESTORE");
+        canViewDeleted = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "VIEW_DELETED");
+
+        if (btnViewInvalidated != null) {
+            btnViewInvalidated.setVisible(canViewDeleted);
+            btnViewInvalidated.setManaged(canViewDeleted);
+        }
+
+        Logs.info(getClass(), "Permisos configurados - Invalidar: {}, Restaurar: {}, Ver eliminados: {}",
+            canInvalidate, canRestore, canViewDeleted);
+    }
+
+    /**
+     * Invalidar un egreso
+     */
+    private void onInvalidateOutcome(Transaction transaction) {
+        if (!canInvalidate) {
+            Utils.showAlert("Acceso Denegado", "No tiene permiso para invalidar egresos");
+            return;
+        }
+
+        if (!transaction.isActive()) {
+            Utils.showAlert("Error", "Este egreso ya está invalidado");
+            return;
+        }
+
+        boolean confirmed = Utils.showConfirmation(
+            "Confirmar Invalidación",
+            "¿Está seguro de invalidar este egreso?\n\n" +
+            "ID: " + transaction.getInteger("id") + "\n" +
+            "Esta acción revertirá el stock de los productos egresados."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        javafx.scene.control.TextInputDialog reasonDialog = new javafx.scene.control.TextInputDialog();
+        reasonDialog.setTitle("Razón de Invalidación");
+        reasonDialog.setHeaderText("Ingrese la razón por la cual invalida este egreso:");
+        reasonDialog.setContentText("Razón:");
+
+        java.util.Optional<String> reasonResult = reasonDialog.showAndWait();
+        if (reasonResult.isEmpty() || reasonResult.get().trim().isEmpty()) {
+            Utils.showAlert("Cancelado", "Debe proporcionar una razón para invalidar");
+            return;
+        }
+
+        try {
+            transactionService.invalidate(transaction, reasonResult.get());
+            Utils.showAlert("Éxito", "Egreso invalidado correctamente");
+            loadPageFromRepo(currentPage);
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error invalidando egreso: {}", e.getMessage());
+            Utils.showAlert("Error", "No se pudo invalidar el egreso: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Restaurar un egreso invalidado
+     */
+    private void onRestoreOutcome(Transaction transaction) {
+        if (!canRestore) {
+            Utils.showAlert("Acceso Denegado", "No tiene permiso para restaurar egresos");
+            return;
+        }
+
+        if (transaction.isActive()) {
+            Utils.showAlert("Error", "Este egreso ya está activo");
+            return;
+        }
+
+        boolean confirmed = Utils.showConfirmation(
+            "Confirmar Restauración",
+            "¿Está seguro de restaurar este egreso?\n\n" +
+            "ID: " + transaction.getInteger("id") + "\n" +
+            "Esta acción volverá a restar el stock de los productos."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            transactionService.restore(transaction);
+            Utils.showAlert("Éxito", "Egreso restaurado correctamente");
+            loadPageFromRepo(currentPage);
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error restaurando egreso: {}", e.getMessage());
+            Utils.showAlert("Error", "No se pudo restaurar el egreso: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Mostrar egresos invalidados
+     */
+    @FXML
+    public void showInvalidatedOutcomes() {
+        showingInvalidated = !showingInvalidated;
+        if (btnViewInvalidated != null) {
+            btnViewInvalidated.setText(showingInvalidated ? "Ver Activos" : "Ver Invalidados");
+        }
+        currentPage = 1;
+        loadPageFromRepo(currentPage);
     }
 }

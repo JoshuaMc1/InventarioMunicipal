@@ -169,24 +169,42 @@ public class Utils {
     }
 
     /**
-     * Mostrar una alerta de confirmación con dos botones: OK y Cancel
-     * Devuelve true si el usuario confirma (OK), false si cancela.
+     * Mostrar un diálogo de confirmación con botones Sí/No
+     * @return true si el usuario confirma, false si cancela
      */
-    public static boolean confirmAction(String title, String message) {
+    public static boolean showConfirmation(String title, String message) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
         alert.setTitle(title);
         alert.setHeaderText(null);
         alert.setContentText(message);
+
+        // Configurar botones
+        alert.getButtonTypes().clear();
+        alert.getButtonTypes().addAll(
+            javafx.scene.control.ButtonType.YES,
+            javafx.scene.control.ButtonType.NO
+        );
+
+        // Añadir icono si es posible
         try {
             if (alert.getDialogPane().getScene() != null && alert.getDialogPane().getScene().getWindow() instanceof Stage) {
                 Stage alertStage = (Stage) alert.getDialogPane().getScene().getWindow();
                 alertStage.getIcons().add(new javafx.scene.image.Image(Objects.requireNonNull(Utils.class.getResourceAsStream("/images/logo.png"))));
             }
         } catch (Exception ignored) {
-            // ignore, avoid breaking confirmation
+            // Si algo falla, seguimos sin icono
         }
 
-        return alert.showAndWait().filter(response -> response == javafx.scene.control.ButtonType.OK).isPresent();
+        java.util.Optional<javafx.scene.control.ButtonType> result = alert.showAndWait();
+        return result.isPresent() && result.get() == javafx.scene.control.ButtonType.YES;
+    }
+
+    /**
+     * Alias de showConfirmation para mantener compatibilidad con código existente
+     * @deprecated Use showConfirmation instead
+     */
+    public static boolean confirmAction(String title, String message) {
+        return showConfirmation(title, message);
     }
 
     public static void openWebpage(String s) {

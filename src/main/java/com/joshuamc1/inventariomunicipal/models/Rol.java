@@ -4,10 +4,16 @@ import org.javalite.activejdbc.Base;
 import org.javalite.activejdbc.Model;
 import org.javalite.activejdbc.annotations.Table;
 
+import java.sql.Timestamp;
 import java.util.List;
 
 @Table("roles")
 public class Rol extends Model {
+
+    // Estados posibles
+    public static final String STATUS_ACTIVE = "active";
+    public static final String STATUS_INACTIVE = "inactive";
+    public static final String STATUS_DELETED = "deleted";
 
     /**
      * Obtiene todos los permisos asociados a este rol
@@ -83,6 +89,74 @@ public class Rol extends Model {
     public boolean isActivo() {
         Object activo = get("activo");
         return activo != null && (activo.equals(1) || activo.equals(true));
+    }
+
+    // ===== MÉTODOS DE SOFT DELETE Y RESTAURACIÓN =====
+
+    /**
+     * Realiza eliminación lógica del rol
+     * @param deletedBy ID del usuario que elimina
+     */
+    public void softDelete(Integer deletedBy) {
+        this.set("status", STATUS_DELETED);
+        this.set("deleted_at", new Timestamp(System.currentTimeMillis()));
+        this.set("deleted_by", deletedBy);
+        this.set("activo", 0); // Mantener compatibilidad
+        this.saveIt();
+    }
+
+    /**
+     * Restaura un rol eliminado lógicamente
+     */
+    public void restore() {
+        this.set("status", STATUS_ACTIVE);
+        this.set("deleted_at", null);
+        this.set("deleted_by", null);
+        this.set("activo", 1); // Mantener compatibilidad
+        this.saveIt();
+    }
+
+    /**
+     * Verifica si el rol está eliminado
+     * @return true si está eliminado
+     */
+    public boolean isDeleted() {
+        return STATUS_DELETED.equals(this.getString("status"));
+    }
+
+    /**
+     * Verifica si el rol está activo (usando nuevo campo status)
+     * @return true si está activo
+     */
+    public boolean isActiveStatus() {
+        String status = this.getString("status");
+        return status == null || STATUS_ACTIVE.equals(status);
+    }
+
+    /**
+     * Verifica si el rol está inactivo
+     * @return true si está inactivo
+     */
+    public boolean isInactiveStatus() {
+        return STATUS_INACTIVE.equals(this.getString("status"));
+    }
+
+    /**
+     * Cambia el estado del rol a inactivo
+     */
+    public void markAsInactive() {
+        this.set("status", STATUS_INACTIVE);
+        this.set("activo", 0); // Mantener compatibilidad
+        this.saveIt();
+    }
+
+    /**
+     * Cambia el estado del rol a activo
+     */
+    public void markAsActive() {
+        this.set("status", STATUS_ACTIVE);
+        this.set("activo", 1); // Mantener compatibilidad
+        this.saveIt();
     }
 }
 

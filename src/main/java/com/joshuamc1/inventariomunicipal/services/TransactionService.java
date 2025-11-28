@@ -325,4 +325,351 @@ public class TransactionService {
                 items
         );
     }
+
+    // ===== MÉTODOS DE INVALIDACIÓN Y RESTAURACIÓN =====
+
+    /**
+     * Invalida una transacción (para errores)
+     * Revierte el impacto en el stock automáticamente
+     */
+    public void invalidate(Transaction transaction, String reason) {
+        Integer currentUserId = Session.getCurrentUserId();
+        Integer transactionId = transaction.getInteger("id");
+
+        // Verificar permisos según tipo
+        String type = transaction.getString("type");
+        boolean allowed = switch (type) {
+            case "in" -> PermissionHelper.canAccess("INGRESOS", "DELETE");
+            case "out" -> PermissionHelper.canAccess("EGRESOS", "DELETE");
+            case "loan" -> PermissionHelper.canAccess("PRESTAMOS", "DELETE");
+            default -> false;
+        };
+
+        if (!allowed) {
+            throw new SecurityException("No tiene permiso para invalidar esta transacción");
+        }
+
+        if (transaction.isInvalidated()) {
+            throw new IllegalStateException("La transacción ya está invalidada");
+        }
+
+        DatabaseManager.runInConnection(() -> {
+            Base.openTransaction();
+
+            // Revertir el stock para cada item
+            List<TransactionItem> items = itemRepo.findByTransactionId(transactionId);
+            for (TransactionItem item : items) {
+                Product product = productRepo.findById(item.getInteger("product_id"));
+                if (product != null) {
+                    // Revertir el movimiento
+                    if ("in".equals(type)) {
+                        product.updateStock(-item.getDouble("quantity"));
+                    } else {
+                        product.updateStock(item.getDouble("quantity"));
+                    }
+                    productRepo.save(product);
+                }
+
+                // Marcar item como cancelado
+                item.markAsCancelled();
+            }
+
+            // Invalidar transacción
+            repo.invalidate(transaction, currentUserId, reason);
+
+            auditService.logAction(
+                currentUserId,
+                "invalidate_transaction",
+                "transactions",
+                transactionId,
+                String.format("type=%s,reason=%s", type, reason)
+            );
+
+            Base.commitTransaction();
+        });
+    }
+
+    /**
+     * Restaura una transacción invalidada
+     * Reaplicael impacto en el stock
+     */
+    public void restore(Transaction transaction) {
+        Integer currentUserId = Session.getCurrentUserId();
+        Integer transactionId = transaction.getInteger("id");
+
+        // Verificar permisos según tipo
+        String type = transaction.getString("type");
+        boolean allowed = switch (type) {
+            case "in" -> PermissionHelper.canAccess("INGRESOS", "RESTORE");
+            case "out" -> PermissionHelper.canAccess("EGRESOS", "RESTORE");
+            case "loan" -> PermissionHelper.canAccess("PRESTAMOS", "RESTORE");
+            default -> false;
+        };
+
+        if (!allowed) {
+            throw new SecurityException("No tiene permiso para restaurar esta transacción");
+        }
+
+        if (!transaction.isInvalidated()) {
+            throw new IllegalStateException("La transacción no está invalidada");
+        }
+
+        DatabaseManager.runInConnection(() -> {
+            Base.openTransaction();
+
+            // Reaplicar el stock para cada item
+            List<TransactionItem> items = itemRepo.findByTransactionId(transactionId);
+            for (TransactionItem item : items) {
+                Product product = productRepo.findById(item.getInteger("product_id"));
+                if (product != null) {
+                    // Reaplicar el movimiento
+                    if ("in".equals(type)) {
+                        product.updateStock(item.getDouble("quantity"));
+                    } else {
+                        product.updateStock(-item.getDouble("quantity"));
+                    }
+                    productRepo.save(product);
+                }
+
+                // Marcar item como activo
+                item.markAsActive();
+            }
+
+            // Restaurar transacción
+            repo.restore(transaction);
+
+            auditService.logAction(
+                currentUserId,
+                "restore_transaction",
+                "transactions",
+                transactionId,
+                String.format("type=%s", type)
+            );
+
+            Base.commitTransaction();
+        });
+    }
+
+    // ===== MÉTODOS DE GESTIÓN DE PRÉSTAMOS (FASE 10) =====
+
+    /**
+     * Crea un préstamo con código automático
+     */
+    public Transaction createLoan(
+            String date,
+            Integer userId,
+            Integer personId,
+            String notes,
+            LocalDate expectedReturnDate,
+            List<TransactionItemDTO> items) {
+
+        if (!PermissionHelper.canAccess("PRESTAMOS", "CREATE")) {
+            throw new SecurityException("No tiene permiso para crear préstamos");
+        }
+
+        if (expectedReturnDate == null) {
+            throw new IllegalArgumentException("La fecha esperada de devolución es obligatoria");
+        }
+
+        return DatabaseManager.callInConnection(() -> {
+            Base.openTransaction();
+
+            // Generar código único de préstamo
+            com.joshuamc1.inventariomunicipal.models.Person person =
+                new com.joshuamc1.inventariomunicipal.repositories.PersonRepository().findById(personId);
+
+            if (person == null) {
+                Base.rollbackTransaction();
+                throw new IllegalArgumentException("Persona no encontrada");
+            }
+
+            String loanCode = com.joshuamc1.inventariomunicipal.core.LoanCodeGenerator
+                .generateLoanCode(person, LocalDate.now());
+
+            // Crear transacción de préstamo
+            Transaction transaction = new Transaction();
+            transaction.set("type", Transaction.TYPE_LOAN);
+            transaction.set("date", date != null ? date : LocalDate.now().toString());
+            transaction.set("user_id", userId);
+            transaction.set("person_id", personId);
+            transaction.set("notes", notes);
+            transaction.set("total_items", items.size());
+            transaction.set("loan_code", loanCode);
+            transaction.set("loan_status", Transaction.LOAN_STATUS_PENDING);
+            transaction.set("expected_return_date", expectedReturnDate.toString());
+            transaction.set("status", Transaction.STATUS_ACTIVE);
+            repo.create(transaction);
+
+            Integer transactionId = transaction.getInteger("id");
+
+            // Crear items y actualizar stock
+            for (TransactionItemDTO itemDTO : items) {
+                Product product = productRepo.findById(itemDTO.getProductId());
+                if (product == null) {
+                    Base.rollbackTransaction();
+                    throw new IllegalArgumentException("Producto no encontrado: " + itemDTO.getProductId());
+                }
+
+                // Restar stock (es un egreso)
+                product.updateStock(-itemDTO.getQuantity());
+                productRepo.save(product);
+
+                TransactionItem item = new TransactionItem();
+                item.set("transaction_id", transactionId);
+                item.set("product_id", itemDTO.getProductId());
+                item.set("quantity", itemDTO.getQuantity());
+                item.set("notes", itemDTO.getNotes());
+                item.set("status", TransactionItem.STATUS_ACTIVE);
+                itemRepo.create(item);
+            }
+
+            auditService.logAction(
+                userId,
+                "create_loan",
+                "transactions",
+                transactionId,
+                String.format("loan_code=%s,person_id=%d,total_items=%d,expected_return=%s",
+                    loanCode, personId, items.size(), expectedReturnDate)
+            );
+
+            Base.commitTransaction();
+            return transaction;
+        });
+    }
+
+    /**
+     * Crea una devolución de préstamo
+     */
+    public Transaction createLoanReturn(
+            Integer loanId,
+            String returnType,
+            String returnNotes,
+            List<TransactionItemDTO> items) {
+
+        if (!PermissionHelper.canAccess("PRESTAMOS", "CREATE") &&
+            !PermissionHelper.canAccess("INGRESOS", "CREATE")) {
+            throw new SecurityException("No tiene permiso para registrar devoluciones");
+        }
+
+        Integer currentUserId = Session.getCurrentUserId();
+
+        return DatabaseManager.callInConnection(() -> {
+            Base.openTransaction();
+
+            // Obtener préstamo original
+            Transaction loan = repo.findById(loanId);
+            if (loan == null || !loan.isLoan()) {
+                Base.rollbackTransaction();
+                throw new IllegalArgumentException("Préstamo no encontrado");
+            }
+
+            if (!loan.isLoanPending()) {
+                Base.rollbackTransaction();
+                throw new IllegalStateException("El préstamo no está pendiente");
+            }
+
+            // Crear transacción de devolución (ingreso)
+            Transaction returnTransaction = new Transaction();
+            returnTransaction.set("type", Transaction.TYPE_IN);
+            returnTransaction.set("date", LocalDate.now().toString());
+            returnTransaction.set("user_id", currentUserId);
+            returnTransaction.set("person_id", loan.getInteger("person_id"));
+            returnTransaction.set("notes", returnNotes);
+            returnTransaction.set("total_items", items.size());
+            returnTransaction.set("related_transaction_id", loanId);
+            returnTransaction.set("return_type", returnType);
+            returnTransaction.set("status", Transaction.STATUS_ACTIVE);
+            repo.create(returnTransaction);
+
+            Integer returnTxId = returnTransaction.getInteger("id");
+
+            // Crear items y actualizar stock
+            for (TransactionItemDTO itemDTO : items) {
+                Product product = productRepo.findById(itemDTO.getProductId());
+                if (product == null) {
+                    Base.rollbackTransaction();
+                    throw new IllegalArgumentException("Producto no encontrado");
+                }
+
+                // Sumar stock (es un ingreso)
+                product.updateStock(itemDTO.getQuantity());
+                productRepo.save(product);
+
+                TransactionItem item = new TransactionItem();
+                item.set("transaction_id", returnTxId);
+                item.set("product_id", itemDTO.getProductId());
+                item.set("quantity", itemDTO.getQuantity());
+                item.set("notes", itemDTO.getNotes());
+                item.set("status", TransactionItem.STATUS_ACTIVE);
+                itemRepo.create(item);
+            }
+
+            // Actualizar préstamo original
+            loan.markAsReturned(returnTxId, returnType, new java.util.Date(), returnNotes);
+
+            auditService.logAction(
+                currentUserId,
+                "loan_return",
+                "transactions",
+                returnTxId,
+                String.format("loan_id=%d,return_type=%s", loanId, returnType)
+            );
+
+            Base.commitTransaction();
+            return returnTransaction;
+        });
+    }
+
+    /**
+     * Busca préstamos pendientes
+     */
+    public List<Transaction> findPendingLoans() {
+        return DatabaseManager.callInConnection(repo::findPendingLoans);
+    }
+
+    /**
+     * Busca préstamos vencidos
+     */
+    public List<Transaction> findOverdueLoans() {
+        return DatabaseManager.callInConnection(repo::findOverdueLoans);
+    }
+
+    /**
+     * Obtiene el historial de un préstamo (préstamo + devolución)
+     */
+    public List<Transaction> getLoanHistory(Integer loanId) {
+        return DatabaseManager.callInConnection(() -> repo.getLoanHistory(loanId));
+    }
+
+    /**
+     * Busca un préstamo por código
+     */
+    public Transaction findByLoanCode(String loanCode) {
+        return DatabaseManager.callInConnection(() -> repo.findByLoanCode(loanCode));
+    }
+
+    /**
+     * Busca préstamos próximos a vencer
+     */
+    public List<Transaction> findLoansExpiringSoon(int days) {
+        return DatabaseManager.callInConnection(() -> repo.findLoansExpiringSoon(days));
+    }
+
+    /**
+     * Cuenta préstamos por estado
+     */
+    public long countLoansByStatus(String loanStatus) {
+        return DatabaseManager.callInConnection(() -> repo.countLoansByStatus(loanStatus));
+    }
+
+    /**
+     * Obtiene transacciones por tipo incluyendo las invalidadas
+     */
+    public List<Transaction> findByTypeIncludingInvalidated(String type) {
+        return DatabaseManager.callInConnection(() -> {
+            return Transaction.where("type = ?", type)
+                .orderBy("created_at DESC");
+        });
+    }
 }
+

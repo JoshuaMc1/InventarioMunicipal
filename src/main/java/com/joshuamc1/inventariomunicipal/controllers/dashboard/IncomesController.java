@@ -42,9 +42,12 @@ public class IncomesController {
     private TableView<Transaction> tblTransactions;
     @FXML private Button btnNewIncome;
     @FXML private Button btnRefresh;
+    @FXML private Button btnViewInvalidated;
     @FXML private TextField txtSearch;
     @FXML
     private TableColumn<Transaction, String> colId;
+    @FXML
+    private TableColumn<Transaction, String> colStatus;
     @FXML
     private TableColumn<Transaction, String> colProduct;
     @FXML
@@ -62,17 +65,23 @@ public class IncomesController {
     @FXML
     private TableColumn<Transaction, Void> colActions;
 
-    // Controles de paginación (agregados)
+    // Controles de paginación
     @FXML private Button btnPrev;
     @FXML private Button btnNext;
     @FXML private Label lblPage;
     @FXML private ChoiceBox<Integer> choicePageSize;
 
     // Estado de paginación
-    private int currentPage = 1; // 1-based
+    private int currentPage = 1;
     private int pageSize = 25;
     private int totalItems = 0;
     private int totalPages = 1;
+    private boolean showingInvalidated = false;
+
+    // Permisos del usuario
+    private boolean canInvalidate = false;
+    private boolean canRestore = false;
+    private boolean canViewDeleted = false;
 
     private final ObservableList<Transaction> currentPageItems = FXCollections.observableArrayList();
 
@@ -82,9 +91,34 @@ public class IncomesController {
 
     @FXML
     public void initialize() {
+        // Configurar permisos
+        setupPermissions();
+
         colId.setCellValueFactory(data -> new SimpleStringProperty(String.valueOf(data.getValue().getInteger("id"))));
+
+        // Columna de estado
+        colStatus.setCellFactory(col -> new TableCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    Transaction tx = getTableView().getItems().get(getIndex());
+                    boolean isActive = tx.isActive();
+                    Label badge = new Label(isActive ? "Activo" : "Inactivo");
+                    badge.setStyle(isActive
+                        ? "-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;"
+                        : "-fx-background-color: #9E9E9E; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
+                    setGraphic(badge);
+                    setText(null);
+                }
+            }
+        });
+
         colProduct.setCellValueFactory(data -> {
-            // Obtener items de la transacción
+            // ...existing code...
             List<TransactionItem> items = transactionService.getTransactionItems(data.getValue().getInteger("id"));
             if (items.isEmpty()) {
                 return new SimpleStringProperty("Sin productos");
@@ -93,7 +127,6 @@ public class IncomesController {
                 Product product = items.get(0).getProduct();
                 return new SimpleStringProperty(product != null ? product.getString("name") : "N/A");
             }
-            // Si hay múltiples items, mostrar "Multi-Producto"
             return new SimpleStringProperty("Multi-Producto (" + items.size() + ")");
         });
 
@@ -135,22 +168,57 @@ public class IncomesController {
             return new SimpleStringProperty("1 item");
         });
 
-        // Columna de acciones (botón Ver Items)
+        // Columna de acciones con botones según permisos y estado
         colActions.setCellFactory(col -> new TableCell<>() {
-            private final Button btnViewItems = new Button("Ver Items");
+            private final HBox container = new HBox(5);
+            private final Button btnViewItems = new Button("Ver");
+            private final Button btnInvalidate = new Button("Invalidar");
+            private final Button btnRestore = new Button("Restaurar");
+
             {
-                btnViewItems.setStyle("-fx-font-size: 16; -fx-background-color: #2196F3; -fx-text-fill: white;");
+                btnViewItems.setStyle("-fx-font-size: 12; -fx-background-color: #2196F3; -fx-text-fill: white;");
+                btnInvalidate.setStyle("-fx-font-size: 12; -fx-background-color: #f44336; -fx-text-fill: white;");
+                btnRestore.setStyle("-fx-font-size: 12; -fx-background-color: #4CAF50; -fx-text-fill: white;");
+
                 btnViewItems.setOnAction(e -> {
                     Transaction transaction = getTableView().getItems().get(getIndex());
                     showTransactionItemsDialog(transaction);
                 });
+
+                btnInvalidate.setOnAction(e -> {
+                    Transaction transaction = getTableView().getItems().get(getIndex());
+                    onInvalidateIncome(transaction);
+                });
+
+                btnRestore.setOnAction(e -> {
+                    Transaction transaction = getTableView().getItems().get(getIndex());
+                    onRestoreIncome(transaction);
+                });
             }
+
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
                 if (empty) {
                     setGraphic(null);
                 } else {
+                    Transaction transaction = getTableView().getItems().get(getIndex());
+                    boolean isActive = transaction.isActive();
+
+                    container.getChildren().clear();
+                    container.getChildren().add(btnViewItems);
+
+                    // Mostrar botón invalidar solo si está activo y tiene permiso
+                    if (isActive && canInvalidate) {
+                        container.getChildren().add(btnInvalidate);
+                    }
+
+                    // Mostrar botón restaurar solo si está inactivo y tiene permiso
+                    if (!isActive && canRestore) {
+                        container.getChildren().add(btnRestore);
+                    }
+
+                    setGraphic(container);
                     setGraphic(btnViewItems);
                 }
             }
@@ -314,27 +382,99 @@ public class IncomesController {
         Dialog<List<TransactionItemDTO>> dialog = createMultiProductDialog();
         dialog.showAndWait().ifPresent(items -> {
             try {
-                // Obtener datos comunes del diálogo
-                Person selectedPerson = (Person) dialog.getDialogPane().getUserData();
-                String date = LocalDate.now().toString(); // Se puede obtener del diálogo si se necesita
-                String notes = ""; // Se puede obtener del diálogo si se necesita
+                // FASE 10: Obtener todos los datos del diálogo
+                @SuppressWarnings("unchecked")
+                java.util.Map<String, Object> dialogData = (java.util.Map<String, Object>)
+                    dialog.getDialogPane().getUserData();
 
-                transactionService.createMultiProductTransaction(
+                Person selectedPerson = (Person) dialogData.get("person");
+                LocalDate date = (LocalDate) dialogData.getOrDefault("date", LocalDate.now());
+                String notes = (String) dialogData.getOrDefault("notes", "");
+                boolean isReturn = (Boolean) dialogData.getOrDefault("isReturn", false);
+
+                if (isReturn) {
+                    // FASE 10: DEVOLUCIÓN DE PRÉSTAMO
+                    String loanCode = (String) dialogData.get("loanCode");
+                    String returnTypeDisplay = (String) dialogData.get("returnType");
+                    String returnNotes = (String) dialogData.getOrDefault("returnNotes", "");
+
+                    // Validar código de préstamo
+                    if (loanCode == null || loanCode.trim().isEmpty()) {
+                        Utils.showAlert("Error", "Debe ingresar el código del préstamo");
+                        return;
+                    }
+
+                    // Buscar préstamo
+                    Transaction loan = transactionService.findByLoanCode(loanCode.trim());
+                    if (loan == null) {
+                        Utils.showAlert("Error", "Préstamo no encontrado con código: " + loanCode);
+                        return;
+                    }
+
+                    // Validar estado del préstamo
+                    String loanStatus = loan.getString("loan_status");
+                    if (!"pending".equals(loanStatus)) {
+                        String statusMsg = switch (loanStatus) {
+                            case "returned" -> "ya fue devuelto";
+                            case "paid" -> "ya fue pagado";
+                            case "replaced" -> "ya fue reemplazado";
+                            default -> "no está disponible para devolución";
+                        };
+                        Utils.showAlert("Error", "El préstamo " + statusMsg);
+                        return;
+                    }
+
+                    // Convertir tipo de devolución
+                    String returnType = mapReturnType(returnTypeDisplay);
+
+                    // Crear devolución
+                    transactionService.createLoanReturn(
+                        loan.getInteger("id"),
+                        returnType,
+                        returnNotes,
+                        items
+                    );
+
+                    loadPageFromRepo(currentPage);
+                    Utils.showAlert("Éxito",
+                        "Devolución registrada exitosamente\n\n" +
+                        "Préstamo: " + loanCode + "\n" +
+                        "Tipo: " + returnTypeDisplay + "\n" +
+                        "Estado: Devuelto");
+
+                } else {
+                    // INGRESO NORMAL
+                    transactionService.createMultiProductTransaction(
                         Transaction.TYPE_IN,
-                        date,
+                        date.toString(),
                         Session.getCurrentUserId(),
                         selectedPerson != null ? selectedPerson.getInteger("id") : null,
                         notes,
                         items
-                );
+                    );
 
-                loadPageFromRepo(currentPage);
-                Utils.showAlert("Éxito", "Ingreso multi-producto registrado exitosamente con " + items.size() + " productos");
+                    loadPageFromRepo(currentPage);
+                    Utils.showAlert("Éxito", "Ingreso multi-producto registrado exitosamente con " + items.size() + " productos");
+                }
+
             } catch (Exception e) {
-                Logs.error(getClass(), "Error creando ingreso multi-producto: {}", e.getMessage());
-                Utils.showAlert("Error", "No se pudo registrar el ingreso: " + e.getMessage());
+                Logs.error(getClass(), "Error: {}", e.getMessage());
+                e.printStackTrace();
+                Utils.showAlert("Error", "No se pudo registrar: " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * FASE 10: Convierte el tipo de devolución de display a valor de BD
+     */
+    private String mapReturnType(String displayType) {
+        return switch (displayType) {
+            case "Mismo Producto (Devuelto)" -> "same_product";
+            case "Comprado/Pagado" -> "purchased";
+            case "Producto Reemplazado" -> "replaced";
+            default -> "other";
+        };
     }
 
     private @NotNull Dialog<List<TransactionItemDTO>> createMultiProductDialog() {
@@ -421,6 +561,140 @@ public class IncomesController {
         txtNotes.setPrefRowCount(2);
         txtNotes.setStyle("-fx-font-size: 17;");
 
+        // FASE 10: Campos para devolución de préstamo
+        CheckBox chkIsReturn = new CheckBox("Este ingreso es una devolución de préstamo");
+        chkIsReturn.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #FF5722;");
+
+        TextField txtLoanCode = new TextField();
+        txtLoanCode.setPromptText("Código del préstamo (ej: P-JA20251127-001)");
+        txtLoanCode.setStyle("-fx-font-size: 17;");
+        txtLoanCode.visibleProperty().bind(chkIsReturn.selectedProperty());
+        txtLoanCode.managedProperty().bind(chkIsReturn.selectedProperty());
+
+        // Botón de búsqueda de préstamo
+        Button btnSearchLoan = new Button("🔍 Buscar");
+        btnSearchLoan.setStyle("-fx-font-size: 14px; -fx-background-color: #2196F3; -fx-text-fill: white; -fx-cursor: hand;");
+        btnSearchLoan.setTooltip(new Tooltip("Buscar préstamo por código"));
+        btnSearchLoan.visibleProperty().bind(chkIsReturn.selectedProperty());
+        btnSearchLoan.managedProperty().bind(chkIsReturn.selectedProperty());
+
+        // Label para información del préstamo
+        Label lblLoanInfo = new Label();
+        lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-background-color: #f5f5f5; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-background-radius: 5;");
+        lblLoanInfo.setWrapText(true);
+        lblLoanInfo.setMaxWidth(Double.MAX_VALUE);
+        lblLoanInfo.visibleProperty().bind(chkIsReturn.selectedProperty());
+        lblLoanInfo.managedProperty().bind(chkIsReturn.selectedProperty());
+
+        // Variable para almacenar el préstamo encontrado
+        final Transaction[] foundLoan = {null};
+
+        // Búsqueda automática mientras escribe (con debounce)
+        PauseTransition loanSearchDebounce = new PauseTransition(Duration.millis(500));
+        txtLoanCode.textProperty().addListener((obs, oldVal, newVal) -> {
+            loanSearchDebounce.stop();
+            if (newVal == null || newVal.trim().isEmpty()) {
+                lblLoanInfo.setText("");
+                lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-background-color: #f5f5f5; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-background-radius: 5;");
+                foundLoan[0] = null;
+                return;
+            }
+
+            loanSearchDebounce.setOnFinished(e -> {
+                String code = newVal.trim();
+                new Thread(() -> {
+                    try {
+                        Transaction loan = transactionService.findByLoanCode(code);
+                        Platform.runLater(() -> {
+                            if (loan == null) {
+                                lblLoanInfo.setText("❌ Préstamo no encontrado");
+                                lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #f44336; -fx-background-color: #ffebee; -fx-border-color: #f44336; -fx-border-radius: 5; -fx-background-radius: 5;");
+                                foundLoan[0] = null;
+                            } else {
+                                String status = loan.getString("loan_status");
+                                if (!"pending".equals(status)) {
+                                    String statusMsg = switch (status) {
+                                        case "returned" -> "ya fue devuelto";
+                                        case "paid" -> "ya fue pagado";
+                                        case "replaced" -> "ya fue reemplazado";
+                                        default -> "no está disponible";
+                                    };
+                                    lblLoanInfo.setText("⚠️ Este préstamo " + statusMsg);
+                                    lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #ff9800; -fx-background-color: #fff3e0; -fx-border-color: #ff9800; -fx-border-radius: 5; -fx-background-radius: 5;");
+                                    foundLoan[0] = null;
+                                } else {
+                                    // Préstamo válido encontrado
+                                    Person person = loan.parent(Person.class);
+                                    String personName = person != null ? person.getFullName() : "N/A";
+                                    String expectedDate = loan.getString("expected_return_date");
+                                    int totalItems = loan.getInteger("total_items") != null ? loan.getInteger("total_items") : 0;
+
+                                    lblLoanInfo.setText(String.format(
+                                        "✅ Préstamo Encontrado\n" +
+                                        "Persona: %s\n" +
+                                        "Fecha: %s | Fecha Esperada Devolución: %s\n" +
+                                        "Productos: %d items",
+                                        personName,
+                                        loan.getString("date"),
+                                        expectedDate != null ? expectedDate : "No especificada",
+                                        totalItems
+                                    ));
+                                    lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #4CAF50; -fx-background-color: #e8f5e9; -fx-border-color: #4CAF50; -fx-border-radius: 5; -fx-background-radius: 5;");
+                                    foundLoan[0] = loan;
+                                }
+                            }
+                        });
+                    } catch (Exception ex) {
+                        Platform.runLater(() -> {
+                            lblLoanInfo.setText("❌ Error al buscar préstamo");
+                            lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #f44336; -fx-background-color: #ffebee; -fx-border-color: #f44336; -fx-border-radius: 5; -fx-background-radius: 5;");
+                            foundLoan[0] = null;
+                        });
+                    }
+                }).start();
+            });
+            loanSearchDebounce.playFromStart();
+        });
+
+        // Acción del botón de búsqueda (forzar búsqueda inmediata)
+        btnSearchLoan.setOnAction(e -> {
+            loanSearchDebounce.stop();
+            String code = txtLoanCode.getText();
+            if (code == null || code.trim().isEmpty()) {
+                Utils.showAlert("Aviso", "Ingrese un código de préstamo");
+                return;
+            }
+            // Disparar búsqueda manualmente
+            txtLoanCode.setText(code + " "); // Truco para disparar listener
+            txtLoanCode.setText(code.trim());
+        });
+
+        // HBox para código de préstamo + botón
+        HBox loanCodeBox = new HBox(5, txtLoanCode, btnSearchLoan);
+        HBox.setHgrow(txtLoanCode, Priority.ALWAYS);
+        loanCodeBox.visibleProperty().bind(chkIsReturn.selectedProperty());
+        loanCodeBox.managedProperty().bind(chkIsReturn.selectedProperty());
+
+        ComboBox<String> cmbReturnType = new ComboBox<>();
+        cmbReturnType.getItems().addAll(
+            "Mismo Producto (Devuelto)",
+            "Comprado/Pagado",
+            "Producto Reemplazado",
+            "Otro"
+        );
+        cmbReturnType.setValue("Mismo Producto (Devuelto)");
+        cmbReturnType.setStyle("-fx-font-size: 17;");
+        cmbReturnType.visibleProperty().bind(chkIsReturn.selectedProperty());
+        cmbReturnType.managedProperty().bind(chkIsReturn.selectedProperty());
+
+        TextArea txtReturnNotes = new TextArea();
+        txtReturnNotes.setPromptText("Notas sobre la devolución (opcional)");
+        txtReturnNotes.setPrefRowCount(2);
+        txtReturnNotes.setStyle("-fx-font-size: 17;");
+        txtReturnNotes.visibleProperty().bind(chkIsReturn.selectedProperty());
+        txtReturnNotes.managedProperty().bind(chkIsReturn.selectedProperty());
+
+
         // === SECCIÓN 2: PRODUCTOS ===
         Label lblProducts = new Label("Productos");
         lblProducts.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: #2196F3;");
@@ -489,6 +763,22 @@ public class IncomesController {
         Label lblNotesGen = new Label("Notas:");
         lblNotesGen.setStyle(lblStyle);
 
+        // FASE 10: Labels para devolución
+        Label lblLoanCode = new Label("Código Préstamo:");
+        lblLoanCode.setStyle(lblStyle);
+        lblLoanCode.visibleProperty().bind(chkIsReturn.selectedProperty());
+        lblLoanCode.managedProperty().bind(chkIsReturn.selectedProperty());
+
+        Label lblReturnType = new Label("Tipo Devolución:");
+        lblReturnType.setStyle(lblStyle);
+        lblReturnType.visibleProperty().bind(chkIsReturn.selectedProperty());
+        lblReturnType.managedProperty().bind(chkIsReturn.selectedProperty());
+
+        Label lblReturnNotes = new Label("Notas Devolución:");
+        lblReturnNotes.setStyle(lblStyle);
+        lblReturnNotes.visibleProperty().bind(chkIsReturn.selectedProperty());
+        lblReturnNotes.managedProperty().bind(chkIsReturn.selectedProperty());
+
         int row = 0;
         gp.add(lblGeneral, 0, row++, 4, 1);
         gp.add(lblDate, 0, row);
@@ -499,6 +789,17 @@ public class IncomesController {
         gp.add(txtSearchPerson, 3, row++);
         gp.add(lblNotesGen, 0, row);
         gp.add(txtNotes, 1, row++, 3, 1);
+
+        // FASE 10: Agregar sección de devolución
+        gp.add(new javafx.scene.control.Separator(), 0, row++, 4, 1);
+        gp.add(chkIsReturn, 0, row++, 4, 1);
+        gp.add(lblLoanCode, 0, row);
+        gp.add(loanCodeBox, 1, row++, 3, 1);
+        gp.add(lblLoanInfo, 0, row++, 4, 1);
+        gp.add(lblReturnType, 0, row);
+        gp.add(cmbReturnType, 1, row++, 3, 1);
+        gp.add(lblReturnNotes, 0, row);
+        gp.add(txtReturnNotes, 1, row++, 3, 1);
 
         gp.add(new javafx.scene.control.Separator(), 0, row++, 4, 1);
         gp.add(lblProducts, 0, row++, 4, 1);
@@ -528,8 +829,21 @@ public class IncomesController {
 
         d.setResultConverter(bt -> {
             if (bt == save && !items.isEmpty()) {
-                // Guardar persona seleccionada en UserData para usarla después
-                d.getDialogPane().setUserData(cmbPerson.getValue());
+                // FASE 10: Guardar todos los datos incluyendo devolución
+                java.util.Map<String, Object> dialogData = new java.util.HashMap<>();
+                dialogData.put("person", cmbPerson.getValue());
+                dialogData.put("date", dpDate.getValue());
+                dialogData.put("notes", txtNotes.getText());
+
+                // Datos de devolución
+                dialogData.put("isReturn", chkIsReturn.isSelected());
+                if (chkIsReturn.isSelected()) {
+                    dialogData.put("loanCode", txtLoanCode.getText());
+                    dialogData.put("returnType", cmbReturnType.getValue());
+                    dialogData.put("returnNotes", txtReturnNotes.getText());
+                }
+
+                d.getDialogPane().setUserData(dialogData);
                 return new java.util.ArrayList<>(items);
             }
             return null;
@@ -793,5 +1107,128 @@ public class IncomesController {
         d.getDialogPane().setPrefSize(750, 500);
 
         d.showAndWait();
+    }
+
+    // ===== MÉTODOS DE INVALIDACIÓN Y RESTAURACIÓN =====
+
+
+    /**
+     * Configurar permisos del usuario actual
+     */
+    private void setupPermissions() {
+        // Verificar permiso de invalidar (DELETE en ingresos)
+        canInvalidate = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INGRESOS", "DELETE");
+
+        // Verificar permiso de restaurar
+        canRestore = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INGRESOS", "RESTORE");
+
+        // Verificar permiso de ver eliminados
+        canViewDeleted = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "VIEW_DELETED");
+
+        // Configurar botón ver invalidados
+        if (btnViewInvalidated != null) {
+            btnViewInvalidated.setVisible(canViewDeleted);
+            btnViewInvalidated.setManaged(canViewDeleted);
+        }
+
+        Logs.info(getClass(), "Permisos configurados - Invalidar: {}, Restaurar: {}, Ver eliminados: {}",
+            canInvalidate, canRestore, canViewDeleted);
+    }
+
+    /**
+     * Invalidar un ingreso
+     */
+    private void onInvalidateIncome(Transaction transaction) {
+        if (!canInvalidate) {
+            Utils.showAlert("Acceso Denegado", "No tiene permiso para invalidar ingresos");
+            return;
+        }
+
+        if (!transaction.isActive()) {
+            Utils.showAlert("Error", "Este ingreso ya está invalidado");
+            return;
+        }
+
+        // Confirmar invalidación
+        boolean confirmed = Utils.showConfirmation(
+            "Confirmar Invalidación",
+            "¿Está seguro de invalidar este ingreso?\n\n" +
+            "ID: " + transaction.getInteger("id") + "\n" +
+            "Esta acción revertirá el stock de los productos ingresados."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        // Solicitar razón
+        javafx.scene.control.TextInputDialog reasonDialog = new javafx.scene.control.TextInputDialog();
+        reasonDialog.setTitle("Razón de Invalidación");
+        reasonDialog.setHeaderText("Ingrese la razón por la cual invalida este ingreso:");
+        reasonDialog.setContentText("Razón:");
+
+        java.util.Optional<String> reasonResult = reasonDialog.showAndWait();
+        if (reasonResult.isEmpty() || reasonResult.get().trim().isEmpty()) {
+            Utils.showAlert("Cancelado", "Debe proporcionar una razón para invalidar");
+            return;
+        }
+
+        try {
+            transactionService.invalidate(transaction, reasonResult.get());
+            Utils.showAlert("Éxito", "Ingreso invalidado correctamente");
+            loadPageFromRepo(currentPage);
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error invalidando ingreso: {}", e.getMessage());
+            Utils.showAlert("Error", "No se pudo invalidar el ingreso: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Restaurar un ingreso invalidado
+     */
+    private void onRestoreIncome(Transaction transaction) {
+        if (!canRestore) {
+            Utils.showAlert("Acceso Denegado", "No tiene permiso para restaurar ingresos");
+            return;
+        }
+
+        if (transaction.isActive()) {
+            Utils.showAlert("Error", "Este ingreso ya está activo");
+            return;
+        }
+
+        // Confirmar restauración
+        boolean confirmed = Utils.showConfirmation(
+            "Confirmar Restauración",
+            "¿Está seguro de restaurar este ingreso?\n\n" +
+            "ID: " + transaction.getInteger("id") + "\n" +
+            "Esta acción volverá a incrementar el stock de los productos."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            transactionService.restore(transaction);
+            Utils.showAlert("Éxito", "Ingreso restaurado correctamente");
+            loadPageFromRepo(currentPage);
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error restaurando ingreso: {}", e.getMessage());
+            Utils.showAlert("Error", "No se pudo restaurar el ingreso: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Mostrar ingresos invalidados
+     */
+    @FXML
+    public void showInvalidatedIncomes() {
+        showingInvalidated = !showingInvalidated;
+        if (btnViewInvalidated != null) {
+            btnViewInvalidated.setText(showingInvalidated ? "Ver Activos" : "Ver Invalidados");
+        }
+        currentPage = 1;
+        loadPageFromRepo(currentPage);
     }
 }

@@ -44,6 +44,29 @@ public class LoginController {
                 return;
             }
 
+            // FASE 8: Verificar si el usuario está bloqueado
+            Integer userId = user.getInteger("id");
+            if (userId != null && userId == -1) {
+                // Usuario bloqueado (inactivo o eliminado)
+                String reason = user.getString("blocked_reason");
+                String status = user.getString("status");
+
+                String message = "Acceso Denegado\n\n" + reason + "\n\n";
+                if ("deleted".equals(status)) {
+                    message += "Este usuario ha sido eliminado del sistema.\n" +
+                              "Contacte al administrador para más información.";
+                } else if ("inactive".equals(status)) {
+                    message += "Este usuario ha sido desactivado temporalmente.\n" +
+                              "Contacte al administrador para reactivar su cuenta.";
+                } else {
+                    message += "Contacte al administrador del sistema.";
+                }
+
+                Utils.showAlert("Acceso Denegado", message);
+                Logs.warn(this.getClass(), "Intento de login bloqueado: username={}, status={}", username, status);
+                return;
+            }
+
             // Establecer sesión antes de cualquier auditoría (p.ej., cambio de contraseña forzado)
             Session.setCurrentUser(user);
 

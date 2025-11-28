@@ -13,9 +13,11 @@ import java.util.List;
 public class ReportRepository {
     // Reporte de usuarios con roles
     public Report usersWithRoles() {
+        // FASE 9: Excluir usuarios eliminados
         String sql = "SELECT u.id, u.name, u.username, r.nombre as role, u.created_at " +
                      "FROM users u " +
                      "LEFT JOIN roles r ON u.rol_id = r.id " +
+                     "WHERE u.status = 'active' " +
                      "ORDER BY u.name";
         Report res = new Report("Usuarios y roles");
         res.addHeader("ID"); res.addHeader("Nombre"); res.addHeader("Username"); res.addHeader("Rol"); res.addHeader("Creado");
@@ -41,7 +43,11 @@ public class ReportRepository {
 
     // Reporte de inventario total
     public Report inventoryTotal() {
-        String sql = "SELECT id, name, unit, current_stock, minimum_stock, created_at FROM products ORDER BY name";
+        // FASE 9: Excluir productos eliminados
+        String sql = "SELECT id, name, unit, current_stock, minimum_stock, created_at " +
+                     "FROM products " +
+                     "WHERE status = 'active' " +
+                     "ORDER BY name";
         Report res = new Report("Inventario total");
         res.addHeader("ID"); res.addHeader("Nombre"); res.addHeader("Unidad"); res.addHeader("Stock actual"); res.addHeader("Stock mínimo"); res.addHeader("Creado");
 
@@ -66,7 +72,11 @@ public class ReportRepository {
 
     // Reporte de inventario con stock bajo
     public Report inventoryLowStock() {
-        String sql = "SELECT id, name, unit, current_stock, minimum_stock FROM products WHERE current_stock <= minimum_stock ORDER BY current_stock ASC";
+        // FASE 9: Excluir productos eliminados
+        String sql = "SELECT id, name, unit, current_stock, minimum_stock " +
+                     "FROM products " +
+                     "WHERE current_stock <= minimum_stock AND status = 'active' " +
+                     "ORDER BY current_stock ASC";
         Report res = new Report("Inventario - Stock bajo");
         res.addHeader("ID"); res.addHeader("Nombre"); res.addHeader("Unidad"); res.addHeader("Stock actual"); res.addHeader("Stock mínimo");
 

@@ -12,6 +12,39 @@ import java.util.List;
 public class AuditService {
     private final AuditRepository repo = new AuditRepository();
 
+    // ===== CONSTANTES DE ACCIONES DE AUDITORÍA =====
+
+    // Acciones básicas
+    public static final String ACTION_CREATE = "create";
+    public static final String ACTION_UPDATE = "update";
+    public static final String ACTION_DELETE = "delete";
+    public static final String ACTION_READ = "read";
+
+    // Acciones de autenticación
+    public static final String ACTION_LOGIN = "login";
+    public static final String ACTION_LOGOUT = "logout";
+    public static final String ACTION_LOGIN_FAILED = "login_failed";
+    public static final String ACTION_LOGIN_BLOCKED = "login_blocked";
+
+    // Acciones de soft delete y restauración
+    public static final String ACTION_SOFT_DELETE = "soft_delete";
+    public static final String ACTION_HARD_DELETE = "hard_delete";
+    public static final String ACTION_RESTORE = "restore";
+
+    // Acciones de transacciones
+    public static final String ACTION_INVALIDATE = "invalidate";
+    public static final String ACTION_APPROVE = "approve";
+    public static final String ACTION_RETURN = "return";
+
+    // Acciones de estado
+    public static final String ACTION_MARK_ACTIVE = "mark_active";
+    public static final String ACTION_MARK_INACTIVE = "mark_inactive";
+
+    // Acciones de backup
+    public static final String ACTION_BACKUP_CREATE = "backup_create";
+    public static final String ACTION_BACKUP_RESTORE = "backup_restore";
+    public static final String ACTION_BACKUP_DELETE = "backup_delete";
+
     public void logAction(Integer userId, String action, String table, Integer recordId, String details) {
         DatabaseManager.runInConnection(() -> {
             Audit audit = new Audit();

@@ -49,11 +49,13 @@
             <TableView fx:id="tblPeople">
                 <columns>
                     <TableColumn fx:id="colId" prefWidth="60" text="ID" />
+                    <TableColumn fx:id="colStatus" prefWidth="100" text="Estado" />
                     <TableColumn fx:id="colDni" prefWidth="240" text="DNI" />
                     <TableColumn fx:id="colFirstName" prefWidth="200" text="Nombre" />
                     <TableColumn fx:id="colLastName" prefWidth="200" text="Apellido" />
                     <TableColumn fx:id="colPhone" prefWidth="180" text="Teléfono" />
                     <TableColumn fx:id="colInternalCode" prefWidth="180" text="Código Interno" />
+                    <TableColumn fx:id="colActions" prefWidth="120" text="Acciones" />
                 </columns>
             </TableView>
         </center>

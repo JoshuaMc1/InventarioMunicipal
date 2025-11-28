@@ -19,6 +19,8 @@
                 <Label text="Gestión de Roles y Permisos"
                        style="-fx-font-size: 24px; -fx-font-weight: bold;"/>
                 <Region HBox.hgrow="ALWAYS"/>
+                <Button fx:id="btnViewDeleted" text="Ver Eliminados" onAction="#showDeletedRoles"
+                        style="-fx-background-color: #6c757d; -fx-text-fill: white; -fx-padding: 10 20;"/>
                 <Button fx:id="btnNuevoRol" text="+ Nuevo Rol"
                         styleClass="btn-primary"
                         style="-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-padding: 10 20;"/>

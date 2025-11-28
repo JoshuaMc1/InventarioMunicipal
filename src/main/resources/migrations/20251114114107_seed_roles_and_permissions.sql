@@ -68,37 +68,66 @@ INSERT INTO permisos (modulo, accion, descripcion) VALUES
 
 -- Módulo: Configuración
 ('CONFIGURACION', 'READ', 'Ver configuración del sistema'),
-('CONFIGURACION', 'UPDATE', 'Modificar configuración del sistema');
+('CONFIGURACION', 'UPDATE', 'Modificar configuración del sistema'),
 
--- Asignar TODOS los permisos al rol ROOT
+-- Módulo: Sistema (Operaciones Destructivas y Visibilidad)
+('SISTEMA', 'DESTRUCTIVE_OPERATIONS', 'Permite ejecutar eliminaciones físicas permanentes'),
+('SISTEMA', 'VIEW_DELETED', 'Permite visualizar registros eliminados lógicamente'),
+
+-- Permisos de RESTORE por módulo
+('INVENTARIO', 'RESTORE', 'Restaurar productos eliminados'),
+('INGRESOS', 'RESTORE', 'Restaurar ingresos invalidados'),
+('EGRESOS', 'RESTORE', 'Restaurar egresos invalidados'),
+('PRESTAMOS', 'RESTORE', 'Restaurar préstamos invalidados'),
+('USUARIOS', 'RESTORE', 'Restaurar usuarios deshabilitados'),
+('ROLES', 'RESTORE', 'Restaurar roles deshabilitados'),
+('PERSONAS', 'RESTORE', 'Restaurar personas deshabilitadas');
+
+-- ====================================
+-- ASIGNACIÓN DE PERMISOS A ROLES
+-- ====================================
+
+-- 1. ROL ROOT: Acceso total sin restricciones
 INSERT INTO rol_permisos (rol_id, permiso_id)
 SELECT 1, id FROM permisos;
 
--- Asignar permisos al rol ADMIN (todos excepto auditoría y roles)
+-- 2. ROL ADMIN: Acceso completo excepto operaciones destructivas
+-- Tiene acceso a TODO incluyendo auditoría, roles, usuarios
+-- Puede ver eliminados y restaurar
+-- NO puede hacer eliminaciones físicas (DESTRUCTIVE_OPERATIONS es solo para ROOT)
 INSERT INTO rol_permisos (rol_id, permiso_id)
 SELECT 2, id FROM permisos
-WHERE modulo NOT IN ('AUDITORIA', 'ROLES');
+WHERE modulo != 'SISTEMA' OR accion != 'DESTRUCTIVE_OPERATIONS';
 
--- Asignar permisos al rol AUDITOR (solo lectura de auditoría y reportes)
+-- 3. ROL AUDITOR: Solo lectura de auditoría, reportes y puede ver eliminados
 INSERT INTO rol_permisos (rol_id, permiso_id)
 SELECT 3, id FROM permisos
 WHERE (modulo = 'AUDITORIA' AND accion IN ('READ', 'EXPORT'))
    OR (modulo = 'REPORTES' AND accion IN ('READ', 'GENERATE', 'EXPORT'))
-   OR (modulo = 'DASHBOARD' AND accion = 'READ');
+   OR (modulo = 'DASHBOARD' AND accion = 'READ')
+   OR (modulo = 'SISTEMA' AND accion = 'VIEW_DELETED')
+   OR (modulo = 'INVENTARIO' AND accion = 'READ')
+   OR (modulo = 'INGRESOS' AND accion = 'READ')
+   OR (modulo = 'EGRESOS' AND accion = 'READ')
+   OR (modulo = 'PRESTAMOS' AND accion = 'READ')
+   OR (modulo = 'PERSONAS' AND accion = 'READ')
+   OR (modulo = 'USUARIOS' AND accion = 'READ');
 
--- Asignar permisos al rol SUPERVISOR
+-- 4. ROL SUPERVISOR: Gestión completa de operaciones + puede restaurar
 INSERT INTO rol_permisos (rol_id, permiso_id)
 SELECT 4, id FROM permisos
-WHERE modulo IN ('DASHBOARD', 'INVENTARIO', 'INGRESOS', 'EGRESOS', 'PRESTAMOS', 'PERSONAS', 'REPORTES')
-  AND accion IN ('CREATE', 'READ', 'UPDATE', 'APPROVE', 'GENERATE', 'EXPORT');
+WHERE (modulo IN ('DASHBOARD', 'INVENTARIO', 'INGRESOS', 'EGRESOS', 'PRESTAMOS', 'PERSONAS', 'REPORTES')
+       AND accion IN ('CREATE', 'READ', 'UPDATE', 'DELETE', 'APPROVE', 'GENERATE', 'EXPORT'))
+   OR (modulo IN ('INVENTARIO', 'INGRESOS', 'EGRESOS', 'PRESTAMOS', 'PERSONAS') AND accion = 'RESTORE')
+   OR (modulo = 'SISTEMA' AND accion = 'VIEW_DELETED');
 
--- Asignar permisos al rol OPERADOR
+-- 5. ROL OPERADOR: Operaciones básicas sin eliminación ni restauración
 INSERT INTO rol_permisos (rol_id, permiso_id)
 SELECT 5, id FROM permisos
 WHERE modulo IN ('DASHBOARD', 'INVENTARIO', 'INGRESOS', 'EGRESOS', 'PRESTAMOS', 'PERSONAS')
   AND accion IN ('CREATE', 'READ', 'UPDATE');
 
--- Asignar permisos al rol CONSULTOR (solo lectura)
+-- 6. ROL CONSULTOR: Solo lectura en módulos operativos
 INSERT INTO rol_permisos (rol_id, permiso_id)
 SELECT 6, id FROM permisos
 WHERE accion IN ('READ', 'GENERATE', 'EXPORT')

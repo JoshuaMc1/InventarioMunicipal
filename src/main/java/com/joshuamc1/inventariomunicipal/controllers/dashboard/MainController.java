@@ -598,6 +598,8 @@ public class MainController {
         } catch (Throwable e) {
             Logs.error(this.getClass(), "Error cargando vista {}: {}", fxmlPath, e.getMessage());
             Utils.showAlert("Error", "No se pudo cargar la vista: " + fxmlPath + "\n" + e.getMessage());
+            e.printStackTrace();
+            Logs.trace(this.getClass(), e.getMessage(), e);
             loading.set(false);
             btnDashboard.setDisable(false);
             btnInventory.setDisable(false);

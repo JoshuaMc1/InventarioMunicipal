@@ -100,19 +100,228 @@ public class ProductService {
         } catch (Exception ignored) {}
     }
 
+    // ===== MÉTODOS DE SOFT DELETE Y RESTAURACIÓN =====
+
+    /**
+     * Elimina un producto (soft delete o hard delete según permisos)
+     * @param product Producto a eliminar
+     */
     public void delete(@NotNull Product product) {
+        Integer currentUserId = Session.getCurrentUserId();
         Integer id = product.getInteger("id");
         String name = product.getString("name");
-        DatabaseManager.runInConnection(() -> {
 
-            repo.delete(product);
-            auditService.logAction(
-                    Session.getCurrentUserId(),
-                    "delete",
+        // Verificar permisos
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INVENTARIO", "DELETE")) {
+            throw new SecurityException("No tiene permiso para eliminar productos");
+        }
+
+        // Decidir si hacer soft delete o hard delete
+        boolean canHardDelete = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "DESTRUCTIVE_OPERATIONS");
+
+        DatabaseManager.runInConnection(() -> {
+            if (canHardDelete) {
+                // Validar antes de hard delete
+                validateBeforeHardDelete(product);
+                repo.hardDelete(product);
+                auditService.logAction(
+                    currentUserId,
+                    "hard_delete",
                     "products",
                     id,
                     String.format("id=%s,name=%s", id, name)
+                );
+            } else {
+                // Soft delete
+                repo.softDelete(product, currentUserId);
+                auditService.logAction(
+                    currentUserId,
+                    "soft_delete",
+                    "products",
+                    id,
+                    String.format("id=%s,name=%s,status=%s", id, name, "deleted")
+                );
+            }
+        });
+    }
+
+    /**
+     * Soft delete explícito de un producto
+     * @param product Producto a eliminar lógicamente
+     */
+    public void softDelete(@NotNull Product product) {
+        Integer currentUserId = Session.getCurrentUserId();
+        Integer id = product.getInteger("id");
+        String name = product.getString("name");
+
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INVENTARIO", "DELETE")) {
+            throw new SecurityException("No tiene permiso para eliminar productos");
+        }
+
+        DatabaseManager.runInConnection(() -> {
+            repo.softDelete(product, currentUserId);
+            auditService.logAction(
+                currentUserId,
+                "soft_delete",
+                "products",
+                id,
+                String.format("id=%s,name=%s", id, name)
             );
         });
+    }
+
+    /**
+     * Eliminación física permanente (solo ROOT)
+     * @param product Producto a eliminar permanentemente
+     */
+    public void hardDelete(@NotNull Product product) {
+        Integer currentUserId = Session.getCurrentUserId();
+        Integer id = product.getInteger("id");
+        String name = product.getString("name");
+
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "DESTRUCTIVE_OPERATIONS")) {
+            throw new SecurityException("Solo ROOT puede ejecutar eliminaciones permanentes");
+        }
+
+        DatabaseManager.runInConnection(() -> {
+            // Validaciones antes de eliminar permanentemente
+            validateBeforeHardDelete(product);
+
+            repo.hardDelete(product);
+            auditService.logAction(
+                currentUserId,
+                "hard_delete",
+                "products",
+                id,
+                String.format("id=%s,name=%s [PERMANENT]", id, name)
+            );
+        });
+    }
+
+    /**
+     * Restaura un producto eliminado lógicamente
+     * @param product Producto a restaurar
+     */
+    public void restore(@NotNull Product product) {
+        Integer currentUserId = Session.getCurrentUserId();
+        Integer id = product.getInteger("id");
+        String name = product.getString("name");
+
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INVENTARIO", "RESTORE")) {
+            throw new SecurityException("No tiene permiso para restaurar productos");
+        }
+
+        if (!product.isDeleted()) {
+            throw new IllegalStateException("El producto no está eliminado");
+        }
+
+        DatabaseManager.runInConnection(() -> {
+            repo.restore(product);
+            auditService.logAction(
+                currentUserId,
+                "restore",
+                "products",
+                id,
+                String.format("id=%s,name=%s", id, name)
+            );
+        });
+    }
+
+    /**
+     * Cambia el estado de un producto a inactivo
+     * @param product Producto a desactivar
+     */
+    public void markAsInactive(@NotNull Product product) {
+        Integer currentUserId = Session.getCurrentUserId();
+        Integer id = product.getInteger("id");
+
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INVENTARIO", "UPDATE")) {
+            throw new SecurityException("No tiene permiso para modificar productos");
+        }
+
+        DatabaseManager.runInConnection(() -> {
+            product.markAsInactive();
+            auditService.logAction(
+                currentUserId,
+                "mark_inactive",
+                "products",
+                id,
+                "status=inactive"
+            );
+        });
+    }
+
+    /**
+     * Cambia el estado de un producto a activo
+     * @param product Producto a activar
+     */
+    public void markAsActive(@NotNull Product product) {
+        Integer currentUserId = Session.getCurrentUserId();
+        Integer id = product.getInteger("id");
+
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INVENTARIO", "UPDATE")) {
+            throw new SecurityException("No tiene permiso para modificar productos");
+        }
+
+        DatabaseManager.runInConnection(() -> {
+            product.markAsActive();
+            auditService.logAction(
+                currentUserId,
+                "mark_active",
+                "products",
+                id,
+                "status=active"
+            );
+        });
+    }
+
+    // ===== MÉTODOS DE BÚSQUEDA AVANZADA =====
+
+    /**
+     * Lista todos los productos incluyendo eliminados (requiere permiso VIEW_DELETED)
+     */
+    public List<Product> findAllIncludingDeleted() {
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "VIEW_DELETED")) {
+            throw new SecurityException("No tiene permiso para ver productos eliminados");
+        }
+        return DatabaseManager.callInConnection(repo::findAllIncludingDeleted);
+    }
+
+    /**
+     * Lista solo productos eliminados (requiere permiso VIEW_DELETED)
+     */
+    public List<Product> findDeleted() {
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "VIEW_DELETED")) {
+            throw new SecurityException("No tiene permiso para ver productos eliminados");
+        }
+        return DatabaseManager.callInConnection(repo::findDeleted);
+    }
+
+    /**
+     * Cuenta productos eliminados
+     */
+    public long countDeleted() {
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "VIEW_DELETED")) {
+            return 0L;
+        }
+        return DatabaseManager.callInConnection(repo::countDeleted);
+    }
+
+    // ===== VALIDACIONES DE NEGOCIO =====
+
+    /**
+     * Valida si un producto puede ser eliminado permanentemente
+     * @param product Producto a validar
+     */
+    private void validateBeforeHardDelete(@NotNull Product product) {
+        // No permitir eliminar productos con transacciones activas
+        // Esta validación se puede implementar cuando sea necesario
+        // Por ahora solo verificamos el estado
+        if (product.isActive()) {
+            throw new IllegalStateException(
+                "No se puede eliminar permanentemente un producto activo. " +
+                "Primero debe marcarse como eliminado."
+            );
+        }
     }
 }

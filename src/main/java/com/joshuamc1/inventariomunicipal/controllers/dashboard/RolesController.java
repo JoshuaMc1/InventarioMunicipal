@@ -212,46 +212,7 @@ public class RolesController {
     }
 
     private void onEliminarRol(@NotNull Rol rol) {
-        // Validar permiso ROLES.DELETE (Solo ROOT)
-        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("ROLES", "DELETE")) {
-            return;
-        }
-
-        // VALIDACIÓN ESPECIAL 1: No eliminar roles del sistema
-        String nombreRol = rol.getString("nombre");
-        java.util.List<String> rolesDelSistema = java.util.Arrays.asList("ROOT", "ADMIN", "AUDITOR", "SUPERVISOR", "OPERADOR", "CONSULTOR");
-
-        if (nombreRol != null && rolesDelSistema.contains(nombreRol)) {
-            Utils.showAlert("Error", "No se puede eliminar un rol del sistema: " + nombreRol);
-            Logs.warn(getClass(), "Intento de eliminar rol del sistema bloqueado: {}", nombreRol);
-            return;
-        }
-
-        // VALIDACIÓN ESPECIAL 2: No eliminar roles con usuarios asignados
-        int cantidadUsuarios = rol.getUsuarios().size();
-        if (cantidadUsuarios > 0) {
-            Utils.showAlert("Error",
-                "No se puede eliminar el rol porque tiene " + cantidadUsuarios + " usuario(s) asignado(s)");
-            Logs.warn(getClass(), "Intento de eliminar rol con usuarios asignados bloqueado");
-            return;
-        }
-
-        Alert confirm = new Alert(Alert.AlertType.CONFIRMATION,
-            "¿Está seguro de eliminar el rol '" + rol.getString("nombre") + "'?",
-            ButtonType.YES, ButtonType.NO);
-
-        confirm.showAndWait().ifPresent(btn -> {
-            if (btn == ButtonType.YES) {
-                try {
-                    rol.delete();
-                    cargarRoles();
-                    Utils.showAlert("Éxito", "Rol eliminado correctamente");
-                } catch (Exception e) {
-                    Logs.error(getClass(), "Error eliminando rol: {}", e.getMessage());
-                    Utils.showAlert("Error", "No se pudo eliminar el rol: " + e.getMessage());
-                }
-            }
-        });
+        deleteSelectedRole(rol);
     }
 
     private void onGestionarPermisos(Rol rol) {
@@ -482,6 +443,235 @@ public class RolesController {
         });
 
         return dialog;
+    }
+
+    // ===== MÉTODOS DE SOFT DELETE Y RESTAURACIÓN =====
+
+    /**
+     * Elimina un rol (soft delete o hard delete según permisos)
+     */
+    private void deleteSelectedRole(Rol rol) {
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("ROLES", "DELETE")) {
+            return;
+        }
+
+        // VALIDACIÓN ESPECIAL 1: No eliminar roles del sistema
+        String nombreRol = rol.getString("nombre");
+        java.util.List<String> rolesDelSistema = java.util.Arrays.asList("ROOT", "ADMIN", "AUDITOR", "SUPERVISOR", "OPERADOR", "CONSULTOR");
+
+        if (nombreRol != null && rolesDelSistema.contains(nombreRol)) {
+            Utils.showAlert("Error", "No se puede eliminar un rol del sistema: " + nombreRol);
+            Logs.warn(getClass(), "Intento de eliminar rol del sistema bloqueado: {}", nombreRol);
+            return;
+        }
+
+        // VALIDACIÓN ESPECIAL 2: No eliminar roles con usuarios activos asignados
+        com.joshuamc1.inventariomunicipal.services.RolService rolService = new com.joshuamc1.inventariomunicipal.services.RolService();
+        if (rolService.hasActiveUsers(rol.getInteger("id"))) {
+            Utils.showAlert("Error",
+                "No se puede eliminar el rol porque tiene usuarios activos asignados.\n\n" +
+                "Debe primero reasignar o eliminar los usuarios de este rol.");
+            Logs.warn(getClass(), "Intento de eliminar rol con usuarios activos bloqueado");
+            return;
+        }
+
+        boolean canHardDelete = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "DESTRUCTIVE_OPERATIONS");
+
+        if (canHardDelete) {
+            showDeleteOptionsDialog(rol);
+        } else {
+            boolean ok = Utils.confirmAction("Confirmar Eliminación",
+                "¿Desea eliminar el rol: " + rol.getString("nombre") + "?\n\n" +
+                "Nota: Esta eliminación es reversible.");
+            if (!ok) return;
+
+            try {
+                rolService.softDelete(rol);
+                Utils.showAlert("Éxito", "Rol eliminado correctamente");
+                cargarRoles();
+            } catch (Exception e) {
+                Logs.error(getClass(), "Error eliminando rol", e);
+                Utils.showAlert("Error", "No se pudo eliminar el rol: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Muestra dialog con opciones de eliminación (solo para ROOT)
+     */
+    private void showDeleteOptionsDialog(Rol rol) {
+        Dialog<String> dialog = new Dialog<>();
+        dialog.setTitle("Opciones de Eliminación");
+        dialog.setHeaderText("Rol: " + rol.getString("nombre"));
+
+        ButtonType softDeleteBtn = new ButtonType("Eliminación Lógica", ButtonBar.ButtonData.OK_DONE);
+        ButtonType hardDeleteBtn = new ButtonType("Eliminación Permanente", ButtonBar.ButtonData.OTHER);
+        dialog.getDialogPane().getButtonTypes().addAll(softDeleteBtn, hardDeleteBtn, ButtonType.CANCEL);
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(15);
+        grid.setPadding(new Insets(20));
+
+        Label lblInfo = new Label("Seleccione el tipo de eliminación:");
+        lblInfo.setStyle("-fx-font-size: 14px; -fx-font-weight: bold;");
+
+        Label lblSoft = new Label("• Eliminación Lógica: Reversible, se puede restaurar");
+        lblSoft.setStyle("-fx-font-size: 13px;");
+        Label lblHard = new Label("• Eliminación Permanente: No reversible, se borra definitivamente");
+        lblHard.setStyle("-fx-font-size: 13px; -fx-text-fill: #d60000;");
+
+        grid.add(lblInfo, 0, 0);
+        grid.add(lblSoft, 0, 1);
+        grid.add(lblHard, 0, 2);
+
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(btn -> {
+            if (btn == softDeleteBtn) return "soft";
+            if (btn == hardDeleteBtn) return "hard";
+            return null;
+        });
+
+        com.joshuamc1.inventariomunicipal.services.RolService rolService = new com.joshuamc1.inventariomunicipal.services.RolService();
+
+        dialog.showAndWait().ifPresent(type -> {
+            try {
+                if ("soft".equals(type)) {
+                    rolService.softDelete(rol);
+                    Utils.showAlert("Éxito", "Rol eliminado lógicamente");
+                } else if ("hard".equals(type)) {
+                    boolean confirm = Utils.confirmAction("⚠️ CONFIRMACIÓN FINAL",
+                        "¿Está COMPLETAMENTE SEGURO de eliminar permanentemente?\n\n" +
+                        "Esta acción NO SE PUEDE DESHACER.\n\n" +
+                        "Rol: " + rol.getString("nombre"));
+                    if (confirm) {
+                        rolService.hardDelete(rol);
+                        Utils.showAlert("Éxito", "Rol eliminado permanentemente");
+                    } else {
+                        return;
+                    }
+                }
+                cargarRoles();
+            } catch (Exception e) {
+                Logs.error(getClass(), "Error eliminando rol", e);
+                Utils.showAlert("Error", "No se pudo eliminar el rol: " + e.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Muestra vista de roles eliminados
+     */
+    @FXML
+    private void showDeletedRoles() {
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "VIEW_DELETED")) {
+            Utils.showAlert("Acceso Denegado", "No tiene permiso para ver roles eliminados");
+            return;
+        }
+
+        javafx.concurrent.Task<List<Rol>> task = new javafx.concurrent.Task<>() {
+            @Override
+            protected List<Rol> call() {
+                com.joshuamc1.inventariomunicipal.config.DatabaseConfig.openConnection();
+                try {
+                    com.joshuamc1.inventariomunicipal.services.RolService rolService = new com.joshuamc1.inventariomunicipal.services.RolService();
+                    return rolService.findDeleted();
+                } finally {
+                    com.joshuamc1.inventariomunicipal.config.DatabaseConfig.closeConnection();
+                }
+            }
+        };
+
+        task.setOnSucceeded(evt -> {
+            List<Rol> deletedRoles = task.getValue();
+            if (deletedRoles.isEmpty()) {
+                Utils.showAlert("Información", "No hay roles eliminados");
+                return;
+            }
+            showDeletedRolesDialog(deletedRoles);
+        });
+        task.setOnFailed(evt -> {
+            Utils.showAlert("Error", "No se pudieron cargar los roles eliminados");
+        });
+
+        Thread th = new Thread(task);
+        th.setDaemon(true);
+        th.start();
+    }
+
+    /**
+     * Dialog para mostrar y restaurar roles eliminados
+     */
+    private void showDeletedRolesDialog(List<Rol> deletedRoles) {
+        Dialog<Void> dialog = new Dialog<>();
+        dialog.setTitle("Roles Eliminados");
+        dialog.setHeaderText("Total: " + deletedRoles.size() + " rol(es)");
+
+        TableView<Rol> table = new TableView<>();
+        table.setItems(javafx.collections.FXCollections.observableArrayList(deletedRoles));
+
+        TableColumn<Rol, Number> colId = new TableColumn<>("ID");
+        colId.setCellValueFactory(c -> new SimpleIntegerProperty(c.getValue().getInteger("id")));
+
+        TableColumn<Rol, String> colNombre = new TableColumn<>("Nombre");
+        colNombre.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("nombre")));
+
+        TableColumn<Rol, String> colDeletedAt = new TableColumn<>("Eliminado");
+        colDeletedAt.setCellValueFactory(c -> {
+            Object deletedAt = c.getValue().get("deleted_at");
+            return new SimpleStringProperty(deletedAt != null ? deletedAt.toString() : "N/A");
+        });
+
+        TableColumn<Rol, Void> colRestore = new TableColumn<>("Acción");
+        colRestore.setCellFactory(col -> new TableCell<>() {
+            private final Button btnRestore = new Button("Restaurar");
+            {
+                btnRestore.setStyle("-fx-background-color: #28a745; -fx-text-fill: white;");
+                btnRestore.setOnAction(e -> {
+                    Rol r = getTableView().getItems().get(getIndex());
+                    restoreRole(r, dialog);
+                });
+            }
+
+            @Override
+            protected void updateItem(Void item, boolean empty) {
+                super.updateItem(item, empty);
+                setGraphic(empty ? null : btnRestore);
+            }
+        });
+
+        table.getColumns().addAll(colId, colNombre, colDeletedAt, colRestore);
+        table.setPrefHeight(400);
+
+        dialog.getDialogPane().setContent(table);
+        dialog.getDialogPane().getButtonTypes().add(ButtonType.CLOSE);
+        dialog.showAndWait();
+    }
+
+    /**
+     * Restaura un rol eliminado
+     */
+    private void restoreRole(Rol rol, Dialog<Void> parentDialog) {
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("ROLES", "RESTORE")) {
+            Utils.showAlert("Acceso Denegado", "No tiene permiso para restaurar roles");
+            return;
+        }
+
+        boolean ok = Utils.confirmAction("Confirmar Restauración",
+            "¿Desea restaurar el rol: " + rol.getString("nombre") + "?");
+        if (!ok) return;
+
+        try {
+            com.joshuamc1.inventariomunicipal.services.RolService rolService = new com.joshuamc1.inventariomunicipal.services.RolService();
+            rolService.restore(rol);
+            Utils.showAlert("Éxito", "Rol restaurado correctamente");
+            parentDialog.close();
+            cargarRoles();
+        } catch (Exception e) {
+            Logs.error(getClass(), "Error restaurando rol", e);
+            Utils.showAlert("Error", "No se pudo restaurar el rol: " + e.getMessage());
+        }
     }
 }
 

@@ -34,6 +34,10 @@
                 <font>
                    <Font name="System Bold" size="14.0" />
                 </font></Button>
+                <Button fx:id="btnToggleStatus" onAction="#toggleUserStatus" text="Activar/Desactivar" style="-fx-background-color: #17a2b8; -fx-text-fill: white;">
+                <font>
+                   <Font name="System Bold" size="14.0" />
+                </font></Button>
                 <Button onAction="#onResetPassword" text="Restablecer contraseña">
                 <font>
                    <Font name="System Bold" size="14.0" />
@@ -49,10 +53,12 @@
             <TableView fx:id="tblUsers">
                 <columns>
                     <TableColumn fx:id="colId" prefWidth="60" text="ID" />
+                    <TableColumn fx:id="colStatus" prefWidth="100" text="Estado" />
                     <TableColumn fx:id="colName" prefWidth="220" text="Nombre" />
                     <TableColumn fx:id="colUsername" prefWidth="220" text="Usuario" />
                     <TableColumn fx:id="colRole" prefWidth="200" text="Rol" />
                     <TableColumn fx:id="colCreated" prefWidth="200" text="Creado" />
+                    <TableColumn fx:id="colActions" prefWidth="120" text="Acciones" />
                 </columns>
             </TableView>
         </center>
