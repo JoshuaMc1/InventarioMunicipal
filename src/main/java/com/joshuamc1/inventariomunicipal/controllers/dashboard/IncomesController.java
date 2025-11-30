@@ -29,14 +29,15 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.LocalDate;
 import java.util.List;
 
+@SuppressWarnings("ALL")
 public class IncomesController {
     @FXML
     private TableView<Transaction> tblTransactions;
@@ -225,6 +226,7 @@ public class IncomesController {
         });
 
         colId.setStyle("-fx-font-size: 17;");
+        colStatus.setStyle("-fx-font-size: 17;");
         colProduct.setStyle("-fx-font-size: 17;");
         colQuantity.setStyle("-fx-font-size: 17;");
         colItems.setStyle("-fx-font-size: 17;");
@@ -375,7 +377,7 @@ public class IncomesController {
     @FXML
     public void onNewMultiProduct() {
         // Validar permiso específico del módulo INGRESOS antes de crear
-        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.validateAndShow("INGRESOS", "CREATE")) {
+        if (!PermissionHelper.validateAndShow("INGRESOS", "CREATE")) {
             return;
         }
 
@@ -393,7 +395,6 @@ public class IncomesController {
                 boolean isReturn = (Boolean) dialogData.getOrDefault("isReturn", false);
 
                 if (isReturn) {
-                    // FASE 10: DEVOLUCIÓN DE PRÉSTAMO
                     String loanCode = (String) dialogData.get("loanCode");
                     String returnTypeDisplay = (String) dialogData.get("returnType");
                     String returnNotes = (String) dialogData.getOrDefault("returnNotes", "");
@@ -468,7 +469,8 @@ public class IncomesController {
     /**
      * FASE 10: Convierte el tipo de devolución de display a valor de BD
      */
-    private String mapReturnType(String displayType) {
+    @Contract(pure = true)
+    private @NotNull String mapReturnType(@NotNull String displayType) {
         return switch (displayType) {
             case "Mismo Producto (Devuelto)" -> "same_product";
             case "Comprado/Pagado" -> "purchased";
@@ -565,18 +567,14 @@ public class IncomesController {
         CheckBox chkIsReturn = new CheckBox("Este ingreso es una devolución de préstamo");
         chkIsReturn.setStyle("-fx-font-size: 14px; -fx-font-weight: bold; -fx-text-fill: #FF5722;");
 
-        TextField txtLoanCode = new TextField();
-        txtLoanCode.setPromptText("Código del préstamo (ej: P-JA20251127-001)");
-        txtLoanCode.setStyle("-fx-font-size: 17;");
-        txtLoanCode.visibleProperty().bind(chkIsReturn.selectedProperty());
-        txtLoanCode.managedProperty().bind(chkIsReturn.selectedProperty());
-
-        // Botón de búsqueda de préstamo
-        Button btnSearchLoan = new Button("🔍 Buscar");
-        btnSearchLoan.setStyle("-fx-font-size: 14px; -fx-background-color: #2196F3; -fx-text-fill: white; -fx-cursor: hand;");
-        btnSearchLoan.setTooltip(new Tooltip("Buscar préstamo por código"));
-        btnSearchLoan.visibleProperty().bind(chkIsReturn.selectedProperty());
-        btnSearchLoan.managedProperty().bind(chkIsReturn.selectedProperty());
+        // ComboBox editable con autocompletado para códigos de préstamo
+        ComboBox<String> cmbLoanCode = new ComboBox<>();
+        cmbLoanCode.setEditable(true);
+        cmbLoanCode.setPromptText("Escribe el código del préstamo...");
+        cmbLoanCode.setMaxWidth(Double.MAX_VALUE);
+        cmbLoanCode.setStyle("-fx-font-size: 17;");
+        cmbLoanCode.visibleProperty().bind(chkIsReturn.selectedProperty());
+        cmbLoanCode.managedProperty().bind(chkIsReturn.selectedProperty());
 
         // Label para información del préstamo
         Label lblLoanInfo = new Label();
@@ -589,23 +587,92 @@ public class IncomesController {
         // Variable para almacenar el préstamo encontrado
         final Transaction[] foundLoan = {null};
 
-        // Búsqueda automática mientras escribe (con debounce)
+        // Bandera para evitar que el listener limpie cuando se selecciona del dropdown
+        final boolean[] isSelecting = {false};
+
+        // Búsqueda con autocompletado (debounce de 500ms)
         PauseTransition loanSearchDebounce = new PauseTransition(Duration.millis(500));
-        txtLoanCode.textProperty().addListener((obs, oldVal, newVal) -> {
+
+        cmbLoanCode.getEditor().textProperty().addListener((obs, oldVal, newVal) -> {
+            // Si está en proceso de selección, no hacer nada
+            if (isSelecting[0]) {
+                return;
+            }
+
             loanSearchDebounce.stop();
+
+            // Limpiar info si está vacío
             if (newVal == null || newVal.trim().isEmpty()) {
+                cmbLoanCode.getItems().clear();
+                cmbLoanCode.hide();
                 lblLoanInfo.setText("");
                 lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-background-color: #f5f5f5; -fx-border-color: #ddd; -fx-border-radius: 5; -fx-background-radius: 5;");
                 foundLoan[0] = null;
                 return;
             }
 
+            // Buscar préstamos mientras escribe (con debounce)
             loanSearchDebounce.setOnFinished(e -> {
-                String code = newVal.trim();
+                String searchText = newVal.trim();
+
+                // Buscar solo si hay al menos 2 caracteres
+                if (searchText.length() < 2) {
+                    return;
+                }
+
                 new Thread(() -> {
                     try {
-                        Transaction loan = transactionService.findByLoanCode(code);
+                        // Buscar préstamos pendientes que coincidan
+                        List<Transaction> matchingLoans = transactionService.searchPendingLoansByCode(searchText);
+
                         Platform.runLater(() -> {
+                            // No limpiar si el texto coincide exactamente con un item existente
+                            // (esto significa que el usuario acaba de seleccionar del dropdown)
+                            if (cmbLoanCode.getItems().contains(searchText)) {
+                                return;
+                            }
+
+                            cmbLoanCode.getItems().clear();
+
+                            if (matchingLoans != null && !matchingLoans.isEmpty()) {
+                                // Agregar códigos al ComboBox
+                                for (Transaction loan : matchingLoans) {
+                                    String code = loan.getString("loan_code");
+                                    if (code != null) {
+                                        cmbLoanCode.getItems().add(code);
+                                    }
+                                }
+
+                                // Mostrar dropdown solo si hay resultados
+                                if (!cmbLoanCode.getItems().isEmpty()) {
+                                    cmbLoanCode.show();
+                                }
+                            }
+                        });
+                    } catch (Exception ex) {
+                        Logs.error(IncomesController.class,"Error buscando préstamos: " + ex.getMessage(), ex);
+                    }
+                }).start();
+            });
+
+            loanSearchDebounce.playFromStart();
+        });
+
+        // Cuando selecciona un código del dropdown, cargar información completa
+        cmbLoanCode.setOnAction(e -> {
+            String selectedCode = cmbLoanCode.getValue();
+            if (selectedCode == null || selectedCode.trim().isEmpty()) {
+                return;
+            }
+
+            // Activar bandera para evitar que el listener interfiera
+            isSelecting[0] = true;
+
+            new Thread(() -> {
+                try {
+                    Transaction loan = transactionService.findByLoanCode(selectedCode.trim());
+                    Platform.runLater(() -> {
+                        try {
                             if (loan == null) {
                                 lblLoanInfo.setText("❌ Préstamo no encontrado");
                                 lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #f44336; -fx-background-color: #ffebee; -fx-border-color: #f44336; -fx-border-radius: 5; -fx-background-radius: 5;");
@@ -622,58 +689,88 @@ public class IncomesController {
                                     lblLoanInfo.setText("⚠️ Este préstamo " + statusMsg);
                                     lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #ff9800; -fx-background-color: #fff3e0; -fx-border-color: #ff9800; -fx-border-radius: 5; -fx-background-radius: 5;");
                                     foundLoan[0] = null;
-                                } else {
-                                    // Préstamo válido encontrado
-                                    Person person = loan.parent(Person.class);
-                                    String personName = person != null ? person.getFullName() : "N/A";
-                                    String expectedDate = loan.getString("expected_return_date");
-                                    int totalItems = loan.getInteger("total_items") != null ? loan.getInteger("total_items") : 0;
+                            } else {
+                                // Préstamo válido encontrado
+                                Person person = loan.parent(Person.class);
+                                String personName = person != null ? person.getFullName() : "N/A";
+                                String expectedDate = loan.getString("expected_return_date");
+                                int totalItems = loan.getInteger("total_items") != null ? loan.getInteger("total_items") : 0;
 
-                                    lblLoanInfo.setText(String.format(
-                                        "✅ Préstamo Encontrado\n" +
-                                        "Persona: %s\n" +
-                                        "Fecha: %s | Fecha Esperada Devolución: %s\n" +
-                                        "Productos: %d items",
-                                        personName,
-                                        loan.getString("date"),
-                                        expectedDate != null ? expectedDate : "No especificada",
-                                        totalItems
-                                    ));
-                                    lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #4CAF50; -fx-background-color: #e8f5e9; -fx-border-color: #4CAF50; -fx-border-radius: 5; -fx-background-radius: 5;");
-                                    foundLoan[0] = loan;
+                                lblLoanInfo.setText(String.format(
+                                    "✅ Préstamo Encontrado - Productos cargados automáticamente\n" +
+                                    "Persona: %s\n" +
+                                    "Fecha: %s | Fecha Esperada Devolución: %s\n" +
+                                    "Productos: %d items",
+                                    personName,
+                                    loan.getString("date"),
+                                    expectedDate != null ? expectedDate : "No especificada",
+                                    totalItems
+                                ));
+                                lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #4CAF50; -fx-background-color: #e8f5e9; -fx-border-color: #4CAF50; -fx-border-radius: 5; -fx-background-radius: 5;");
+                                foundLoan[0] = loan;
+
+                                // AUTOCOMPLETAR: Seleccionar la persona del préstamo
+                                if (person != null) {
+                                    Integer personId = person.getInteger("id");
+
+                                    // Buscar la persona en la lista masterPeople por ID
+                                    Person personInList = masterPeople.stream()
+                                        .filter(p -> p.getInteger("id").equals(personId))
+                                        .findFirst()
+                                        .orElse(null);
+
+                                    if (personInList != null) {
+                                        // Si la persona ya está en la lista, usarla
+                                        cmbPerson.setValue(personInList);
+                                    } else {
+                                        // Si no está, agregarla y seleccionarla
+                                        masterPeople.add(person);
+                                        cmbPerson.setValue(person);
+                                    }
+                                }
+
+                                // AUTOCOMPLETAR: Cargar los productos del préstamo automáticamente
+                                items.clear(); // Limpiar items actuales
+                                List<TransactionItem> loanItems = loan.getAll(TransactionItem.class);
+
+                                for (TransactionItem loanItem : loanItems) {
+                                    Product product = loanItem.parent(Product.class);
+                                    if (product != null) {
+                                        double quantity = loanItem.getDouble("quantity");
+                                        String itemNotes = loanItem.getString("notes");
+
+                                        // Crear DTO con los datos del préstamo usando el constructor correcto
+                                        TransactionItemDTO dto = new TransactionItemDTO(
+                                            product.getInteger("id"),
+                                            quantity,
+                                            itemNotes != null ? "Devolución: " + itemNotes : "Devolución de préstamo",
+                                            product.getString("name")
+                                        );
+
+                                        items.add(dto);
+                                    }
                                 }
                             }
-                        });
-                    } catch (Exception ex) {
-                        Platform.runLater(() -> {
+                            }
+                        } finally {
+                            // Desactivar bandera después de procesar
+                            isSelecting[0] = false;
+                        }
+                    });
+                } catch (Exception ex) {
+                    Platform.runLater(() -> {
+                        try {
                             lblLoanInfo.setText("❌ Error al buscar préstamo");
                             lblLoanInfo.setStyle("-fx-font-size: 14px; -fx-padding: 5; -fx-text-fill: #f44336; -fx-background-color: #ffebee; -fx-border-color: #f44336; -fx-border-radius: 5; -fx-background-radius: 5;");
                             foundLoan[0] = null;
-                        });
-                    }
-                }).start();
-            });
-            loanSearchDebounce.playFromStart();
+                        } finally {
+                            // Desactivar bandera en caso de error
+                            isSelecting[0] = false;
+                        }
+                    });
+                }
+            }).start();
         });
-
-        // Acción del botón de búsqueda (forzar búsqueda inmediata)
-        btnSearchLoan.setOnAction(e -> {
-            loanSearchDebounce.stop();
-            String code = txtLoanCode.getText();
-            if (code == null || code.trim().isEmpty()) {
-                Utils.showAlert("Aviso", "Ingrese un código de préstamo");
-                return;
-            }
-            // Disparar búsqueda manualmente
-            txtLoanCode.setText(code + " "); // Truco para disparar listener
-            txtLoanCode.setText(code.trim());
-        });
-
-        // HBox para código de préstamo + botón
-        HBox loanCodeBox = new HBox(5, txtLoanCode, btnSearchLoan);
-        HBox.setHgrow(txtLoanCode, Priority.ALWAYS);
-        loanCodeBox.visibleProperty().bind(chkIsReturn.selectedProperty());
-        loanCodeBox.managedProperty().bind(chkIsReturn.selectedProperty());
 
         ComboBox<String> cmbReturnType = new ComboBox<>();
         cmbReturnType.getItems().addAll(
@@ -794,7 +891,7 @@ public class IncomesController {
         gp.add(new javafx.scene.control.Separator(), 0, row++, 4, 1);
         gp.add(chkIsReturn, 0, row++, 4, 1);
         gp.add(lblLoanCode, 0, row);
-        gp.add(loanCodeBox, 1, row++, 3, 1);
+        gp.add(cmbLoanCode, 1, row++, 3, 1);
         gp.add(lblLoanInfo, 0, row++, 4, 1);
         gp.add(lblReturnType, 0, row);
         gp.add(cmbReturnType, 1, row++, 3, 1);
@@ -838,9 +935,10 @@ public class IncomesController {
                 // Datos de devolución
                 dialogData.put("isReturn", chkIsReturn.isSelected());
                 if (chkIsReturn.isSelected()) {
-                    dialogData.put("loanCode", txtLoanCode.getText());
+                    dialogData.put("loanCode", cmbLoanCode.getValue());
                     dialogData.put("returnType", cmbReturnType.getValue());
                     dialogData.put("returnNotes", txtReturnNotes.getText());
+                    dialogData.put("foundLoan", foundLoan[0]); // Pasar el préstamo encontrado
                 }
 
                 d.getDialogPane().setUserData(dialogData);
@@ -1117,13 +1215,13 @@ public class IncomesController {
      */
     private void setupPermissions() {
         // Verificar permiso de invalidar (DELETE en ingresos)
-        canInvalidate = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INGRESOS", "DELETE");
+        canInvalidate = PermissionHelper.canAccess("INGRESOS", "DELETE");
 
         // Verificar permiso de restaurar
-        canRestore = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("INGRESOS", "RESTORE");
+        canRestore = PermissionHelper.canAccess("INGRESOS", "RESTORE");
 
         // Verificar permiso de ver eliminados
-        canViewDeleted = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "VIEW_DELETED");
+        canViewDeleted = PermissionHelper.canAccess("SISTEMA", "VIEW_DELETED");
 
         // Configurar botón ver invalidados
         if (btnViewInvalidated != null) {

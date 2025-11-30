@@ -3,6 +3,7 @@ package com.joshuamc1.inventariomunicipal.services;
 import com.github.anastaciocintra.escpos.EscPos;
 import com.github.anastaciocintra.escpos.EscPosConst;
 import com.github.anastaciocintra.escpos.Style;
+import com.github.anastaciocintra.escpos.barcode.BarCode;
 import com.github.anastaciocintra.escpos.image.*;
 import com.github.anastaciocintra.output.PrinterOutputStream;
 import com.itextpdf.io.image.ImageDataFactory;
@@ -17,7 +18,12 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
 import com.joshuamc1.inventariomunicipal.models.*;
 import com.joshuamc1.inventariomunicipal.models.dto.LoanReceiptDTO;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.oned.Code128Writer;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,7 +31,7 @@ import javax.imageio.ImageIO;
 import javax.print.PrintService;
 import javax.print.PrintServiceLookup;
 import java.awt.image.BufferedImage;
-import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,6 +47,46 @@ public class LoanReceiptService {
     private static final Logger logger = LoggerFactory.getLogger(LoanReceiptService.class);
     private static final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy");
     private static final SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+
+    /**
+     * Normaliza el texto para impresoras térmicas
+     * Convierte caracteres especiales a su equivalente ASCII
+     */
+    private static @NotNull String normalizeText(String text) {
+        if (text == null) return "";
+
+        // Reemplazar caracteres especiales del español
+        return text
+            .replace("á", "a").replace("Á", "A")
+            .replace("é", "e").replace("É", "E")
+            .replace("í", "i").replace("Í", "I")
+            .replace("ó", "o").replace("Ó", "O")
+            .replace("ú", "u").replace("Ú", "U")
+            .replace("ñ", "n").replace("Ñ", "N")
+            .replace("ü", "u").replace("Ü", "U")
+            // Caracteres problemáticos
+            .replace("°", "o")
+            .replace("¿", "?")
+            .replace("¡", "!");
+    }
+
+    /**
+     * Genera un código de barras CODE128 como imagen
+     * @param barcodeText Texto a codificar en el código de barras
+     * @param width Ancho de la imagen en píxeles
+     * @param height Alto de la imagen en píxeles
+     * @return BufferedImage con el código de barras
+     */
+    private static @Nullable BufferedImage generateBarcodeImage(String barcodeText, int width, int height) {
+        try {
+            Code128Writer barcodeWriter = new Code128Writer();
+            BitMatrix bitMatrix = barcodeWriter.encode(barcodeText, BarcodeFormat.CODE_128, width, height);
+            return MatrixToImageWriter.toBufferedImage(bitMatrix);
+        } catch (Exception e) {
+            logger.error("Error generando código de barras: " + e.getMessage(), e);
+            return null;
+        }
+    }
 
     /**
      * Obtiene la lista de impresoras disponibles en el sistema
@@ -146,12 +192,53 @@ public class LoanReceiptService {
     }
 
     /**
+     * Imprime el recibo de préstamo en una impresora térmica usando un DTO
+     * Este método es seguro para usar en hilos secundarios ya que no accede a la BD
+     * @param receiptDTO DTO con los datos del recibo
+     * @param printerName Nombre de la impresora
+     * @param copies Número de copias a imprimir
+     * @throws Exception Si ocurre un error durante la impresión
+     */
+    public static void printReceiptFromDTO(LoanReceiptDTO receiptDTO, String printerName, int copies) throws Exception {
+        if (receiptDTO == null) {
+            throw new IllegalArgumentException("El DTO no puede ser nulo");
+        }
+
+        PrintService printService = findPrintService(printerName);
+        if (printService == null) {
+            throw new Exception("No se encontró la impresora: " + printerName);
+        }
+
+        for (int i = 0; i < copies; i++) {
+            try (PrinterOutputStream printerOutputStream = new PrinterOutputStream(printService);
+                 EscPos escpos = new EscPos(printerOutputStream)) {
+
+                printReceiptContentFromDTO(escpos, receiptDTO, i == 0 ? "ORIGINAL" : "COPIA");
+
+                escpos.feed(5);
+                escpos.cut(EscPos.CutMode.FULL);
+
+            } catch (IOException e) {
+                logger.error("Error al imprimir recibo", e);
+                throw new Exception("Error al imprimir: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
      * Imprime el contenido del recibo en el dispositivo ESC/POS
      */
-    private static void printReceiptContent(EscPos escpos, Transaction transaction, String copyType) throws IOException {
+    private static void printReceiptContent(@NotNull EscPos escpos, @NotNull Transaction transaction, String copyType) throws IOException {
+        // Estilos mejorados
         Style titleStyle = new Style()
                 .setFontSize(Style.FontSize._2, Style.FontSize._2)
-                .setJustification(EscPosConst.Justification.Center);
+                .setJustification(EscPosConst.Justification.Center)
+                .setBold(true);
+
+        Style subtitleStyle = new Style()
+                .setFontSize(Style.FontSize._1, Style.FontSize._2)
+                .setJustification(EscPosConst.Justification.Center)
+                .setBold(true);
 
         Style boldStyle = new Style()
                 .setFontSize(Style.FontSize._1, Style.FontSize._1)
@@ -164,119 +251,254 @@ public class LoanReceiptService {
         Style centerStyle = new Style()
                 .setJustification(EscPosConst.Justification.Center);
 
-        // Logo (si existe)
-        try {
-            InputStream logoStream = LoanReceiptService.class.getResourceAsStream("/images/logo.png");
-            if (logoStream != null) {
-                BufferedImage bufferedImage = ImageIO.read(logoStream);
-                com.github.anastaciocintra.escpos.image.CoffeeImageImpl coffeeImage =
-                    new com.github.anastaciocintra.escpos.image.CoffeeImageImpl(bufferedImage);
-                com.github.anastaciocintra.escpos.image.BitonalThreshold threshold =
-                    new com.github.anastaciocintra.escpos.image.BitonalThreshold();
-                com.github.anastaciocintra.escpos.image.EscPosImage escposImage =
-                    new com.github.anastaciocintra.escpos.image.EscPosImage(coffeeImage, threshold);
-                RasterBitImageWrapper imageWrapper = new RasterBitImageWrapper();
-                escpos.write(imageWrapper, escposImage);
-                escpos.feed(1);
-                logoStream.close();
-            }
-        } catch (Exception e) {
-            logger.warn("No se pudo cargar el logo", e);
-        }
+        Style smallCenterStyle = new Style()
+                .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                .setJustification(EscPosConst.Justification.Center);
 
-        // Encabezado
+        // Encabezado compacto
         escpos.writeLF(titleStyle, "INVENTARIO MUNICIPAL");
-        escpos.feed(1);
-        escpos.writeLF(centerStyle, "RECIBO DE PRESTAMO");
-        escpos.writeLF(centerStyle, copyType);
-        escpos.writeLF(centerStyle, "================================");
+        escpos.writeLF(subtitleStyle, "RECIBO DE PRESTAMO");
+        escpos.writeLF(smallCenterStyle, "[ " + copyType + " ]");
         escpos.feed(1);
 
-        // Información del préstamo
+        // Código del préstamo
         String loanCode = transaction.getString("loan_code");
-        escpos.writeLF(boldStyle, "Codigo: " + loanCode);
-        escpos.feed(1);
+        escpos.writeLF(centerStyle, "Codigo: " + loanCode);
 
-        // Fecha y hora
+        // Código de barras centrado
+        try {
+            BarCode barcode = new BarCode();
+            barcode.setJustification(EscPosConst.Justification.Center);
+            escpos.write(barcode, loanCode);
+            escpos.feed(1);
+        } catch (Exception e) {
+            logger.warn("No se pudo generar código de barras: " + e.getMessage());
+        }
+
+        // Fecha y hora compactas
         Date createdAt = transaction.getTimestamp("created_at");
-        escpos.writeLF(normalStyle, "Fecha: " + dateFormat.format(createdAt));
-        escpos.writeLF(normalStyle, "Hora: " + timeFormat.format(createdAt));
-        escpos.feed(1);
+        escpos.writeLF(normalStyle, dateFormat.format(createdAt) + " " + timeFormat.format(createdAt));
 
-        // Usuario que realizó el préstamo
-        User user = transaction.parent(User.class);
-        if (user != null) {
-            escpos.writeLF(normalStyle, "Realizado por:");
-            escpos.writeLF(boldStyle, "  " + user.getString("name"));
-            escpos.writeLF(normalStyle, "  Usuario: " + user.getString("username").toUpperCase());
-        }
-        escpos.feed(1);
-
-        // Persona que recibe el préstamo
-        Person person = transaction.parent(Person.class);
-        if (person != null) {
-            escpos.writeLF(normalStyle, "Prestado a:");
-            escpos.writeLF(boldStyle, "  " + person.getString("first_name") + " " + person.getString("last_name"));
-            escpos.writeLF(normalStyle, "  DNI: " + person.getString("dni"));
-            String phone = person.getString("phone");
-            if (phone != null && !phone.isEmpty()) {
-                escpos.writeLF(normalStyle, "  Tel: " + phone);
-            }
-        }
-        escpos.feed(1);
-
-        // Fecha de devolución esperada
+        // Fecha de devolución
         Date expectedReturnDate = transaction.getDate("expected_return_date");
         if (expectedReturnDate != null) {
-            escpos.writeLF(boldStyle, "Devolucion esperada:");
-            escpos.writeLF(normalStyle, "  " + dateFormat.format(expectedReturnDate));
-            escpos.feed(1);
+            escpos.writeLF(boldStyle, "Devolver: " + dateFormat.format(expectedReturnDate));
+        }
+        escpos.feed(1);
+
+        // Usuario y Persona en formato compacto
+        User user = transaction.parent(User.class);
+        if (user != null) {
+            escpos.writeLF(normalStyle, "Entrego: " + user.getString("name"));
         }
 
-        // Línea separadora
-        escpos.writeLF(normalStyle, "================================");
+        Person person = transaction.parent(Person.class);
+        if (person != null) {
+            String fullName = person.getString("first_name") + " " + person.getString("last_name");
+            escpos.writeLF(boldStyle, "Recibe: " + fullName.toUpperCase());
+            escpos.writeLF(normalStyle, "DNI: " + person.getString("dni"));
+            String phone = person.getString("phone");
+            if (phone != null && !phone.isEmpty()) {
+                escpos.writeLF(normalStyle, "Tel: " + phone);
+            }
+        }
         escpos.feed(1);
 
-        // Artículos prestados
-        escpos.writeLF(boldStyle, "ARTICULOS PRESTADOS:");
-        escpos.feed(1);
-
+        // Artículos en formato compacto
         List<TransactionItem> items = transaction.getAll(TransactionItem.class);
+        escpos.writeLF(boldStyle, "ARTICULOS (" + items.size() + "):");
+
         int itemNumber = 1;
+        double totalItems = 0;
         for (TransactionItem item : items) {
             Product product = item.parent(Product.class);
             if (product != null) {
-                escpos.writeLF(normalStyle, itemNumber + ". " + product.getString("name"));
-                escpos.writeLF(normalStyle, "   Codigo: " + product.getString("code"));
-                escpos.writeLF(normalStyle, "   Cantidad: " + item.getDouble("quantity") + " " +
-                              (product.getString("unit") != null ? product.getString("unit") : "unidad(es)"));
+                double quantity = item.getDouble("quantity");
+                totalItems += quantity;
 
-                String itemNotes = item.getString("notes");
-                if (itemNotes != null && !itemNotes.isEmpty()) {
-                    escpos.writeLF(normalStyle, "   Nota: " + itemNotes);
-                }
-                escpos.feed(1);
+                String unit = product.getString("unit") != null ? product.getString("unit") : "u";
+                String quantityStr = String.format("%.2f", quantity).replaceAll("\\.?0+$", "");
+
+                // Formato compacto: [1] Nombre (Cod: XXX) - 5 unidades
+                escpos.writeLF(normalStyle,
+                    "[" + itemNumber + "] " + product.getString("name") +
+                    " (Cod:" + product.getString("code") + ") - " +
+                    quantityStr + " " + unit);
+
                 itemNumber++;
             }
         }
+        escpos.feed(1);
 
-        // Notas generales
+        // Resumen compacto
+        String totalItemsStr = String.format("%.2f", totalItems).replaceAll("\\.?0+$", "");
+        escpos.writeLF(boldStyle, "Total: " + items.size() + " art. / " + totalItemsStr + " unid.");
+        escpos.feed(1);
+
+        // Notas generales (solo del préstamo)
         String notes = transaction.getString("notes");
         if (notes != null && !notes.isEmpty()) {
-            escpos.writeLF(normalStyle, "================================");
-            escpos.writeLF(boldStyle, "NOTAS:");
-            escpos.writeLF(normalStyle, notes);
+            escpos.writeLF(boldStyle, "Notas:");
+
+            String[] noteLines = notes.split("\n");
+            for (String line : noteLines) {
+                if (line.length() > 32) {
+                    int pos = 0;
+                    while (pos < line.length()) {
+                        int end = Math.min(pos + 32, line.length());
+                        escpos.writeLF(normalStyle, line.substring(pos, end));
+                        pos = end;
+                    }
+                } else {
+                    escpos.writeLF(normalStyle, line);
+                }
+            }
             escpos.feed(1);
         }
 
-        // Pie de página
-        escpos.writeLF(normalStyle, "================================");
+        // Pie de página compacto
+        escpos.writeLF(smallCenterStyle, "Conserve este recibo");
+        escpos.feed(2);
+        escpos.writeLF(centerStyle, "_______________________________________");
+        escpos.writeLF(centerStyle, "Firma");
+    }
+
+    /**
+     * Imprime el contenido del recibo en el dispositivo ESC/POS usando DTO
+     * Este método no accede a la base de datos
+     */
+    private static void printReceiptContentFromDTO(EscPos escpos, LoanReceiptDTO dto, String copyType) throws IOException {
+        // Nota: No configuramos charset porque escpos-coffee tiene soporte limitado
+        // En su lugar, usamos normalización de texto para máxima compatibilidad
+
+        // Estilos mejorados
+        Style titleStyle = new Style()
+                .setFontSize(Style.FontSize._2, Style.FontSize._2)
+                .setJustification(EscPosConst.Justification.Center)
+                .setBold(true);
+
+        Style subtitleStyle = new Style()
+                .setFontSize(Style.FontSize._1, Style.FontSize._2)
+                .setJustification(EscPosConst.Justification.Center)
+                .setBold(true);
+
+        Style boldStyle = new Style()
+                .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                .setBold(true);
+
+        Style normalStyle = new Style()
+                .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                .setBold(false);
+
+        Style centerStyle = new Style()
+                .setJustification(EscPosConst.Justification.Center);
+
+        Style smallCenterStyle = new Style()
+                .setFontSize(Style.FontSize._1, Style.FontSize._1)
+                .setJustification(EscPosConst.Justification.Center);
+
+        // Encabezado compacto
+        escpos.writeLF(titleStyle, normalizeText("INVENTARIO MUNICIPAL"));
+        escpos.writeLF(subtitleStyle, normalizeText("RECIBO DE PRESTAMO"));
+        escpos.writeLF(smallCenterStyle, normalizeText("[ " + copyType + " ]"));
         escpos.feed(1);
-        escpos.writeLF(centerStyle, "Total de articulos: " + items.size());
+
+        // Código del préstamo
+        String loanCode = dto.getLoanCode();
+        escpos.writeLF(centerStyle, normalizeText("Codigo: ") + loanCode);
+
+        // Código de barras centrado
+        try {
+            BarCode barcode = new BarCode();
+            barcode.setJustification(EscPosConst.Justification.Center);
+            escpos.write(barcode, loanCode);
+        } catch (Exception e) {
+            logger.warn("No se pudo generar código de barras: " + e.getMessage());
+        }
         escpos.feed(1);
-        escpos.writeLF(centerStyle, "GRACIAS POR SU CONFIANZA");
+
+        // Fecha y hora compactas
+        Date createdAt = dto.getCreatedAt();
+        escpos.writeLF(normalStyle, dateFormat.format(createdAt) + " " + timeFormat.format(createdAt));
+
+        // Fecha de devolución
+        Date expectedReturnDate = dto.getExpectedReturnDate();
+        if (expectedReturnDate != null) {
+            escpos.writeLF(boldStyle, normalizeText("Devolver: ") + dateFormat.format(expectedReturnDate));
+        }
         escpos.feed(1);
-        escpos.writeLF(centerStyle, "Firma: _________________");
+
+        // Usuario y Persona en formato compacto
+        if (dto.getUserName() != null) {
+            escpos.writeLF(normalStyle, normalizeText("Entrego: " + dto.getUserName()));
+        }
+
+        if (dto.getPersonFirstName() != null) {
+            String fullName = dto.getPersonFirstName() + " " + dto.getPersonLastName();
+            escpos.writeLF(boldStyle, normalizeText("Recibe: " + fullName.toUpperCase()));
+            escpos.writeLF(normalStyle, "DNI: " + dto.getPersonDni());
+            String phone = dto.getPersonPhone();
+            if (phone != null && !phone.isEmpty()) {
+                escpos.writeLF(normalStyle, "Tel: " + phone);
+            }
+        }
+        escpos.feed(1);
+
+        // Artículos en formato compacto
+        List<LoanReceiptDTO.LoanReceiptItemDTO> items = dto.getItems();
+        escpos.writeLF(boldStyle, normalizeText("ARTICULOS (" + items.size() + "):"));
+
+        int itemNumber = 1;
+        double totalItems = 0;
+        for (LoanReceiptDTO.LoanReceiptItemDTO item : items) {
+            double quantity = item.getQuantity();
+            totalItems += quantity;
+
+            String unit = item.getUnit() != null ? normalizeText(item.getUnit()) : "u";
+            String quantityStr = String.format("%.2f", quantity).replaceAll("\\.?0+$", "");
+
+            // Formato compacto: [1] Nombre (Cod: XXX) - 5 unidades
+            escpos.writeLF(normalStyle,
+                "[" + itemNumber + "] " + normalizeText(item.getProductName()) +
+                " (Cod:" + item.getProductCode() + ") - " +
+                quantityStr + " " + unit);
+
+            itemNumber++;
+        }
+        escpos.feed(1);
+
+        // Resumen compacto
+        String totalItemsStr = String.format("%.2f", totalItems).replaceAll("\\.?0+$", "");
+        escpos.writeLF(boldStyle, normalizeText("Total: " + items.size() + " art. / " + totalItemsStr + " unid."));
+        escpos.feed(1);
+
+        // Notas generales (solo del préstamo, no de productos individuales)
+        String notes = dto.getNotes();
+        if (notes != null && !notes.isEmpty()) {
+            escpos.writeLF(boldStyle, normalizeText("Notas:"));
+
+            String[] noteLines = notes.split("\n");
+            for (String line : noteLines) {
+                String normalizedLine = normalizeText(line);
+                if (normalizedLine.length() > 32) {
+                    int pos = 0;
+                    while (pos < normalizedLine.length()) {
+                        int end = Math.min(pos + 32, normalizedLine.length());
+                        escpos.writeLF(normalStyle, normalizedLine.substring(pos, end));
+                        pos = end;
+                    }
+                } else {
+                    escpos.writeLF(normalStyle, normalizedLine);
+                }
+            }
+            escpos.feed(1);
+        }
+
+        // Pie de página compacto
+        escpos.writeLF(smallCenterStyle, normalizeText("Conserve este recibo"));
+        escpos.feed(2);
+        escpos.writeLF(centerStyle, "_______________________________________");
+        escpos.writeLF(centerStyle, normalizeText("Firma"));
     }
 
     /**
@@ -332,9 +554,26 @@ public class LoanReceiptService {
             String loanCode = transaction.getString("loan_code");
             addTableRow(infoTable, "Código:", loanCode, true);
 
+            // Agregar código de barras compacto
+            try {
+                BufferedImage barcodeImage = generateBarcodeImage(loanCode, 250, 60);
+                if (barcodeImage != null) {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    ImageIO.write(barcodeImage, "png", baos);
+                    Image barcode = new Image(ImageDataFactory.create(baos.toByteArray()));
+                    barcode.setHorizontalAlignment(HorizontalAlignment.CENTER);
+                    barcode.setWidth(200);
+                    barcode.setMarginTop(5);
+                    barcode.setMarginBottom(5);
+                    document.add(barcode);
+                }
+            } catch (Exception e) {
+                logger.warn("No se pudo generar código de barras en PDF: " + e.getMessage());
+            }
+
             Date createdAt = transaction.getTimestamp("created_at");
-            addTableRow(infoTable, "Fecha:", dateFormat.format(createdAt), false);
-            addTableRow(infoTable, "Hora:", timeFormat.format(createdAt), false);
+            // Combinar fecha y hora en una sola fila
+            addTableRow(infoTable, "Fecha y Hora:", dateFormat.format(createdAt) + " " + timeFormat.format(createdAt), false);
 
             // Usuario
             User user = transaction.parent(User.class);
@@ -399,36 +638,30 @@ public class LoanReceiptService {
             document.add(itemsTable);
             document.add(new Paragraph("\n"));
 
-            // Notas
+            // Notas (con menos espacio)
             String notes = transaction.getString("notes");
             if (notes != null && !notes.isEmpty()) {
                 Paragraph notesTitle = new Paragraph("NOTAS:")
                         .setFontSize(12)
-                        .setBold();
+                        .setBold()
+                        .setMarginTop(10);
                 document.add(notesTitle);
-                Paragraph notesContent = new Paragraph(notes);
+                Paragraph notesContent = new Paragraph(notes)
+                        .setMarginBottom(5);
                 document.add(notesContent);
-                document.add(new Paragraph("\n"));
             }
 
-            // Pie de página
-            document.add(new Paragraph("\n\n"));
-
+            // Pie de página (más compacto)
             Paragraph totalItems = new Paragraph("Total de artículos: " + items.size())
                     .setTextAlignment(TextAlignment.CENTER)
-                    .setBold();
+                    .setBold()
+                    .setMarginTop(15);
             document.add(totalItems);
 
-            document.add(new Paragraph("\n\n"));
-
             Paragraph signature = new Paragraph("Firma: _____________________________")
-                    .setTextAlignment(TextAlignment.CENTER);
-            document.add(signature);
-
-            Paragraph footer = new Paragraph("GRACIAS POR SU CONFIANZA")
                     .setTextAlignment(TextAlignment.CENTER)
-                    .setItalic();
-            document.add(footer);
+                    .setMarginTop(20);
+            document.add(signature);
 
             logger.info("PDF generado exitosamente en: {}", outputPath);
         } catch (Exception e) {
@@ -565,13 +798,31 @@ public class LoanReceiptService {
 
             document.add(loanCodeParagraph);
 
-            // Línea decorativa inferior
+            // Agregar código de barras CODE128 (más compacto)
+            try {
+                BufferedImage barcodeImage = generateBarcodeImage(receiptDTO.getLoanCode(), 200, 50);
+                if (barcodeImage != null) {
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    ImageIO.write(barcodeImage, "png", baos);
+                    Image barcode = new Image(ImageDataFactory.create(baos.toByteArray()));
+                    barcode.setHorizontalAlignment(HorizontalAlignment.CENTER);
+                    barcode.setWidth(180);
+                    barcode.setMarginTop(5);
+                    barcode.setMarginBottom(10);
+                    document.add(barcode);
+                }
+            } catch (Exception e) {
+                logger.warn("No se pudo generar código de barras en PDF: " + e.getMessage());
+            }
+
+            // Línea decorativa inferior (más delgada y con menos margen)
             com.itextpdf.layout.element.LineSeparator separator2 = new com.itextpdf.layout.element.LineSeparator(
                 new com.itextpdf.kernel.pdf.canvas.draw.SolidLine(1f));
-            separator2.setMarginBottom(15);
+            separator2.setMarginTop(5);
+            separator2.setMarginBottom(10);
             document.add(separator2);
 
-            // Información del préstamo
+            // Información del préstamo (reorganizada en formato más compacto)
             Table infoTable = new Table(UnitValue.createPercentArray(new float[]{1, 2}));
             infoTable.setWidth(UnitValue.createPercentValue(100));
 
@@ -600,12 +851,13 @@ public class LoanReceiptService {
             }
 
             document.add(infoTable);
-            document.add(new Paragraph("\n"));
 
-            // Tabla de artículos
+            // Tabla de artículos (con márgenes optimizados)
             Paragraph itemsTitle = new Paragraph("ARTÍCULOS PRESTADOS")
                     .setFontSize(14)
-                    .setBold();
+                    .setBold()
+                    .setMarginTop(10)
+                    .setMarginBottom(5);
             document.add(itemsTitle);
 
             Table itemsTable = new Table(UnitValue.createPercentArray(new float[]{1, 3, 2, 1, 2}));
@@ -631,38 +883,32 @@ public class LoanReceiptService {
             }
 
             document.add(itemsTable);
-            document.add(new Paragraph("\n"));
 
-            // Notas
+            // Notas (con menos espacio)
             String notes = receiptDTO.getNotes();
             if (notes != null && !notes.isEmpty()) {
                 Paragraph notesTitle = new Paragraph("NOTAS:")
                         .setFontSize(12)
-                        .setBold();
+                        .setBold()
+                        .setMarginTop(10);
                 document.add(notesTitle);
-                Paragraph notesContent = new Paragraph(notes);
+                Paragraph notesContent = new Paragraph(notes)
+                        .setMarginBottom(5);
                 document.add(notesContent);
-                document.add(new Paragraph("\n"));
             }
 
-            // Pie de página
-            document.add(new Paragraph("\n\n"));
-
+            // Pie de página (más compacto)
             Paragraph totalItems = new Paragraph("Total de artículos: " + items.size())
                     .setTextAlignment(TextAlignment.CENTER)
-                    .setBold();
+                    .setBold()
+                    .setMarginTop(15);
             document.add(totalItems);
 
-            document.add(new Paragraph("\n\n"));
-
             Paragraph signature = new Paragraph("Firma: _____________________________")
-                    .setTextAlignment(TextAlignment.CENTER);
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setMarginTop(20);
             document.add(signature);
 
-            Paragraph footer = new Paragraph("GRACIAS POR SU CONFIANZA")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setItalic();
-            document.add(footer);
 
             logger.info("PDF generado exitosamente en: {}", outputPath);
         } catch (Exception e) {

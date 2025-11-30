@@ -1,5 +1,9 @@
 # 🔐 Seguridad - Sistema de Inventario Municipal
 
+**Última actualización:** 28 de Noviembre de 2025
+
+---
+
 ## 🛡️ Arquitectura de Seguridad
 
 ### Capas de Seguridad Implementadas
@@ -102,12 +106,12 @@ Ejemplo:
 
 | Rol | Permisos | Módulos | Descripción |
 |-----|----------|---------|-------------|
-| **ROOT** | 52 (100%) | 13/13 | Superadministrador |
-| **ADMIN** | 40 (77%) | 12/13 | Administrador general |
-| **SUPERVISOR** | 29 (56%) | 9/13 | Supervisor operativo |
-| **OPERADOR** | 16 (sin DELETE) | 8/13 | Operador básico |
-| **CONSULTOR** | 12 (solo READ) | 7/13 | Consulta y reportes |
-| **AUDITOR** | 5 (especializado) | 3/13 | Auditoría y supervisión |
+| **ROOT** | 98 (100%) | 14/14 | Superadministrador con acceso total |
+| **ADMIN** | 85 (~87%) | 13/14 | Administrador general (sin auditoría total) |
+| **SUPERVISOR** | 45 (~46%) | 9/14 | Supervisor operativo |
+| **OPERADOR** | 28 (~29%) | 8/14 | Operador básico (sin DELETE) |
+| **CONSULTOR** | 20 (~20%) | 8/14 | Consulta y reportes |
+| **AUDITOR** | 12 (~12%) | 3/14 | Auditoría y supervisión especializada |
 
 ### Matriz de Permisos
 
@@ -116,22 +120,37 @@ Ejemplo:
 │   Módulo    │ ROOT │ ADMIN │ SUPERVISOR │ OPERADOR │ CONSULTOR │ AUDITOR │
 ├─────────────┼──────┼───────┼────────────┼──────────┼───────────┼─────────┤
 │ Dashboard   │  ✓   │   ✓   │     ✓     │    ✓     │     ✓     │    ✓   │
-│ Inventario  │ CRUD │  CRUD │    CRUD    │   CRU    │     R     │    -    │
-│ Ingresos    │  C   │   C   │     C      │    C     │     -     │    -    │
-│ Egresos     │  C   │   C   │     C      │    C     │     -     │    -    │
-│ Préstamos   │  C   │   C   │     C      │    C     │     -     │    -    │
-│ Personas    │ CRUD │  CRUD │    CRUD    │   CRU    │     R     │    -    │
-│ Usuarios    │ CRUD │  CRUD │     -      │    -     │     -     │    -    │
-│ Roles       │ CRUD │   -   │     -      │    -     │     -     │    -    │
-│ Auditoría   │  R   │   -   │     -      │    -     │     -     │    R    │
-│ Reportes    │  RE  │   RE  │     RE     │    RE    │    RE     │   RE    │
-│ Backup      │ CRD  │  CRD  │     -      │    -     │     -     │    -    │
-│ Perfil      │  U   │   U   │     U      │    U     │     U     │    U    │
+│ Inventario  │ CRUDRS│ CRUDRS│    CRUD   │   CRU    │     R     │    -    │
+│ Ingresos    │CRUDRIS│CRUDRI │    CRUD   │   CRU    │     R     │    -    │
+│ Egresos     │CRUDRIS│CRUDRI │    CRUD   │   CRU    │     R     │    -    │
+│ Préstamos   │CRUDRIS│CRUDRI │    CRUD   │   CRU    │     R     │    -    │
+│ Personas    │ CRUDRS│ CRUDRS│    CRUD   │   CRU    │     R     │    -    │
+│ Usuarios    │ CRUDRS│ CRUDRS│     -     │    -     │     -     │    -    │
+│ Roles       │ CRUD  │ CRUD  │     -     │    -     │     -     │    -    │
+│ Auditoría   │  RE   │   R   │     -     │    -     │     -     │   RE    │
+│ Reportes    │  GE   │   GE  │     GE    │    GE    │    GE     │   GE    │
+│ Backup      │ CRD   │  CRD  │     -     │    -     │     -     │    -    │
+│ Perfil      │  U    │   U   │     U     │    U     │     U     │    U    │
+│ Configuración│ RU   │   R   │     -     │    -     │     -     │    -    │
 └─────────────┴──────┴───────┴────────────┴──────────┴───────────┴─────────┘
 
 Leyenda:
-C = CREATE  │  R = READ  │  U = UPDATE  │  D = DELETE  │  E = EXPORT
+C = CREATE    │ R = READ     │ U = UPDATE   │ D = DELETE      │ E = EXPORT
+G = GENERATE  │ S = RESTORE  │ I = INVALIDATE
 ```
+
+### Acciones por Permiso
+
+| Acción | Código | Descripción | Aplicable a |
+|--------|--------|-------------|-------------|
+| **Crear** | CREATE | Crear nuevos registros | Todos los módulos CRUD |
+| **Leer** | READ | Ver y listar registros | Todos los módulos |
+| **Actualizar** | UPDATE | Editar registros existentes | Todos los módulos CRUD |
+| **Eliminar** | DELETE | Eliminar registros (soft delete) | Todos los módulos CRUD |
+| **Restaurar** | RESTORE | Restaurar registros eliminados | Usuarios, Personas, Productos |
+| **Invalidar** | INVALIDATE | Invalidar transacciones | Ingresos, Egresos, Préstamos |
+| **Exportar** | EXPORT | Exportar datos (CSV, PDF) | Reportes, Auditoría |
+| **Generar** | GENERATE | Generar reportes | Reportes |
 
 ---
 
@@ -480,6 +499,311 @@ if (!file.getCanonicalPath().startsWith(allowedDirectory)) {
 4. **Mantener backups actualizados**
 5. **Limitar permisos al mínimo necesario**
 6. **Actualizar el sistema regularmente**
+
+---
+
+## 🤖 Usuario SYSTEM
+
+### Características Especiales
+
+El sistema incluye un usuario especial `SYSTEM` para operaciones automáticas.
+
+#### Configuración
+```java
+username: "SYSTEM"
+password: "" (vacío, no válido para login)
+rol_id: NULL
+status: 0 (inactivo)
+must_change_password: 0
+```
+
+#### Propósito
+- Realizar operaciones automáticas del sistema
+- Registro de backups automáticos
+- Operaciones programadas
+- Tareas del sistema sin intervención humana
+
+#### Protecciones
+```java
+// 1. No puede iniciar sesión
+if ("SYSTEM".equals(username)) {
+    throw new AuthenticationException("Usuario no autorizado");
+}
+
+// 2. No aparece en lista de usuarios
+WHERE u.username != 'SYSTEM' AND u.status = 1
+
+// 3. No puede ser creado manualmente
+if ("SYSTEM".equalsIgnoreCase(username)) {
+    throw new ValidationException("No se puede crear usuario SYSTEM");
+}
+
+// 4. No puede ser editado
+if ("SYSTEM".equals(user.getUsername())) {
+    throw new SecurityException("Usuario SYSTEM no puede ser modificado");
+}
+
+// 5. No puede ser eliminado
+if ("SYSTEM".equals(user.getUsername())) {
+    throw new SecurityException("Usuario SYSTEM no puede ser eliminado");
+}
+```
+
+#### Uso del Usuario SYSTEM
+```java
+// Backups automáticos
+User systemUser = User.findFirst("username = ?", "SYSTEM");
+Backup backup = new Backup();
+backup.set("usuario_id", systemUser.getId());
+backup.set("mensaje", "Copia de seguridad creada por el sistema");
+backup.saveIt();
+// NO se registra en auditoría
+```
+
+---
+
+## 🗑️ Soft Delete (Eliminación Lógica)
+
+### Concepto
+
+En lugar de eliminar registros permanentemente de la base de datos, se marcan como "eliminados" mediante campos de estado.
+
+### Implementación
+
+#### Campos de Soft Delete
+```sql
+-- En tablas: users, people, products
+status TINYINT(1) DEFAULT 1,        -- 1=activo, 0=eliminado
+deleted_at TIMESTAMP NULL,           -- Fecha de eliminación
+deleted_by INT NULL,                 -- Usuario que eliminó
+FOREIGN KEY (deleted_by) REFERENCES users(id)
+```
+
+#### Proceso de Eliminación
+```java
+// 1. Usuario hace click en "Eliminar"
+public void softDelete(Integer id) {
+    // Verificar permiso DELETE
+    if (!hasPermission("DELETE")) {
+        throw new PermissionException("Sin permiso para eliminar");
+    }
+    
+    // Marcar como eliminado
+    Product product = Product.findById(id);
+    product.set("status", 0);
+    product.set("deleted_at", new Timestamp(System.currentTimeMillis()));
+    product.set("deleted_by", Session.getCurrentUserId());
+    product.saveIt();
+    
+    // Registrar en auditoría
+    AuditService.log(userId, "soft_delete", "products", id, "Producto eliminado");
+}
+```
+
+### Restauración de Datos
+
+#### Permiso RESTORE
+```java
+// Solo usuarios con permiso RESTORE pueden ver y restaurar
+public void restore(Integer id) {
+    // Verificar permiso RESTORE
+    if (!hasPermission("RESTORE")) {
+        throw new PermissionException("Sin permiso para restaurar");
+    }
+    
+    // Restaurar registro
+    Product product = Product.findById(id);
+    product.set("status", 1);
+    product.set("deleted_at", null);
+    product.set("deleted_by", null);
+    product.saveIt();
+    
+    // Registrar en auditoría
+    AuditService.log(userId, "restore", "products", id, "Producto restaurado");
+}
+```
+
+### Filtrado de Datos
+
+#### Consultas Normales (Solo Activos)
+```java
+// Sin permiso RESTORE - solo ve activos
+List<Product> products = Product.where("status = ?", 1);
+```
+
+#### Consultas con Permiso RESTORE
+```java
+// Con permiso RESTORE - ve todos (con badge de estado)
+if (hasPermission("RESTORE")) {
+    // Mostrar todos
+    List<Product> products = Product.findAll();
+} else {
+    // Solo activos
+    List<Product> products = Product.where("status = ?", 1);
+}
+```
+
+### Eliminación Permanente
+
+#### Solo Usuario ROOT
+```java
+public void hardDelete(Integer id) {
+    // SOLO ROOT puede eliminar permanentemente
+    if (!isRoot()) {
+        throw new PermissionException("Solo ROOT puede eliminar permanentemente");
+    }
+    
+    // Verificar que esté eliminado (soft delete)
+    Product product = Product.findById(id);
+    if (product.getInteger("status") == 1) {
+        throw new IllegalStateException("Debe marcar como eliminado antes de borrar");
+    }
+    
+    // Eliminar de BD
+    product.delete();
+    
+    // Registrar en auditoría
+    AuditService.log(userId, "hard_delete", "products", id, "Eliminación permanente");
+}
+```
+
+### Ventajas del Soft Delete
+
+1. **Recuperación de datos**: Errores humanos pueden corregirse
+2. **Auditoría completa**: Historial de quién eliminó y cuándo
+3. **Integridad referencial**: Referencias a datos "eliminados" siguen válidas
+4. **Análisis histórico**: Datos disponibles para reportes y análisis
+5. **Cumplimiento legal**: Algunos datos no deben eliminarse permanentemente
+
+---
+
+## ❌ Invalidación de Transacciones
+
+### Concepto
+
+Las transacciones (ingresos, egresos, préstamos) no se eliminan, se **invalidan**.
+
+### Implementación
+
+#### Campos de Invalidación
+```sql
+-- En tabla: transactions
+status TINYINT(1) DEFAULT 1,         -- 1=válido, 0=invalidado
+invalidated_at TIMESTAMP NULL,        -- Fecha de invalidación
+invalidated_by INT NULL,              -- Usuario que invalidó
+FOREIGN KEY (invalidated_by) REFERENCES users(id)
+```
+
+#### Proceso de Invalidación
+```java
+// Permiso: INVALIDATE
+public void invalidateTransaction(Integer transactionId) {
+    // Verificar permiso
+    if (!hasPermission("INVALIDATE")) {
+        throw new PermissionException("Sin permiso para invalidar");
+    }
+    
+    Transaction transaction = Transaction.findById(transactionId);
+    
+    // 1. Ajustar stock (revertir operación)
+    if ("in".equals(transaction.getString("type"))) {
+        // Era ingreso → restar del stock
+        adjustStock(transaction, -1);
+    } else if ("out".equals(transaction.getString("type"))) {
+        // Era egreso → sumar al stock
+        adjustStock(transaction, 1);
+    }
+    
+    // 2. Marcar como invalidado
+    transaction.set("status", 0);
+    transaction.set("invalidated_at", new Timestamp(System.currentTimeMillis()));
+    transaction.set("invalidated_by", Session.getCurrentUserId());
+    transaction.saveIt();
+    
+    // 3. Auditoría
+    AuditService.log(userId, "invalidate_transaction", "transactions", 
+                    transactionId, "Transacción invalidada");
+}
+```
+
+#### Filtrado de Transacciones
+```java
+// Ver solo válidas (por defecto)
+List<Transaction> validTransactions = 
+    Transaction.where("status = ?", 1);
+
+// Ver todas (con badge de estado)
+List<Transaction> allTransactions = Transaction.findAll();
+
+// Ver solo invalidadas
+List<Transaction> invalidTransactions = 
+    Transaction.where("status = ?", 0);
+```
+
+### Diferencia: Soft Delete vs Invalidación
+
+| Característica | Soft Delete | Invalidación |
+|----------------|-------------|--------------|
+| **Aplicable a** | Usuarios, Personas, Productos | Transacciones |
+| **Campo** | `status` | `status` |
+| **Puede restaurarse** | ✅ Sí (con permiso RESTORE) | ❌ No |
+| **Ajusta stock** | ❌ No | ✅ Sí |
+| **Motivo** | Error, duplicado | Corrección, error de registro |
+| **Visible para** | Solo con permiso RESTORE | Todos (con badge) |
+| **Auditoría** | `soft_delete` / `restore` | `invalidate_transaction` |
+
+---
+
+## 🎯 Resumen de Seguridad
+
+### Capas de Protección
+
+```
+1. UI (Interfaz)
+   └─ Botones ocultos/deshabilitados según permisos
+   
+2. Controladores
+   └─ Validación de permisos antes de ejecutar
+   
+3. Servicios
+   └─ Lógica de negocio con validaciones
+   
+4. Repositorios
+   └─ Consultas parametrizadas (SQL injection protection)
+   
+5. Base de Datos
+   └─ Contraseñas hasheadas, integridad referencial
+```
+
+### Características Clave
+
+✅ **Autenticación**: BCrypt con salt automático  
+✅ **Autorización**: RBAC con 7 acciones y 14 módulos  
+✅ **Auditoría**: Log completo de todas las acciones  
+✅ **Soft Delete**: Eliminación lógica recuperable  
+✅ **Invalidación**: Transacciones no se eliminan  
+✅ **Usuario SYSTEM**: Operaciones automáticas seguras  
+✅ **Sesiones**: Control de usuario actual  
+✅ **Permisos granulares**: Control por módulo y acción  
+✅ **Validaciones múltiples**: UI + Backend + BD  
+
+### Recomendaciones para Producción
+
+1. ✅ Implementar timeout de sesión
+2. ✅ Agregar requisitos de complejidad de contraseñas
+3. ✅ Implementar política de rotación de contraseñas
+4. ✅ Habilitar logs de seguridad detallados
+5. ✅ Revisar permisos regularmente
+6. ✅ Mantener backups cifrados
+7. ✅ Usar conexión MySQL cifrada (SSL/TLS)
+8. ✅ Implementar 2FA (autenticación de dos factores)
+9. ✅ Limitar intentos de login fallidos
+10. ✅ Monitorear actividad sospechosa en auditoría
+
+---
+
+**Última revisión**: 28 de Noviembre de 2025  
+**Versión**: 1.0-SNAPSHOT
 7. **Deshabilitar usuarios inactivos**
 
 ### Para Usuarios Finales

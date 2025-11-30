@@ -301,6 +301,9 @@ public class LoansController {
         });
 
         colId.setStyle("-fx-font-size: 17;");
+        colLoanCode.setStyle("-fx-font-size: 17;");
+        colLoanStatus.setStyle("-fx-font-size: 17;");
+        colRecordStatus.setStyle("-fx-font-size: 17;");
         colProduct.setStyle("-fx-font-size: 17;");
         colQuantity.setStyle("-fx-font-size: 17;");
         colItems.setStyle("-fx-font-size: 17;");

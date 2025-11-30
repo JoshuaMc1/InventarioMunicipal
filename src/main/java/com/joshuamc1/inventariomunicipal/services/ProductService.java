@@ -314,13 +314,25 @@ public class ProductService {
      * @param product Producto a validar
      */
     private void validateBeforeHardDelete(@NotNull Product product) {
-        // No permitir eliminar productos con transacciones activas
-        // Esta validación se puede implementar cuando sea necesario
-        // Por ahora solo verificamos el estado
+        // No permitir eliminar productos activos
         if (product.isActive()) {
             throw new IllegalStateException(
                 "No se puede eliminar permanentemente un producto activo. " +
                 "Primero debe marcarse como eliminado."
+            );
+        }
+
+        // Verificar si tiene transacciones asociadas
+        Long transactionCount = (Long) org.javalite.activejdbc.Base.firstCell(
+            "SELECT COUNT(*) FROM transaction_items WHERE product_id = ?",
+            product.getId()
+        );
+
+        if (transactionCount != null && transactionCount > 0) {
+            throw new IllegalStateException(
+                "No se puede eliminar permanentemente este producto porque tiene " +
+                transactionCount + " transacción(es) asociada(s). " +
+                "Los productos con historial de transacciones no pueden ser eliminados del sistema."
             );
         }
     }

@@ -1,6 +1,6 @@
 # 🚀 Características del Sistema - Inventario Municipal
 
-**Fecha de última actualización:** 24 de Noviembre de 2025
+**Fecha de última actualización:** 28 de Noviembre de 2025
 
 ---
 
@@ -8,28 +8,49 @@
 
 ### **Productos**
 - ✅ CRUD completo de productos
+- ✅ **Soft Delete:** Eliminación lógica (status = 0, deleted_at, deleted_by)
+- ✅ **Restauración:** Solo usuarios con permiso RESTORE
+- ✅ **Eliminación permanente:** Solo usuario ROOT
 - ✅ Códigos de barras y QR únicos por producto
 - ✅ Generación automática de códigos EAN-13
+- ✅ Generación aleatoria de códigos con botón 🎲
 - ✅ Descarga de códigos en formato PNG (Code128 y QR)
 - ✅ Control de stock actual y stock mínimo
 - ✅ Alertas de stock bajo
+- ✅ Badge de estado (Activo/Eliminado) con colores
 - ✅ Búsqueda por ID, nombre o código
 - ✅ Compatible con lectores de códigos de barras/QR
-- ✅ Paginación eficiente (25 registros por defecto)
+- ✅ Paginación eficiente (25 registros por defecto, configurable)
 - ✅ Unidades de medida configurables
+- ✅ Validaciones de campos obligatorios con helper text
+- ✅ Botón de crear habilitado solo si se cumplen validaciones
 
 ### **Transacciones Multi-Producto**
 - ✅ **Ingresos:** Registro de entrada de múltiples productos
+  - Soporte para devoluciones de préstamos
+  - Autocompletado de productos y persona del préstamo
+  - Tipos: Mismo Producto, Comprado/Pagado, Reemplazado, Otro
 - ✅ **Egresos:** Registro de salida de múltiples productos
-- ✅ **Préstamos:** Gestión de productos prestados
+  - Invalidación de egresos (solo usuarios con permiso)
+  - Badge de estado (Válido/Inválido)
+- ✅ **Préstamos:** Gestión completa de productos prestados
+  - Códigos únicos de préstamo (P-XX20251128-001)
+  - Fecha de préstamo y fecha esperada de devolución
+  - Estados: Pendiente, Devuelto, Pagado, Reemplazado
+  - Historial completo de préstamos
+  - Invalidación de préstamos
+  - Badge de estado con colores
+  - Filtros: Todos, Pendientes, Devueltos, Invalidados
+  - Búsqueda por código de préstamo con autocompletado
 - ✅ Asociación con personas (DNI, nombre, contacto)
 - ✅ Usuarios responsables de cada transacción
 - ✅ Notas generales y específicas por producto
 - ✅ Cálculo automático de totales
 - ✅ Actualización automática de stock
-- ✅ Búsqueda por ID de transacción, producto o persona
-- ✅ Paginación configurable (10, 25, 50, 100 registros)
+- ✅ Búsqueda por ID de transacción, producto, persona o código
+- ✅ Paginación a nivel de repositorio (10, 25, 50, 100 registros)
 - ✅ Búsqueda optimizada con debounce (500ms)
+- ✅ Botón de refrescar en todas las vistas
 
 ---
 
@@ -42,25 +63,44 @@
 - ✅ **EDITOR:** Edición de productos y transacciones
 - ✅ **OPERADOR:** Operaciones básicas
 - ✅ **CONSULTOR:** Solo lectura
+- ✅ **Permisos granulares:** 84 permisos (14 módulos x 6 acciones)
+- ✅ **Nuevo permiso RESTORE:** Para restaurar datos eliminados
+- ✅ CRUD de roles (solo ROOT y ADMIN)
+- ✅ Asignación flexible de permisos por rol
+- ✅ Validaciones de campos obligatorios
 
 ### **Usuarios**
 - ✅ CRUD completo de usuarios
+- ✅ **Soft Delete:** Eliminación lógica (status = 0)
+- ✅ **Activar/Desactivar:** Toggle de estado sin eliminar
+- ✅ **Eliminación permanente:** Solo ROOT (botón rojo separado)
+- ✅ **Restauración:** Solo usuarios con permiso RESTORE
+- ✅ Badge de estado (Activo/Inactivo) con colores
 - ✅ Autenticación con BCrypt
 - ✅ Roles y permisos granulares
 - ✅ Usuario especial **SYSTEM** para operaciones automáticas
-- ✅ Validaciones de username único
-- ✅ Control de usuarios activos/inactivos
-- ✅ Búsqueda y filtrado
-- ✅ Paginación eficiente
+- ✅ Validaciones de username único en tiempo real
+- ✅ Protección: No se puede crear usuario "SYSTEM"
+- ✅ Username deshabilitado al editar (excepto ROOT)
+- ✅ Búsqueda por username con debounce
+- ✅ Paginación a nivel de repositorio
+- ✅ Helper text para campos obligatorios
 
 ### **Personas**
+- ✅ CRUD completo de personas
+- ✅ **Soft Delete:** Eliminación lógica
+- ✅ **Restauración:** Solo usuarios con permiso RESTORE
+- ✅ **Eliminación permanente:** Solo ROOT
+- ✅ Badge de estado (Activo/Eliminado)
 - ✅ Registro de personas (empleados, beneficiarios)
-- ✅ DNI único
+- ✅ DNI único con validación en tiempo real
 - ✅ Datos de contacto (teléfono, email)
 - ✅ Máscara de teléfono (0000-0000)
 - ✅ Validación de DNI duplicado
-- ✅ Búsqueda por DNI o nombre
+- ✅ Búsqueda por DNI o nombre con debounce
+- ✅ Paginación a nivel de repositorio
 - ✅ Helper text para campos obligatorios
+- ✅ Botón de refrescar tabla
 
 ---
 
@@ -131,6 +171,55 @@
 
 ---
 
+## 🖨️ Sistema de Impresión de Recibos
+
+### **Impresión de Recibos de Préstamos**
+- ✅ **Impresoras Térmicas (58mm y 80mm)**
+  - Biblioteca: escpos-coffee
+  - Formato compacto optimizado para papel térmico
+  - Código de barras CODE128 integrado
+  - Encabezado sin logo (optimizado para espacio)
+  - Información del préstamo y persona
+  - Lista de productos con cantidades
+  - Notas generales y específicas por producto
+  - Fecha esperada de devolución
+  - Espaciado optimizado para ahorro de papel
+  - Codificación CP850 para caracteres especiales
+
+- ✅ **Impresoras Normales / PDF**
+  - Biblioteca: iText 7
+  - Formato A4 profesional
+  - Logo de la institución en encabezado
+  - Código de barras CODE128 (200x50px, centrado)
+  - Título y descripción del préstamo
+  - Información completa de la persona
+  - Tabla de productos con columnas ajustables
+  - Notas por producto y generales
+  - Total de artículos prestados
+  - Espacio para firma del beneficiario
+  - Márgenes optimizados (15-20px entre secciones)
+  - Diseño compacto sin desperdiciar papel
+
+### **Características Generales**
+- ✅ Detección automática de impresoras disponibles
+- ✅ Selección de impresora desde diálogo
+- ✅ Vista previa antes de imprimir
+- ✅ Guardado de PDF para archivo
+- ✅ Impresión en background (no bloquea UI)
+- ✅ Diálogo de progreso durante impresión
+- ✅ Manejo de errores con mensajes claros
+- ✅ Soporte para múltiples productos por préstamo
+- ✅ Información del usuario que genera el recibo
+
+### **Opciones de Impresión**
+- ✅ Imprimir en impresora térmica
+- ✅ Imprimir en impresora normal
+- ✅ Guardar como PDF
+- ✅ Vista previa del documento
+- ✅ Cancelar operación en cualquier momento
+
+---
+
 ## 🔍 Búsqueda y Filtrado
 
 ### **Búsqueda Inteligente**
@@ -161,10 +250,19 @@
 
 ### **Autorización (RBAC)**
 - ✅ 6 roles predefinidos
-- ✅ 84 permisos granulares (14 módulos x 6 acciones)
-- ✅ Control por módulo y acción (CREATE, READ, UPDATE, DELETE, EXPORT, GENERATE)
-- ✅ Validación en UI (botones deshabilitados)
+- ✅ 98 permisos granulares (14 módulos x 7 acciones)
+- ✅ Control por módulo y acción:
+  - CREATE: Crear nuevos registros
+  - READ: Ver/listar registros
+  - UPDATE: Editar registros existentes
+  - DELETE: Eliminar registros (soft delete)
+  - RESTORE: Restaurar registros eliminados (nuevo)
+  - EXPORT: Exportar datos
+  - GENERATE: Generar reportes
+- ✅ Permiso especial INVALIDATE para transacciones
+- ✅ Validación en UI (botones deshabilitados/ocultos)
 - ✅ Validación en backend (servicios)
+- ✅ Filtrado automático de datos según permisos
 
 ### **Auditoría**
 - ✅ Registro de todas las acciones importantes

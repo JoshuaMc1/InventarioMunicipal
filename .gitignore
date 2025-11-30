@@ -42,3 +42,8 @@ build/
 *.db
 inventario_municipal_dev.db
 inventario_municipal_prod.db
+
+### Development Notes & Cache ###
+.dev-notes/
+.cache/
+

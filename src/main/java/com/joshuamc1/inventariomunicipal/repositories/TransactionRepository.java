@@ -329,6 +329,29 @@ public class TransactionRepository {
     }
 
     /**
+     * Busca préstamos pendientes que coincidan con el texto de búsqueda
+     * Solo devuelve préstamos con loan_status = 'pending' y status = 1
+     * Útil para autocompletado
+     * @param searchText Texto a buscar en loan_code
+     * @return Lista de hasta 10 préstamos que coinciden
+     */
+    public List<Transaction> searchPendingLoansByCode(String searchText) {
+        if (searchText == null || searchText.trim().isEmpty()) {
+            return new java.util.ArrayList<>();
+        }
+
+        String pattern = "%" + searchText.trim().toUpperCase() + "%";
+
+        return Transaction.where(
+            "type = ? AND loan_status = ? AND status = ? AND loan_code LIKE ? ORDER BY loan_code DESC LIMIT 10",
+            Transaction.TYPE_LOAN,
+            "pending",
+            Transaction.STATUS_ACTIVE,
+            pattern
+        );
+    }
+
+    /**
      * Cuenta préstamos por estado
      */
     public long countLoansByStatus(String loanStatus) {

@@ -1,6 +1,6 @@
 # 🚀 Guía de Inicio Rápido - Inventario Municipal
 
-**Fecha:** 24 de Noviembre de 2025
+**Última actualización:** 28 de Noviembre de 2025
 
 ---
 
@@ -11,19 +11,46 @@
 ☑️ Java JDK 21 o superior
 ☑️ Maven 3.9.11 o superior
 ☑️ MySQL 8.0 o superior
-☑️ mysqldump (incluido con MySQL)
-☑️ gzip (Linux/Mac incluido, Windows: instalar)
+☑️ mysqldump (incluido con MySQL, debe estar en PATH)
+☑️ gzip (Linux/Mac incluido, Windows: instalar y agregar a PATH)
 ☑️ IDE recomendado: IntelliJ IDEA
+☑️ Impresora térmica (opcional, para recibos)
 ```
 
 ### **Producción**
 ```
 ☑️ Java JRE 21 o superior
 ☑️ MySQL 8.0 o superior
-☑️ mysqldump configurado en PATH
-☑️ gzip configurado en PATH
-☑️ 2GB RAM mínimo
-☑️ 1GB espacio en disco
+☑️ mysqldump configurado en PATH del sistema
+☑️ gzip configurado en PATH del sistema
+☑️ 2GB RAM mínimo (4GB recomendado)
+☑️ 1GB espacio en disco para aplicación
+☑️ Espacio adicional para backups (depende del tamaño de BD)
+☑️ Impresora térmica 58mm/80mm (opcional)
+```
+
+### **Configuración de mysqldump y gzip (Importante para Backups)**
+
+#### Windows
+```powershell
+# Verificar que mysqldump está disponible
+mysqldump --version
+
+# Si no está en PATH, agregarlo:
+# 1. Buscar la ruta de MySQL (ejemplo: C:\Program Files\MySQL\MySQL Server 8.0\bin)
+# 2. Agregar a variables de entorno PATH
+# 3. Reiniciar terminal
+
+# Instalar gzip (si no está)
+# Opción 1: Usando Git Bash (viene con Git for Windows)
+# Opción 2: Descargar gzip para Windows y agregar a PATH
+```
+
+#### Linux/Mac
+```bash
+# Verificar disponibilidad (generalmente vienen instalados)
+mysqldump --version
+gzip --version
 ```
 
 ---
@@ -134,31 +161,82 @@ Los roles ya están creados automáticamente:
 
 1. Ir a **Inventario** → **Nuevo**
 2. Completar formulario:
-   - Código (generado automáticamente o manual)
-   - Nombre
-   - Descripción (opcional)
-   - Unidad (Unidad, Caja, Paquete, etc.)
-   - Stock actual
-   - Stock mínimo
+   - **Código**: Generado automáticamente (EAN-13)
+     - Click en 🎲 para generar código aleatorio
+     - O ingresa código manualmente
+   - **Nombre** (obligatorio)
+   - **Descripción** (opcional)
+   - **Unidad** (obligatorio): Unidad, Caja, Paquete, Kg, L, etc.
+   - **Stock actual** (obligatorio)
+   - **Stock mínimo** (obligatorio)
 3. Click en **Crear**
+4. **Descargar códigos** (opcional):
+   - Click en **Code128** para descargar código de barras
+   - Click en **QR** para descargar código QR
+   - Usar estos códigos para etiquetar productos
 
-### **5. Registrar Transacciones**
+### **5. Registrar Transacciones Multi-Producto**
 
 #### **Ingreso:**
 1. Ir a **Ingresos** → **Nuevo Ingreso**
-2. Seleccionar persona (opcional)
-3. Agregar productos:
+2. **Si es devolución de préstamo:**
+   - Marcar checkbox **"Es devolución"**
+   - Escribir código de préstamo (autocompletado)
+   - Sistema carga automáticamente:
+     - Persona del préstamo
+     - Todos los productos y cantidades
+   - Seleccionar tipo de devolución
+   - Agregar notas si es necesario
+3. **Si es ingreso normal:**
+   - Seleccionar persona (opcional)
+   - Seleccionar fecha
+   - Agregar productos:
+     - Buscar producto (por nombre, ID o código)
+     - Usar escáner de código de barras/QR
+     - Ingresar cantidad
+     - Notas (opcional)
+     - Click en **Agregar**
+   - Repetir para más productos
+4. Notas generales (opcional)
+5. Click en **Guardar Ingreso**
+
+#### **Egreso:**
+1. Ir a **Egresos** → **Nuevo Egreso**
+2. Mismo proceso que ingresos
+3. **Invalidar egreso** (si es necesario):
+   - Solo usuarios con permiso INVALIDATE
+   - Click en botón de invalidar en la tabla
+   - Confirmar acción
+
+#### **Préstamo:**
+1. Ir a **Préstamos** → **Nuevo Préstamo**
+2. Seleccionar persona (obligatorio)
+3. Seleccionar fecha de préstamo
+4. **Fecha esperada de devolución** (obligatorio)
+5. Agregar productos:
    - Buscar producto
    - Ingresar cantidad
    - Notas (opcional)
    - Click en **Agregar**
-4. Repetir para más productos
-5. Notas generales (opcional)
-6. Click en **Guardar**
+6. Notas generales del préstamo
+7. Click en **Guardar Préstamo**
+8. **Sistema genera código único**: P-XX20251128-001
+9. **Imprimir recibo** (opcional):
+   - Seleccionar tipo de impresora
+   - Imprimir en térmica o normal
+   - Guardar como PDF
 
-#### **Egreso:** Mismo proceso en módulo **Egresos**
+#### **Estados de Préstamo:**
+- **Pendiente**: Préstamo activo, esperando devolución
+- **Devuelto**: Productos devueltos
+- **Pagado**: Compensado económicamente
+- **Reemplazado**: Sustituido por otro producto
 
-#### **Préstamo:** Mismo proceso en módulo **Préstamos**
+#### **Filtros disponibles:**
+- Todos los préstamos
+- Solo pendientes
+- Solo devueltos
+- Invalidados
 
 ---
 
@@ -192,6 +270,74 @@ Los roles ya están creados automáticamente:
    - Todos los movimientos
    - Por rango de fechas
    - Por tipo de transacción
+
+---
+
+## 🖨️ Impresión de Recibos de Préstamos
+
+### **Requisitos**
+- Impresora térmica 58mm o 80mm (para recibos térmicos)
+- O cualquier impresora normal (para PDF/papel normal)
+
+### **Imprimir Recibo**
+
+1. Ir a **Préstamos**
+2. Seleccionar un préstamo de la tabla
+3. Click en botón **Imprimir** (🖨️)
+4. Seleccionar opciones:
+   - **Impresora Térmica**: Formato compacto para papel térmico
+   - **Impresora Normal**: Formato A4 profesional
+   - **Guardar PDF**: Guardar archivo para imprimir después
+5. Seleccionar impresora disponible
+6. Click en **Imprimir** o **Guardar**
+
+### **Contenido del Recibo**
+- Logo de la institución (solo en PDF)
+- Código de barras del préstamo
+- Información de la persona
+- Fecha del préstamo y fecha esperada de devolución
+- Lista de productos con cantidades
+- Notas generales y específicas
+- Usuario que generó el recibo
+- Espacio para firma
+
+---
+
+## 🗑️ Gestión de Datos Eliminados (Soft Delete)
+
+El sistema usa **eliminación lógica** en lugar de eliminar permanentemente.
+
+### **Eliminar Usuarios/Personas/Productos**
+
+1. Seleccionar registro de la tabla
+2. Click en **Eliminar**
+3. Confirmar acción
+4. **El registro se marca como eliminado** (status = 0)
+5. **No aparece en listas normales** (solo si tienes permiso RESTORE)
+
+### **Restaurar Datos Eliminados**
+
+**Requisito:** Permiso `RESTORE` (Solo ADMIN y ROOT)
+
+1. Los registros eliminados aparecen en la tabla con badge "Eliminado"
+2. Click en botón **Restaurar** (↻)
+3. Confirmar acción
+4. Registro vuelve a estado activo
+
+### **Eliminación Permanente**
+
+**Requisito:** Solo usuario ROOT
+
+1. Seleccionar registro eliminado
+2. Click en botón rojo **Eliminar Permanentemente**
+3. **⚠️ ADVERTENCIA**: Esta acción no se puede deshacer
+4. Confirmar acción
+5. Registro se borra de la base de datos
+
+### **Estados de Registros**
+- **Activo** (badge verde): Registro normal
+- **Inactivo/Eliminado** (badge rojo): Eliminación lógica
+- **Invalidado** (badge naranja): Transacciones invalidadas
 
 ---
 

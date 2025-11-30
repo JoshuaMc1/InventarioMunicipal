@@ -649,6 +649,16 @@ public class TransactionService {
     }
 
     /**
+     * Busca préstamos pendientes que coincidan con el código (para autocompletado)
+     * Solo devuelve préstamos con loan_status = 'pending' y status = 1 (activos)
+     * @param searchText Texto a buscar en loan_code
+     * @return Lista de préstamos que coinciden con la búsqueda
+     */
+    public List<Transaction> searchPendingLoansByCode(String searchText) {
+        return DatabaseManager.callInConnection(() -> repo.searchPendingLoansByCode(searchText));
+    }
+
+    /**
      * Busca préstamos próximos a vencer
      */
     public List<Transaction> findLoansExpiringSoon(int days) {

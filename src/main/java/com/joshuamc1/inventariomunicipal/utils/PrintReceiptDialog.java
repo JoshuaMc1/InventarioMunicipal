@@ -2,6 +2,7 @@ package com.joshuamc1.inventariomunicipal.utils;
 
 import com.itextpdf.io.exceptions.IOException;
 import com.joshuamc1.inventariomunicipal.models.Transaction;
+import com.joshuamc1.inventariomunicipal.models.dto.LoanReceiptDTO;
 import com.joshuamc1.inventariomunicipal.services.LoanReceiptService;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
@@ -235,6 +236,9 @@ public class PrintReceiptDialog {
      * Usa un Stage personalizado en lugar de Alert para mayor confiabilidad
      */
     private static void showProgressAndPrint(Transaction transaction, String printerName, int copies) {
+        // Convertir la transacción a DTO en el hilo principal (donde hay conexión a BD)
+        LoanReceiptDTO receiptDTO = LoanReceiptService.createReceiptDTO(transaction);
+
         // Crear Stage personalizado para el progreso
         Stage progressStage = new Stage();
         progressStage.initModality(javafx.stage.Modality.APPLICATION_MODAL);
@@ -263,14 +267,15 @@ public class PrintReceiptDialog {
         javafx.scene.Scene scene = new javafx.scene.Scene(progressBox, 350, 150);
         progressStage.setScene(scene);
 
-        // Ejecutar impresión en un hilo separado
+        // Ejecutar impresión en un hilo separado usando el DTO (no requiere conexión a BD)
         Thread printThread = new Thread(() -> {
             boolean success = false;
             String errorMessage = null;
 
             try {
                 logger.info("Iniciando impresión en: {}", printerName);
-                LoanReceiptService.printReceipt(transaction, printerName, copies);
+                // Usar el método con DTO que no accede a la base de datos
+                LoanReceiptService.printReceiptFromDTO(receiptDTO, printerName, copies);
                 success = true;
                 logger.info("Impresión completada exitosamente");
             } catch (Exception e) {

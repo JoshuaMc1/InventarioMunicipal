@@ -707,6 +707,27 @@ public class InventoryController {
         grid.add(lblSoft, 0, 1);
         grid.add(lblHard, 0, 2);
 
+        // Verificar si tiene transacciones asociadas
+        try {
+            Long transactionCount = (Long) org.javalite.activejdbc.Base.firstCell(
+                "SELECT COUNT(*) FROM transaction_items WHERE product_id = ?",
+                product.getId()
+            );
+
+            if (transactionCount != null && transactionCount > 0) {
+                Label lblWarning = new Label("⚠️ Este producto tiene " + transactionCount +
+                    " transacción(es) asociada(s).\nNo se puede eliminar permanentemente.");
+                lblWarning.setStyle("-fx-font-size: 13px; -fx-text-fill: #ff9800; -fx-font-weight: bold;");
+                lblWarning.setWrapText(true);
+                grid.add(lblWarning, 0, 3);
+
+                // Deshabilitar eliminación permanente
+                dialog.getDialogPane().lookupButton(hardDeleteBtn).setDisable(true);
+            }
+        } catch (Exception e) {
+            Logs.warn(getClass(), "No se pudo verificar transacciones asociadas: " + e.getMessage());
+        }
+
         dialog.getDialogPane().setContent(grid);
 
         dialog.setResultConverter(btn -> {
@@ -734,6 +755,10 @@ public class InventoryController {
                     }
                 }
                 loadProducts();
+            } catch (IllegalStateException e) {
+                // Errores de validación
+                Logs.warn(getClass(), "Validación de eliminación: " + e.getMessage());
+                Utils.showAlert("No se puede eliminar", e.getMessage());
             } catch (Exception e) {
                 Logs.error(getClass(), "Error eliminando producto", e);
                 Utils.showAlert("Error", "No se pudo eliminar el producto: " + e.getMessage());

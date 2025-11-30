@@ -222,6 +222,7 @@ public class OutcomesController {
         });
 
         colId.setStyle("-fx-font-size: 17;");
+        colStatus.setStyle("-fx-font-size: 17;");
         colProduct.setStyle("-fx-font-size: 17;");
         colQuantity.setStyle("-fx-font-size: 17;");
         colItems.setStyle("-fx-font-size: 17;");

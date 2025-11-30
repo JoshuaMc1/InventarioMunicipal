@@ -14,7 +14,7 @@ public class ProductRepository {
      */
     public List<Product> findAll() {
         return Product.where("status != ?", Product.STATUS_DELETED)
-            .orderBy("name");
+            .orderBy("id");
     }
 
     /**

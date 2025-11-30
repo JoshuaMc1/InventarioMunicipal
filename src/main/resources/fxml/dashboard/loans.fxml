@@ -69,7 +69,7 @@
                     <TableColumn fx:id="colDni" prefWidth="120" text="DNI" />
                     <TableColumn fx:id="colPerson" prefWidth="180" text="Persona" />
                     <TableColumn fx:id="colNotes" prefWidth="200" text="Notas" />
-                    <TableColumn fx:id="colActions" prefWidth="160" text="Acciones" />
+                    <TableColumn fx:id="colActions" prefWidth="200" text="Acciones" />
                 </columns>
             </TableView>
         </center>

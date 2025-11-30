@@ -7,13 +7,11 @@ import com.joshuamc1.inventariomunicipal.core.PermissionHelper;
 import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.models.Product;
 import com.joshuamc1.inventariomunicipal.models.Transaction;
-import com.joshuamc1.inventariomunicipal.models.TransactionItem;
 import com.joshuamc1.inventariomunicipal.models.User;
 import com.joshuamc1.inventariomunicipal.services.ProductService;
 import com.joshuamc1.inventariomunicipal.services.TransactionService;
 import com.joshuamc1.inventariomunicipal.services.UserService;
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
@@ -26,12 +24,16 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -71,7 +73,7 @@ public class HomeController implements AsyncLoadable {
     @FXML private TableColumn<Transaction, String> colFecha;
     @FXML private TableColumn<Transaction, String> colProducto;
     @FXML private TableColumn<Transaction, String> colTipo;
-    @FXML private TableColumn<Transaction, Number> colCantidad;
+    @FXML private TableColumn<Transaction, String> colCantidad; // Cambiado a String para formato personalizado
     @FXML private TableColumn<Transaction, String> colUsuario;
 
     private final ProductService productService = new ProductService();
@@ -81,11 +83,19 @@ public class HomeController implements AsyncLoadable {
     private final AtomicBoolean loading = new AtomicBoolean(false);
     private final AtomicReference<Runnable> onLoaded = new AtomicReference<>(null);
 
+    // Caché temporal para evitar queries duplicadas al renderizar tabla
+    private final Map<Integer, List<com.joshuamc1.inventariomunicipal.models.TransactionItem>> itemsCache = new HashMap<>();
+
+    // Auto-refresh del dashboard
+    private ScheduledExecutorService refreshScheduler;
+    private static final int AUTO_REFRESH_MINUTES = 5;
+
     @FXML
     public void initialize() {
         btnRefresh.setOnAction(e -> loadDashboardAsync());
         setupTableColumns();
         configurePermissions();
+        setupAutoRefresh();
         loadDashboardAsync();
     }
 
@@ -114,6 +124,51 @@ public class HomeController implements AsyncLoadable {
 
         // Con DASHBOARD.READ puede ver todas las estadísticas
         Logs.info(getClass(), "Usuario con DASHBOARD.READ - mostrando todas las estadísticas");
+    }
+
+    /**
+     * Configura el auto-refresh del dashboard cada X minutos.
+     */
+    private void setupAutoRefresh() {
+        refreshScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "dashboard-auto-refresh");
+            t.setDaemon(true);
+            return t;
+        });
+
+        // Programar actualización automática
+        refreshScheduler.scheduleAtFixedRate(
+            () -> {
+                if (!loading.get()) {
+                    Platform.runLater(this::loadDashboardAsync);
+                }
+            },
+            AUTO_REFRESH_MINUTES,
+            AUTO_REFRESH_MINUTES,
+            TimeUnit.MINUTES
+        );
+
+        Logs.info(HomeController.class, "Auto-refresh configurado cada {} minutos", AUTO_REFRESH_MINUTES);
+    }
+
+    /**
+     * Detiene el auto-refresh y libera recursos.
+     * Debe llamarse cuando se cierra el controller.
+     */
+    public void shutdown() {
+        if (refreshScheduler != null && !refreshScheduler.isShutdown()) {
+            refreshScheduler.shutdown();
+            try {
+                if (!refreshScheduler.awaitTermination(1, TimeUnit.SECONDS)) {
+                    refreshScheduler.shutdownNow();
+                }
+                Logs.info(HomeController.class, "Auto-refresh detenido correctamente");
+            } catch (InterruptedException e) {
+                refreshScheduler.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+        clearItemsCache();
     }
 
     /**
@@ -208,34 +263,110 @@ public class HomeController implements AsyncLoadable {
         }
     }
 
+    /**
+     * Obtiene los items de una transacción con caché para evitar queries duplicadas.
+     *
+     * @param transactionId ID de la transacción
+     * @return Lista de items de la transacción
+     */
+    private List<com.joshuamc1.inventariomunicipal.models.TransactionItem> getTransactionItemsCached(Integer transactionId) {
+        if (transactionId == null) {
+            return Collections.emptyList();
+        }
+        return itemsCache.computeIfAbsent(transactionId,
+            id -> transactionService.getTransactionItems(id));
+    }
+
+    /**
+     * Limpia el caché de transaction items.
+     * Debe llamarse después de actualizar la tabla para liberar memoria.
+     */
+    private void clearItemsCache() {
+        itemsCache.clear();
+    }
+
     private void setupTableColumns() {
-        colFecha.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("created_at")));
+        // Fecha de creación de la transacción
+        colFecha.setCellValueFactory(c -> {
+            String createdAt = c.getValue().getString("created_at");
+            if (createdAt != null && createdAt.length() >= 19) {
+                // Formato: 2025-11-28 14:30:00 -> 28/11/2025 14:30
+                try {
+                    LocalDateTime dateTime = LocalDateTime.parse(createdAt, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    return new SimpleStringProperty(dateTime.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")));
+                } catch (Exception e) {
+                    return new SimpleStringProperty(createdAt.substring(0, 16));
+                }
+            }
+            return new SimpleStringProperty("N/A");
+        });
+
+        // Productos de la transacción (multi-producto)
         colProducto.setCellValueFactory(c -> {
-            // Obtener items de la transacción
-            var items = transactionService.getTransactionItems(c.getValue().getInteger("id"));
+            Transaction transaction = c.getValue();
+            Integer totalItems = transaction.getInteger("total_items");
+
+            if (totalItems == null || totalItems == 0) {
+                return new SimpleStringProperty("Sin productos");
+            }
+
+            // Obtener items con caché
+            var items = getTransactionItemsCached(transaction.getInteger("id"));
             if (items.isEmpty()) {
                 return new SimpleStringProperty("Sin productos");
             }
+
             if (items.size() == 1) {
-                var product = items.get(0).getProduct();
-                return new SimpleStringProperty(product != null ? product.getString("name") : "N/A");
+                var item = items.get(0);
+                var product = item.parent(Product.class);
+                String productName = product != null ? product.getString("name") : "N/A";
+                return new SimpleStringProperty(productName);
             }
-            return new SimpleStringProperty("Multi-Producto (" + items.size() + ")");
+
+            // Multi-producto
+            return new SimpleStringProperty("Multi-Producto (" + items.size() + " items)");
         });
-        colTipo.setCellValueFactory(c -> new SimpleStringProperty(
-            com.joshuamc1.inventariomunicipal.core.enums.Transaction.fromDbValue(c.getValue().getString("type")).toString()
-        ));
+
+        // Tipo de transacción
+        colTipo.setCellValueFactory(c -> {
+            String type = c.getValue().getString("type");
+            String displayType = switch (type) {
+                case "in" -> "Ingreso";
+                case "out" -> "Egreso";
+                case "loan" -> "Préstamo";
+                default -> type;
+            };
+            return new SimpleStringProperty(displayType);
+        });
+
+        // Cantidad total de la transacción
         colCantidad.setCellValueFactory(c -> {
-            // Calcular suma total de cantidades desde los items
-            var items = transactionService.getTransactionItems(c.getValue().getInteger("id"));
-            double total = items.stream().mapToDouble(item -> item.getDouble("quantity")).sum();
-            return new ReadOnlyObjectWrapper<>(total);
+            Transaction transaction = c.getValue();
+
+            // Calcular suma total de cantidades desde los items (con caché)
+            var items = getTransactionItemsCached(transaction.getInteger("id"));
+            double total = items.stream()
+                .mapToDouble(item -> {
+                    Double qty = item.getDouble("quantity");
+                    return qty != null ? qty : 0.0;
+                })
+                .sum();
+
+            // Formatear: sin decimales si es entero, con decimales si no
+            String formatted = total % 1.0 == 0.0 ?
+                String.format("%.0f", total) :
+                String.format("%.2f", total);
+
+            return new SimpleStringProperty(formatted);
         });
+
+        // Usuario que registró la transacción
         colUsuario.setCellValueFactory(c -> {
             User u = c.getValue().parent(User.class);
             return new SimpleStringProperty(u != null ? u.getString("name") : "N/A");
         });
 
+        // Estilos
         colFecha.setStyle("-fx-font-size: 14;");
         colProducto.setStyle("-fx-font-size: 14;");
         colTipo.setStyle("-fx-font-size: 14;");
@@ -284,8 +415,15 @@ public class HomeController implements AsyncLoadable {
                         data.mostMovedProducts = transactionService.getMostMovedProducts(10);
                         data.transactionsByType = transactionService.getTransactionsByType();
                         data.weeklyActivity = transactionService.getWeeklyActivity();
+
+                        // Comparaciones mensuales por tipo de transacción
                         data.incomesThisMonth = transactionService.countByTypeThisMonth("in");
                         data.incomesLastMonth = transactionService.countByTypeLastMonth("in");
+                        data.outcomesThisMonth = transactionService.countByTypeThisMonth("out");
+                        data.outcomesLastMonth = transactionService.countByTypeLastMonth("out");
+                        data.loansThisMonth = transactionService.countByTypeThisMonth("loan");
+                        data.loansLastMonth = transactionService.countByTypeLastMonth("loan");
+
                         data.quarterlyTrend = transactionService.getQuarterlyTrend();
 
                         Logs.info(HomeController.class, "Dashboard data loaded successfully");
@@ -305,7 +443,6 @@ public class HomeController implements AsyncLoadable {
                         DashboardData data = getValue();
                         updateKPIs(data);
                         updateCharts(data);
-                        updateComparatives(data);
                         updateTable(data.latestTransactions);
                         updateContextInfo();
                     } finally {
@@ -334,33 +471,135 @@ public class HomeController implements AsyncLoadable {
     }
 
     private void updateKPIs(DashboardData data) {
+        // KPIs principales
         lblTotalProductos.setText(String.valueOf(data.totalProducts));
         lblBajoStock.setText(String.valueOf(data.lowStock));
         lblSinStock.setText(String.valueOf(data.outOfStock));
         lblPrestamosActivos.setText(String.valueOf(data.activeLoans));
         lblTransaccionesMes.setText(String.valueOf(data.transactionsThisMonth));
 
-        // Tendencia del mes
+        // === COMPARACIÓN 1: Transacciones Mes Actual vs Mes Anterior ===
         if (data.transactionsLastMonth > 0) {
-            double change = ((data.transactionsThisMonth - data.transactionsLastMonth) / (double) data.transactionsLastMonth) * 100;
-            if (change > 0) {
-                lblTrendMes.setText(String.format("↑ %.1f%%", change));
-                lblTrendMes.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #27ae60;");
-            } else if (change < 0) {
-                lblTrendMes.setText(String.format("↓ %.1f%%", Math.abs(change)));
-                lblTrendMes.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #e74c3c;");
+            double changePercent = ((data.transactionsThisMonth - data.transactionsLastMonth) / (double) data.transactionsLastMonth) * 100;
+            long difference = data.transactionsThisMonth - data.transactionsLastMonth;
+
+            String trendText;
+            String trendStyle;
+
+            if (changePercent > 0) {
+                trendText = String.format("↑ %.1f%% (+%d)", changePercent, difference);
+                trendStyle = "-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #27ae60;";
+            } else if (changePercent < 0) {
+                trendText = String.format("↓ %.1f%% (%d)", Math.abs(changePercent), difference);
+                trendStyle = "-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #e74c3c;";
             } else {
-                lblTrendMes.setText("→ 0%");
-                lblTrendMes.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #95a5a6;");
+                trendText = "→ 0% (sin cambios)";
+                trendStyle = "-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #95a5a6;";
+            }
+
+            lblTrendMes.setText(trendText);
+            lblTrendMes.setStyle(trendStyle);
+        } else if (data.transactionsThisMonth > 0) {
+            // Primer mes con transacciones
+            lblTrendMes.setText(String.format("↑ Nuevo (%d)", data.transactionsThisMonth));
+            lblTrendMes.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #3498db;");
+        } else {
+            // Sin transacciones en ambos meses
+            lblTrendMes.setText("→ Sin datos");
+            lblTrendMes.setStyle("-fx-font-size: 18; -fx-font-weight: bold; -fx-text-fill: #95a5a6;");
+        }
+
+        // === COMPARACIÓN 2: Total de Transacciones (desglosado) ===
+        if (lblCompTransacciones != null) {
+            long totalThisMonth = data.incomesThisMonth + data.outcomesThisMonth + data.loansThisMonth;
+            lblCompTransacciones.setText(String.format("%d (I:%d E:%d P:%d)",
+                totalThisMonth,
+                data.incomesThisMonth,
+                data.outcomesThisMonth,
+                data.loansThisMonth));
+
+            if (lblCompTransaccionesTrend != null) {
+                long totalLastMonth = data.incomesLastMonth + data.outcomesLastMonth + data.loansLastMonth;
+                updateComparisonLabel(lblCompTransaccionesTrend, totalThisMonth, totalLastMonth);
+            }
+        }
+
+        // === COMPARACIÓN 3: Productos Nuevos ===
+        if (lblCompProductos != null) {
+            lblCompProductos.setText(String.valueOf(data.newProductsThisMonth));
+
+            if (lblCompProductosTrend != null) {
+                updateComparisonLabel(lblCompProductosTrend, data.newProductsThisMonth, data.newProductsLastMonth);
+            }
+        }
+
+        // === COMPARACIÓN 4: Ingresos ===
+        if (lblCompIngresos != null) {
+            lblCompIngresos.setText(String.valueOf(data.incomesThisMonth));
+
+            if (lblCompIngresosTrend != null) {
+                updateComparisonLabel(lblCompIngresosTrend, data.incomesThisMonth, data.incomesLastMonth);
             }
         }
     }
 
-    private void updateCharts(DashboardData data) {
-        // 1. BarChart: Top 10 Stock
+    /**
+     * Actualiza un label de comparación con formato y colores apropiados.
+     *
+     * @param label Label a actualizar
+     * @param currentValue Valor del mes actual
+     * @param previousValue Valor del mes anterior
+     */
+    private void updateComparisonLabel(Label label, long currentValue, long previousValue) {
+        if (previousValue > 0) {
+            double changePercent = ((currentValue - previousValue) / (double) previousValue) * 100;
+            long difference = currentValue - previousValue;
+
+            String text;
+            String style;
+
+            if (changePercent > 5) {
+                // Incremento significativo (>5%)
+                text = String.format("↑ %.1f%% (+%d)", changePercent, difference);
+                style = "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #27ae60;";
+            } else if (changePercent > 0) {
+                // Incremento leve (0-5%)
+                text = String.format("↑ %.1f%% (+%d)", changePercent, difference);
+                style = "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #2ecc71;";
+            } else if (changePercent < -5) {
+                // Decremento significativo (<-5%)
+                text = String.format("↓ %.1f%% (%d)", Math.abs(changePercent), difference);
+                style = "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #e74c3c;";
+            } else if (changePercent < 0) {
+                // Decremento leve (0 a -5%)
+                text = String.format("↓ %.1f%% (%d)", Math.abs(changePercent), difference);
+                style = "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #e67e22;";
+            } else {
+                // Sin cambios (0%)
+                text = "→ 0%";
+                style = "-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #95a5a6;";
+            }
+
+            label.setText(text);
+            label.setStyle(style);
+        } else if (currentValue > 0) {
+            // Primer mes con datos
+            label.setText(String.format("↑ Nuevo (%d)", currentValue));
+            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3498db;");
+        } else {
+            // Sin datos en ambos meses
+            label.setText("→ Sin datos");
+            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #bdc3c7;");
+        }
+    }
+
+    private void updateCharts(@NotNull DashboardData data) {
+        // 1. BarChart: Top 10 Stock (productos activos)
         XYChart.Series<String, Number> stockSeries = new XYChart.Series<>();
-        stockSeries.setName("Stock");
+        stockSeries.setName("Stock Actual");
+
         data.products.stream()
+            .filter(this::isProductActive) // Solo productos activos
             .sorted((p1, p2) -> {
                 Double s1 = p1.getDouble("current_stock");
                 Double s2 = p2.getDouble("current_stock");
@@ -380,10 +619,15 @@ public class HomeController implements AsyncLoadable {
         barStock.getData().clear();
         barStock.getData().add(stockSeries);
 
-        // 2. PieChart: Stock Crítico vs Normal
+        // 2. PieChart: Distribución de Stock
+        long activeProducts = data.products.stream()
+            .filter(this::isProductActive)
+            .count();
+        long normalStock = Math.max(0, activeProducts - data.lowStock - data.outOfStock);
+
         pieStock.setData(FXCollections.observableArrayList(
-            new PieChart.Data("Crítico", data.lowStock),
-            new PieChart.Data("Normal", Math.max(0, data.totalProducts - data.lowStock)),
+            new PieChart.Data("Stock Normal", normalStock),
+            new PieChart.Data("Stock Bajo", data.lowStock),
             new PieChart.Data("Sin Stock", data.outOfStock)
         ));
 
@@ -409,32 +653,45 @@ public class HomeController implements AsyncLoadable {
 
         lineMovimientos.getData().addAll(ingresosSeries, egresosSeries, prestamosSeries);
 
-        // 4. BarChart: Productos Más Movidos
+        // 4. BarChart: Productos Más Movidos (desde transaction_items)
         XYChart.Series<String, Number> movidosSeries = new XYChart.Series<>();
-        movidosSeries.setName("Movimientos");
-        data.mostMovedProducts.forEach((productName, count) -> {
-            String displayName = productName.length() > 15 ? productName.substring(0, 12) + "..." : productName;
-            movidosSeries.getData().add(new XYChart.Data<>(displayName, count));
-        });
+        movidosSeries.setName("Transacciones");
+
+        if (data.mostMovedProducts != null && !data.mostMovedProducts.isEmpty()) {
+            data.mostMovedProducts.forEach((productName, count) -> {
+                String displayName = productName.length() > 15 ? productName.substring(0, 12) + "..." : productName;
+                movidosSeries.getData().add(new XYChart.Data<>(displayName, count));
+            });
+        }
         barMasMovidos.getData().clear();
         barMasMovidos.getData().add(movidosSeries);
 
-        // 5. PieChart: Distribución por Tipo
-        pieTipoTransaccion.setData(FXCollections.observableArrayList(
-            data.transactionsByType.entrySet().stream()
-                .map(e -> new PieChart.Data(
-                    com.joshuamc1.inventariomunicipal.core.enums.Transaction.fromDbValue(e.getKey()).getDisplayName(),
-                    e.getValue()
-                ))
-                .collect(java.util.stream.Collectors.toList())
-        ));
+        // 5. PieChart: Distribución por Tipo de Transacción
+        if (data.transactionsByType != null && !data.transactionsByType.isEmpty()) {
+            pieTipoTransaccion.setData(FXCollections.observableArrayList(
+                data.transactionsByType.entrySet().stream()
+                    .map(e -> {
+                        String displayName = switch (e.getKey()) {
+                            case "in" -> "Ingresos";
+                            case "out" -> "Egresos";
+                            case "loan" -> "Préstamos";
+                            default -> e.getKey();
+                        };
+                        return new PieChart.Data(displayName, e.getValue());
+                    })
+                    .collect(java.util.stream.Collectors.toList())
+            ));
+        } else {
+            pieTipoTransaccion.setData(FXCollections.observableArrayList());
+        }
 
         // 6. BarChart: Actividad Semanal
         XYChart.Series<String, Number> weeklySeries = new XYChart.Series<>();
         weeklySeries.setName("Transacciones");
-        String[] dias = {"Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"};
+        String[] dias = {"Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"};
         for (int i = 0; i < 7; i++) {
-            weeklySeries.getData().add(new XYChart.Data<>(dias[i], data.weeklyActivity.getOrDefault(i + 1, 0L)));
+            long count = data.weeklyActivity != null ? data.weeklyActivity.getOrDefault(i + 1, 0L) : 0L;
+            weeklySeries.getData().add(new XYChart.Data<>(dias[i], count));
         }
         barActividadSemanal.getData().clear();
         barActividadSemanal.getData().add(weeklySeries);
@@ -448,50 +705,21 @@ public class HomeController implements AsyncLoadable {
         XYChart.Series<String, Number> trimPrestamos = new XYChart.Series<>();
         trimPrestamos.setName("Préstamos");
 
-        data.quarterlyTrend.forEach((month, types) -> {
-            trimIngresos.getData().add(new XYChart.Data<>(month, types.getOrDefault("in", 0L)));
-            trimEgresos.getData().add(new XYChart.Data<>(month, types.getOrDefault("out", 0L)));
-            trimPrestamos.getData().add(new XYChart.Data<>(month, types.getOrDefault("loan", 0L)));
-        });
+        if (data.quarterlyTrend != null && !data.quarterlyTrend.isEmpty()) {
+            data.quarterlyTrend.forEach((month, types) -> {
+                trimIngresos.getData().add(new XYChart.Data<>(month, types.getOrDefault("in", 0L)));
+                trimEgresos.getData().add(new XYChart.Data<>(month, types.getOrDefault("out", 0L)));
+                trimPrestamos.getData().add(new XYChart.Data<>(month, types.getOrDefault("loan", 0L)));
+            });
+        }
 
         barTendenciaTrimestral.getData().addAll(trimIngresos, trimEgresos, trimPrestamos);
     }
 
-    private void updateComparatives(DashboardData data) {
-        // Transacciones
-        lblCompTransacciones.setText(data.transactionsThisMonth + " vs " + data.transactionsLastMonth);
-        setTrendLabel(lblCompTransaccionesTrend, data.transactionsThisMonth, data.transactionsLastMonth);
-
-        // Productos
-        lblCompProductos.setText(data.newProductsThisMonth + " vs " + data.newProductsLastMonth);
-        setTrendLabel(lblCompProductosTrend, data.newProductsThisMonth, data.newProductsLastMonth);
-
-        // Ingresos
-        lblCompIngresos.setText(data.incomesThisMonth + " vs " + data.incomesLastMonth);
-        setTrendLabel(lblCompIngresosTrend, data.incomesThisMonth, data.incomesLastMonth);
-    }
-
-    private void setTrendLabel(Label label, long current, long previous) {
-        if (previous == 0) {
-            label.setText(current > 0 ? "↑ Nuevo" : "→");
-            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #3498db;");
-            return;
-        }
-
-        double change = ((current - previous) / (double) previous) * 100;
-        if (change > 0) {
-            label.setText(String.format("↑ %.1f%%", change));
-            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #27ae60;");
-        } else if (change < 0) {
-            label.setText(String.format("↓ %.1f%%", Math.abs(change)));
-            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #e74c3c;");
-        } else {
-            label.setText("→ 0%");
-            label.setStyle("-fx-font-size: 14; -fx-font-weight: bold; -fx-text-fill: #95a5a6;");
-        }
-    }
 
     private void updateTable(List<Transaction> transactions) {
+        // Limpiar caché anterior
+        clearItemsCache();
         tblTransacciones.setItems(FXCollections.observableArrayList(transactions));
     }
 
@@ -505,27 +733,32 @@ public class HomeController implements AsyncLoadable {
     private Map<String, Map<String, Long>> groupTransactionsByDate(List<Transaction> transactions) {
         Map<String, Map<String, Long>> result = new LinkedHashMap<>();
 
+        // Inicializar los últimos 30 días
         for (int i = 29; i >= 0; i--) {
             LocalDate date = LocalDate.now().minusDays(i);
             String dateKey = date.format(DateTimeFormatter.ofPattern("dd/MM"));
             result.put(dateKey, new HashMap<>());
         }
 
-        transactions.forEach(t -> {
-            String createdAt = t.getString("created_at");
-            if (createdAt != null && createdAt.length() >= 10) {
-                try {
-                    LocalDate date = LocalDate.parse(createdAt.substring(0, 10));
-                    String dateKey = date.format(DateTimeFormatter.ofPattern("dd/MM"));
-                    String type = t.getString("type");
+        // Agrupar transacciones por fecha
+        if (transactions != null && !transactions.isEmpty()) {
+            transactions.forEach(t -> {
+                String createdAt = t.getString("created_at");
+                if (createdAt != null && createdAt.length() >= 10) {
+                    try {
+                        LocalDate date = LocalDate.parse(createdAt.substring(0, 10));
+                        String dateKey = date.format(DateTimeFormatter.ofPattern("dd/MM"));
+                        String type = t.getString("type");
 
-                    result.computeIfAbsent(dateKey, k -> new HashMap<>());
-                    result.get(dateKey).merge(type, 1L, Long::sum);
-                } catch (Exception e) {
-                    Logs.warn(HomeController.class, "Error parsing date: {}", createdAt);
+                        if (type != null && result.containsKey(dateKey)) {
+                            result.get(dateKey).merge(type, 1L, Long::sum);
+                        }
+                    } catch (Exception e) {
+                        Logs.warn(HomeController.class, "Error parsing date: {}", createdAt);
+                    }
                 }
-            }
-        });
+            });
+        }
 
         return result;
     }
@@ -535,22 +768,79 @@ public class HomeController implements AsyncLoadable {
         return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
 
+    /**
+     * Verifica si un producto está activo.
+     * Maneja tanto valores Integer como String para el campo status.
+     *
+     * @param product El producto a verificar
+     * @return true si el producto está activo (status = 1 o "1" o "active"), false en caso contrario
+     */
+    private boolean isProductActive(Product product) {
+        if (product == null) {
+            return false;
+        }
+
+        try {
+            // Intentar obtener como Integer primero
+            Integer status = product.getInteger("status");
+            if (status != null) {
+                return status == 1;
+            }
+
+            // Si falla, intentar como String
+            String statusStr = product.getString("status");
+            if (statusStr != null) {
+                // Puede ser "1", "active", "true", etc.
+                return "1".equals(statusStr) ||
+                       "active".equalsIgnoreCase(statusStr) ||
+                       "true".equalsIgnoreCase(statusStr);
+            }
+
+            // Si no hay campo status, asumimos que está activo
+            return true;
+
+        } catch (Exception e) {
+            Logs.warn(HomeController.class, "Error verificando estado del producto ID {}: {}",
+                     product.getId(), e.getMessage());
+            // En caso de error, asumimos que está activo para no ocultar datos
+            return true;
+        }
+    }
+
     // Clase interna para datos del dashboard
     private static class DashboardData {
+        // KPIs básicos
         long totalProducts;
         long lowStock;
         long outOfStock;
         long activeLoans;
+
+        // Comparaciones mensuales - Transacciones totales
         long transactionsThisMonth;
         long transactionsLastMonth;
+
+        // Comparaciones mensuales - Productos nuevos
         long newProductsThisMonth;
         long newProductsLastMonth;
+
+        // Comparaciones mensuales - Ingresos
         long incomesThisMonth;
         long incomesLastMonth;
 
+        // Comparaciones mensuales - Egresos
+        long outcomesThisMonth;
+        long outcomesLastMonth;
+
+        // Comparaciones mensuales - Préstamos
+        long loansThisMonth;
+        long loansLastMonth;
+
+        // Listas de datos
         List<Product> products;
         List<Transaction> latestTransactions;
         List<Transaction> last30DaysTransactions;
+
+        // Mapas de análisis
         Map<String, Long> mostMovedProducts;
         Map<String, Long> transactionsByType;
         Map<Integer, Long> weeklyActivity;
