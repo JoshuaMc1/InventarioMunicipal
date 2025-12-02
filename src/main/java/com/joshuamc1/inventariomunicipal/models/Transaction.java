@@ -160,14 +160,25 @@ public class Transaction extends Model {
      * @return true si está vencido
      */
     public boolean isLoanOverdue() {
-        if (!isLoan() || !LOAN_STATUS_PENDING.equals(this.getString("loan_status"))) {
+        if (!isLoan()) {
             return false;
         }
 
-        Date expectedReturn = this.getDate("expected_return_date");
-        if (expectedReturn == null) return false;
+        String loanStatus = this.getString("loan_status");
 
-        return expectedReturn.before(new Date());
+        // Si ya está marcado como vencido, retornar true
+        if (LOAN_STATUS_OVERDUE.equals(loanStatus)) {
+            return true;
+        }
+
+        // Si está pendiente, verificar la fecha
+        if (LOAN_STATUS_PENDING.equals(loanStatus)) {
+            Date expectedReturn = this.getDate("expected_return_date");
+            if (expectedReturn == null) return false;
+            return expectedReturn.before(new Date());
+        }
+
+        return false;
     }
 
     /**

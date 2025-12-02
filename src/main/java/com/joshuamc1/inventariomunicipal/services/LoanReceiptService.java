@@ -16,6 +16,7 @@ import com.itextpdf.layout.element.*;
 import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
 import com.joshuamc1.inventariomunicipal.models.*;
 import com.joshuamc1.inventariomunicipal.models.dto.LoanReceiptDTO;
 import com.google.zxing.BarcodeFormat;
@@ -367,7 +368,7 @@ public class LoanReceiptService {
      * Imprime el contenido del recibo en el dispositivo ESC/POS usando DTO
      * Este método no accede a la base de datos
      */
-    private static void printReceiptContentFromDTO(EscPos escpos, LoanReceiptDTO dto, String copyType) throws IOException {
+    private static void printReceiptContentFromDTO(@NotNull EscPos escpos, @NotNull LoanReceiptDTO dto, String copyType) throws IOException {
         // Nota: No configuramos charset porque escpos-coffee tiene soporte limitado
         // En su lugar, usamos normalización de texto para máxima compatibilidad
 
@@ -512,156 +513,12 @@ public class LoanReceiptService {
             throw new IllegalArgumentException("La transacción no puede ser nula");
         }
 
-        try (PdfWriter writer = new PdfWriter(new FileOutputStream(outputPath));
-             PdfDocument pdf = new PdfDocument(writer);
-             Document document = new Document(pdf)) {
+        try {
+            // Crear DTO dentro de una conexión garantizada para evitar errores "no connection on this thread"
+            LoanReceiptDTO dto = DatabaseManager.callInConnection(() -> createReceiptDTO(transaction));
 
-            // Configuración del documento
-            document.setMargins(30, 30, 30, 30);
-
-            // Logo (si existe)
-            try {
-                InputStream logoStream = LoanReceiptService.class.getResourceAsStream("/images/logo.png");
-                if (logoStream != null) {
-                    byte[] logoBytes = logoStream.readAllBytes();
-                    Image logo = new Image(ImageDataFactory.create(logoBytes));
-                    logo.setWidth(100);
-                    logo.setHorizontalAlignment(HorizontalAlignment.CENTER);
-                    document.add(logo);
-                }
-            } catch (Exception e) {
-                logger.warn("No se pudo cargar el logo para PDF", e);
-            }
-
-            // Título
-            Paragraph title = new Paragraph("INVENTARIO MUNICIPAL")
-                    .setFontSize(20)
-                    .setBold()
-                    .setTextAlignment(TextAlignment.CENTER);
-            document.add(title);
-
-            Paragraph subtitle = new Paragraph("RECIBO DE PRÉSTAMO")
-                    .setFontSize(16)
-                    .setTextAlignment(TextAlignment.CENTER);
-            document.add(subtitle);
-
-            document.add(new Paragraph("\n"));
-
-            // Información del préstamo
-            Table infoTable = new Table(UnitValue.createPercentArray(new float[]{1, 2}));
-            infoTable.setWidth(UnitValue.createPercentValue(100));
-
-            String loanCode = transaction.getString("loan_code");
-            addTableRow(infoTable, "Código:", loanCode, true);
-
-            // Agregar código de barras compacto
-            try {
-                BufferedImage barcodeImage = generateBarcodeImage(loanCode, 250, 60);
-                if (barcodeImage != null) {
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    ImageIO.write(barcodeImage, "png", baos);
-                    Image barcode = new Image(ImageDataFactory.create(baos.toByteArray()));
-                    barcode.setHorizontalAlignment(HorizontalAlignment.CENTER);
-                    barcode.setWidth(200);
-                    barcode.setMarginTop(5);
-                    barcode.setMarginBottom(5);
-                    document.add(barcode);
-                }
-            } catch (Exception e) {
-                logger.warn("No se pudo generar código de barras en PDF: " + e.getMessage());
-            }
-
-            Date createdAt = transaction.getTimestamp("created_at");
-            // Combinar fecha y hora en una sola fila
-            addTableRow(infoTable, "Fecha y Hora:", dateFormat.format(createdAt) + " " + timeFormat.format(createdAt), false);
-
-            // Usuario
-            User user = transaction.parent(User.class);
-            if (user != null) {
-                addTableRow(infoTable, "Realizado por:", user.getString("name"), false);
-                addTableRow(infoTable, "Usuario:", user.getString("username"), false);
-            }
-
-            // Persona
-            Person person = transaction.parent(Person.class);
-            if (person != null) {
-                addTableRow(infoTable, "Prestado a:",
-                           person.getString("first_name") + " " + person.getString("last_name"), true);
-                addTableRow(infoTable, "DNI:", person.getString("dni"), false);
-                String phone = person.getString("phone");
-                if (phone != null && !phone.isEmpty()) {
-                    addTableRow(infoTable, "Teléfono:", phone, false);
-                }
-            }
-
-            // Fecha de devolución
-            Date expectedReturnDate = transaction.getDate("expected_return_date");
-            if (expectedReturnDate != null) {
-                addTableRow(infoTable, "Devolución esperada:", dateFormat.format(expectedReturnDate), true);
-            }
-
-            document.add(infoTable);
-            document.add(new Paragraph("\n"));
-
-            // Tabla de artículos
-            Paragraph itemsTitle = new Paragraph("ARTÍCULOS PRESTADOS")
-                    .setFontSize(14)
-                    .setBold();
-            document.add(itemsTitle);
-
-            Table itemsTable = new Table(UnitValue.createPercentArray(new float[]{1, 3, 2, 1, 2}));
-            itemsTable.setWidth(UnitValue.createPercentValue(100));
-
-            // Encabezados
-            itemsTable.addHeaderCell(createHeaderCell("#"));
-            itemsTable.addHeaderCell(createHeaderCell("Artículo"));
-            itemsTable.addHeaderCell(createHeaderCell("Código"));
-            itemsTable.addHeaderCell(createHeaderCell("Cantidad"));
-            itemsTable.addHeaderCell(createHeaderCell("Unidad"));
-
-            // Items
-            List<TransactionItem> items = transaction.getAll(TransactionItem.class);
-            int itemNumber = 1;
-            for (TransactionItem item : items) {
-                Product product = item.parent(Product.class);
-                if (product != null) {
-                    itemsTable.addCell(createCell(String.valueOf(itemNumber)));
-                    itemsTable.addCell(createCell(product.getString("name")));
-                    itemsTable.addCell(createCell(product.getString("code")));
-                    itemsTable.addCell(createCell(String.valueOf(item.getDouble("quantity"))));
-                    itemsTable.addCell(createCell(product.getString("unit") != null ?
-                                                  product.getString("unit") : "unidad(es)"));
-                    itemNumber++;
-                }
-            }
-
-            document.add(itemsTable);
-            document.add(new Paragraph("\n"));
-
-            // Notas (con menos espacio)
-            String notes = transaction.getString("notes");
-            if (notes != null && !notes.isEmpty()) {
-                Paragraph notesTitle = new Paragraph("NOTAS:")
-                        .setFontSize(12)
-                        .setBold()
-                        .setMarginTop(10);
-                document.add(notesTitle);
-                Paragraph notesContent = new Paragraph(notes)
-                        .setMarginBottom(5);
-                document.add(notesContent);
-            }
-
-            // Pie de página (más compacto)
-            Paragraph totalItems = new Paragraph("Total de artículos: " + items.size())
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setBold()
-                    .setMarginTop(15);
-            document.add(totalItems);
-
-            Paragraph signature = new Paragraph("Firma: _____________________________")
-                    .setTextAlignment(TextAlignment.CENTER)
-                    .setMarginTop(20);
-            document.add(signature);
+            // Delegar la generación a la versión que no accede a la BD
+            generatePdfReceiptFromDTO(dto, outputPath);
 
             logger.info("PDF generado exitosamente en: {}", outputPath);
         } catch (Exception e) {
@@ -920,7 +777,7 @@ public class LoanReceiptService {
     /**
      * Busca un servicio de impresión por nombre
      */
-    private static PrintService findPrintService(String printerName) {
+    private static @Nullable PrintService findPrintService(String printerName) {
         PrintService[] printServices = PrintServiceLookup.lookupPrintServices(null, null);
         for (PrintService printService : printServices) {
             if (printService.getName().equalsIgnoreCase(printerName)) {
@@ -933,7 +790,7 @@ public class LoanReceiptService {
     /**
      * Agrega una fila a la tabla de información
      */
-    private static void addTableRow(Table table, String label, String value, boolean bold) {
+    private static void addTableRow(@NotNull Table table, String label, String value, boolean bold) {
         Cell labelCell = new Cell().add(new Paragraph(label).setBold());
         labelCell.setBorder(Border.NO_BORDER);
         table.addCell(labelCell);

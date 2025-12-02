@@ -91,7 +91,7 @@ public class PeopleController {
         colActions.setCellFactory(col -> new TableCell<>() {
             private final Button btnRestore = new Button("Restaurar");
             {
-                btnRestore.setStyle("-fx-font-size: 12; -fx-background-color: #4CAF50; -fx-text-fill: white;");
+                btnRestore.setStyle("-fx-font-size: 14; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-padding: 5 10;");
                 btnRestore.setOnAction(e -> {
                     Person person = getTableView().getItems().get(getIndex());
                     restorePerson(person);

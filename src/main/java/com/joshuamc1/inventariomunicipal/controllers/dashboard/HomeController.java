@@ -730,7 +730,7 @@ public class HomeController implements AsyncLoadable {
         lblEstadoSistema.setStyle("-fx-font-size: 12; -fx-text-fill: #27ae60;");
     }
 
-    private Map<String, Map<String, Long>> groupTransactionsByDate(List<Transaction> transactions) {
+    private @NotNull Map<String, Map<String, Long>> groupTransactionsByDate(List<Transaction> transactions) {
         Map<String, Map<String, Long>> result = new LinkedHashMap<>();
 
         // Inicializar los últimos 30 días
@@ -770,10 +770,10 @@ public class HomeController implements AsyncLoadable {
 
     /**
      * Verifica si un producto está activo.
-     * Maneja tanto valores Integer como String para el campo status.
+     * Maneja tanto valores Number como String para el campo status (soporta ENUM en BD).
      *
      * @param product El producto a verificar
-     * @return true si el producto está activo (status = 1 o "1" o "active"), false en caso contrario
+     * @return true si el producto está activo, false en caso contrario
      */
     private boolean isProductActive(Product product) {
         if (product == null) {
@@ -781,23 +781,21 @@ public class HomeController implements AsyncLoadable {
         }
 
         try {
-            // Intentar obtener como Integer primero
-            Integer status = product.getInteger("status");
-            if (status != null) {
-                return status == 1;
+            Object statusObj = product.get("status");
+            if (statusObj == null) {
+                // Si no hay status almacenado, asumimos activo por compatibilidad
+                return true;
             }
 
-            // Si falla, intentar como String
-            String statusStr = product.getString("status");
-            if (statusStr != null) {
-                // Puede ser "1", "active", "true", etc.
-                return "1".equals(statusStr) ||
-                       "active".equalsIgnoreCase(statusStr) ||
-                       "true".equalsIgnoreCase(statusStr);
+            // Si viene como número (compatibilidad con migraciones antiguas)
+            if (statusObj instanceof Number) {
+                int v = ((Number) statusObj).intValue();
+                return v == 1;
             }
 
-            // Si no hay campo status, asumimos que está activo
-            return true;
+            // Tratar como cadena (ENUM: 'active','inactive','deleted' o valores '1','true')
+            String statusStr = String.valueOf(statusObj).trim().toLowerCase();
+            return "1".equals(statusStr) || "active".equals(statusStr) || "true".equals(statusStr);
 
         } catch (Exception e) {
             Logs.warn(HomeController.class, "Error verificando estado del producto ID {}: {}",

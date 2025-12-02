@@ -50,6 +50,10 @@ public class MigrationRunner {
             } else {
                 Logs.info(MigrationRunner.class, "Migraciones aplicadas: {}", applied);
             }
+
+            // Crear eventos MySQL para préstamos vencidos
+            createOverdueLoansEvents();
+
         } catch (Exception e) {
             Logs.error(MigrationRunner.class, "Error ejecutando migraciones: {}", e.getMessage());
             throw new RuntimeException("Error ejecutando migraciones de base de datos", e);
@@ -171,5 +175,174 @@ public class MigrationRunner {
 
     private static String truncate(@NotNull String s) {
         return s.length() > 60 ? s.substring(0,57) + "..." : s;
+    }
+
+    /**
+     * Crea eventos MySQL para actualizar préstamos vencidos automáticamente.
+     * Se ejecuta después de las migraciones y usa JDBC directo para evitar problemas con DELIMITER.
+     */
+    private static void createOverdueLoansEvents() {
+        try {
+            Logs.info(MigrationRunner.class, "Configurando eventos de préstamos vencidos...");
+
+            // Activar event scheduler
+            enableEventScheduler();
+
+            // Crear los 3 eventos
+            createOverdueEventMorning();
+            createOverdueEventBackup();
+            createOverdueEventMidnight();
+
+            Logs.info(MigrationRunner.class, "Eventos de préstamos vencidos configurados correctamente");
+        } catch (Exception e) {
+            Logs.warn(MigrationRunner.class, "No se pudieron crear eventos automáticos: {}", e.getMessage());
+            Logs.warn(MigrationRunner.class, "Los eventos pueden crearse manualmente con MANUAL_create_overdue_events.sql");
+        }
+    }
+
+    /**
+     * Activa el event scheduler de MySQL
+     */
+    private static void enableEventScheduler() {
+        try {
+            Base.exec("SET GLOBAL event_scheduler = ON");
+            Logs.debug(MigrationRunner.class, "Event scheduler activado");
+        } catch (Exception e) {
+            Logs.debug(MigrationRunner.class, "Event scheduler ya estaba activo o no se pudo activar: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Crea evento para actualizar préstamos vencidos a las 8:35 AM
+     */
+    private static void createOverdueEventMorning() {
+        String eventName = "update_overdue_loans_morning";
+        try {
+            // Eliminar si existe
+            dropEventIfExists(eventName);
+
+            // Crear el evento (sin DELIMITER, todo en una línea)
+            String sql = "CREATE EVENT " + eventName + " " +
+                    "ON SCHEDULE EVERY 1 DAY " +
+                    "STARTS (CURDATE() + INTERVAL '08:35:00' HOUR_SECOND) " +
+                    "COMMENT 'Actualiza préstamos vencidos cada día a las 8:35 AM' " +
+                    "DO " +
+                    "BEGIN " +
+                    "  DECLARE affected_count INT DEFAULT 0; " +
+                    "  DECLARE system_user_id INT DEFAULT 1; " +
+                    "  SELECT id INTO system_user_id FROM users WHERE username = 'SYSTEM' LIMIT 1; " +
+                    "  UPDATE transactions SET loan_status = 'overdue' " +
+                    "  WHERE type = 'loan' AND loan_status = 'pending' AND status = 'active' " +
+                    "  AND expected_return_date < CURDATE(); " +
+                    "  SET affected_count = ROW_COUNT(); " +
+                    "  IF affected_count > 0 THEN " +
+                    "    INSERT INTO audit (user_id, action, table_name, record_id, details, created_at) " +
+                    "    VALUES (system_user_id, 'scheduled_update', 'transactions', NULL, " +
+                    "            CONCAT('Evento automático: ', affected_count, ' préstamo(s) actualizado(s) a estado VENCIDO a las 08:35 AM'), NOW()); " +
+                    "  END IF; " +
+                    "END";
+
+            Base.exec(sql);
+            Logs.debug(MigrationRunner.class, "Evento creado: {}", eventName);
+        } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("already exists")) {
+                Logs.debug(MigrationRunner.class, "Evento {} ya existe", eventName);
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Crea evento para actualizar préstamos vencidos a las 9:00 AM (respaldo)
+     */
+    private static void createOverdueEventBackup() {
+        String eventName = "update_overdue_loans_backup";
+        try {
+            dropEventIfExists(eventName);
+
+            String sql = "CREATE EVENT " + eventName + " " +
+                    "ON SCHEDULE EVERY 1 DAY " +
+                    "STARTS (CURDATE() + INTERVAL '09:00:00' HOUR_SECOND) " +
+                    "COMMENT 'Actualiza préstamos vencidos cada día a las 9:00 AM como respaldo' " +
+                    "DO " +
+                    "BEGIN " +
+                    "  DECLARE affected_count INT DEFAULT 0; " +
+                    "  DECLARE system_user_id INT DEFAULT 1; " +
+                    "  SELECT id INTO system_user_id FROM users WHERE username = 'SYSTEM' LIMIT 1; " +
+                    "  UPDATE transactions SET loan_status = 'overdue' " +
+                    "  WHERE type = 'loan' AND loan_status = 'pending' AND status = 'active' " +
+                    "  AND expected_return_date < CURDATE(); " +
+                    "  SET affected_count = ROW_COUNT(); " +
+                    "  IF affected_count > 0 THEN " +
+                    "    INSERT INTO audit (user_id, action, table_name, record_id, details, created_at) " +
+                    "    VALUES (system_user_id, 'scheduled_update', 'transactions', NULL, " +
+                    "            CONCAT('Evento automático (respaldo): ', affected_count, ' préstamo(s) actualizado(s) a estado VENCIDO a las 09:00 AM'), NOW()); " +
+                    "  END IF; " +
+                    "END";
+
+            Base.exec(sql);
+            Logs.debug(MigrationRunner.class, "Evento creado: {}", eventName);
+        } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("already exists")) {
+                Logs.debug(MigrationRunner.class, "Evento {} ya existe", eventName);
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Crea evento para actualizar préstamos vencidos a las 00:05 AM (medianoche)
+     */
+    private static void createOverdueEventMidnight() {
+        String eventName = "update_overdue_loans_midnight";
+        try {
+            dropEventIfExists(eventName);
+
+            String sql = "CREATE EVENT " + eventName + " " +
+                    "ON SCHEDULE EVERY 1 DAY " +
+                    "STARTS (CURDATE() + INTERVAL 1 DAY + INTERVAL '00:05:00' HOUR_SECOND) " +
+                    "COMMENT 'Actualiza préstamos vencidos cada día a las 00:05 AM' " +
+                    "DO " +
+                    "BEGIN " +
+                    "  DECLARE affected_count INT DEFAULT 0; " +
+                    "  DECLARE system_user_id INT DEFAULT 1; " +
+                    "  SELECT id INTO system_user_id FROM users WHERE username = 'SYSTEM' LIMIT 1; " +
+                    "  UPDATE transactions SET loan_status = 'overdue' " +
+                    "  WHERE type = 'loan' AND loan_status = 'pending' AND status = 'active' " +
+                    "  AND expected_return_date < CURDATE(); " +
+                    "  SET affected_count = ROW_COUNT(); " +
+                    "  IF affected_count > 0 THEN " +
+                    "    INSERT INTO audit (user_id, action, table_name, record_id, details, created_at) " +
+                    "    VALUES (system_user_id, 'scheduled_update', 'transactions', NULL, " +
+                    "            CONCAT('Evento automático (medianoche): ', affected_count, ' préstamo(s) actualizado(s) a estado VENCIDO a las 00:05 AM'), NOW()); " +
+                    "  END IF; " +
+                    "END";
+
+            Base.exec(sql);
+            Logs.debug(MigrationRunner.class, "Evento creado: {}", eventName);
+        } catch (Exception e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("already exists")) {
+                Logs.debug(MigrationRunner.class, "Evento {} ya existe", eventName);
+            } else {
+                throw e;
+            }
+        }
+    }
+
+    /**
+     * Elimina un evento si existe
+     */
+    private static void dropEventIfExists(String eventName) {
+        try {
+            Base.exec("DROP EVENT IF EXISTS " + eventName);
+        } catch (Exception e) {
+            // Ignorar errores al eliminar
+            Logs.debug(MigrationRunner.class, "No se pudo eliminar evento {}: {}", eventName, e.getMessage());
+        }
     }
 }

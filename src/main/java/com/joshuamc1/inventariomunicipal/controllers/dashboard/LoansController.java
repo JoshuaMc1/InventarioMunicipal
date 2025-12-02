@@ -2,7 +2,6 @@ package com.joshuamc1.inventariomunicipal.controllers.dashboard;
 
 import com.joshuamc1.inventariomunicipal.config.DatabaseConfig;
 import com.joshuamc1.inventariomunicipal.core.Logs;
-import com.joshuamc1.inventariomunicipal.core.LoanCodeGenerator;
 import com.joshuamc1.inventariomunicipal.core.dialog.PersonDialogHelper;
 import com.joshuamc1.inventariomunicipal.core.Session;
 import com.joshuamc1.inventariomunicipal.core.Utils;
@@ -29,7 +28,6 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import javafx.util.Duration;
@@ -106,15 +104,13 @@ public class LoansController {
         setupPermissions();
 
         // Configurar ComboBox de filtros
-        cmbFilter.getItems().addAll("Todos", "Pendientes", "Vencidos", "Devueltos", "Pagados");
+        cmbFilter.getItems().addAll("Todos", "Pendientes", "Vencidos");
         cmbFilter.setValue("Todos");
         cmbFilter.setOnAction(e -> {
             String selected = cmbFilter.getValue();
             currentFilter = switch (selected) {
                 case "Pendientes" -> "pending";
                 case "Vencidos" -> "overdue";
-                case "Devueltos" -> "returned";
-                case "Pagados" -> "paid";
                 default -> "all";
             };
             currentPage = 1;
@@ -240,10 +236,10 @@ public class LoansController {
             private final Button btnPrintReceipt = new Button("Recibo");
 
             {
-                btnViewItems.setStyle("-fx-font-size: 12; -fx-background-color: #9C27B0; -fx-text-fill: white;");
-                btnInvalidate.setStyle("-fx-font-size: 12; -fx-background-color: #f44336; -fx-text-fill: white;");
-                btnRestore.setStyle("-fx-font-size: 12; -fx-background-color: #4CAF50; -fx-text-fill: white;");
-                btnPrintReceipt.setStyle("-fx-font-size: 12; -fx-background-color: #2196F3; -fx-text-fill: white;");
+                btnViewItems.setStyle("-fx-font-size: 14; -fx-background-color: #9C27B0; -fx-text-fill: white; -fx-padding: 5 10;");
+                btnInvalidate.setStyle("-fx-font-size: 14; -fx-background-color: #f44336; -fx-text-fill: white; -fx-padding: 5 10;");
+                btnRestore.setStyle("-fx-font-size: 14; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-padding: 5 10;");
+                btnPrintReceipt.setStyle("-fx-font-size: 14; -fx-background-color: #2196F3; -fx-text-fill: white; -fx-padding: 5 10;");
                 btnPrintReceipt.setTooltip(new Tooltip("Emitir recibo del préstamo"));
 
                 btnViewItems.setOnAction(e -> {
@@ -1065,51 +1061,46 @@ public class LoansController {
     /**
      * Crea un badge visual según el estado del préstamo
      */
-    private @NotNull Label createStatusBadge(Transaction tx) {
+    private @NotNull Label createStatusBadge(@NotNull Transaction tx) {
         Label badge = new Label();
-        badge.setPadding(new Insets(3, 10, 3, 10));
-        badge.setStyle("-fx-background-radius: 3; -fx-font-size: 12px; -fx-font-weight: bold;");
+        badge.setStyle("-fx-font-size: 12px; -fx-font-weight: bold;");
 
         String status = tx.getString("status");
         String loanStatus = tx.getString("loan_status");
 
         // Verificar si está invalidado
         if ("invalidated".equals(status)) {
-            badge.setText("🚫 INVALIDADO");
-            badge.setStyle(badge.getStyle() + "-fx-background-color: #fd7e14; -fx-text-fill: white;");
+            badge.setText("INVALIDADO");
+            badge.setStyle(badge.getStyle() + "-fx-background-color: #fd7e14; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
             return badge;
         }
 
         // Estados de préstamo
         if ("returned".equals(loanStatus)) {
-            badge.setText("✓ DEVUELTO");
-            badge.setStyle(badge.getStyle() + "-fx-background-color: #28a745; -fx-text-fill: white;");
+            badge.setText("DEVUELTO");
+            badge.setStyle(badge.getStyle() + "-fx-background-color: #28a745; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
         } else if ("paid".equals(loanStatus)) {
-            badge.setText("💰 PAGADO");
-            badge.setStyle(badge.getStyle() + "-fx-background-color: #17a2b8; -fx-text-fill: white;");
+            badge.setText("PAGADO");
+            badge.setStyle(badge.getStyle() + "-fx-background-color: #17a2b8; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
         } else if ("replaced".equals(loanStatus)) {
-            badge.setText("🔄 REEMPLAZADO");
-            badge.setStyle(badge.getStyle() + "-fx-background-color: #6c757d; -fx-text-fill: white;");
+            badge.setText("REEMPLAZADO");
+            badge.setStyle(badge.getStyle() + "-fx-background-color: #6c757d; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
+        } else if ("overdue".equals(loanStatus)) {
+            // Estado vencido (actualizado por evento programado)
+            badge.setText("VENCIDO");
+            badge.setStyle(badge.getStyle() + "-fx-background-color: #dc3545; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
         } else if ("pending".equals(loanStatus)) {
-            // Verificar si está vencido
+            // Verificar si está vencido (para el caso en que el evento aún no se haya ejecutado)
             if (tx.isLoanOverdue()) {
-                badge.setText("⚠️ VENCIDO");
-                badge.setStyle(badge.getStyle() + "-fx-background-color: #dc3545; -fx-text-fill: white;");
-                // Efecto parpadeante
-                javafx.animation.Timeline timeline = new javafx.animation.Timeline(
-                    new javafx.animation.KeyFrame(javafx.util.Duration.seconds(0.5),
-                        e -> badge.setVisible(!badge.isVisible())),
-                    new javafx.animation.KeyFrame(javafx.util.Duration.seconds(1))
-                );
-                timeline.setCycleCount(javafx.animation.Timeline.INDEFINITE);
-                timeline.play();
+                badge.setText("VENCIDO");
+                badge.setStyle(badge.getStyle() + "-fx-background-color: #dc3545; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
             } else {
-                badge.setText("⏰ PENDIENTE");
-                badge.setStyle(badge.getStyle() + "-fx-background-color: #007bff; -fx-text-fill: white;");
+                badge.setText("PENDIENTE");
+                badge.setStyle(badge.getStyle() + "-fx-background-color: #007bff; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
             }
         } else {
             badge.setText("ACTIVO");
-            badge.setStyle(badge.getStyle() + "-fx-background-color: #28a745; -fx-text-fill: white;");
+            badge.setStyle(badge.getStyle() + "-fx-background-color: #28a745; -fx-text-fill: white; -fx-padding: 5 10; -fx-background-radius: 5;");
         }
 
         return badge;

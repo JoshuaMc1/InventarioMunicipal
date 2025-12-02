@@ -174,9 +174,9 @@ public class OutcomesController {
             private final Button btnRestore = new Button("Restaurar");
 
             {
-                btnViewItems.setStyle("-fx-font-size: 12; -fx-background-color: #FF9800; -fx-text-fill: white;");
-                btnInvalidate.setStyle("-fx-font-size: 12; -fx-background-color: #f44336; -fx-text-fill: white;");
-                btnRestore.setStyle("-fx-font-size: 12; -fx-background-color: #4CAF50; -fx-text-fill: white;");
+                btnViewItems.setStyle("-fx-font-size: 14; -fx-background-color: #FF9800; -fx-text-fill: white; -fx-padding: 5 10;");
+                btnInvalidate.setStyle("-fx-font-size: 14; -fx-background-color: #f44336; -fx-text-fill: white; -fx-padding: 5 10;");
+                btnRestore.setStyle("-fx-font-size: 14; -fx-background-color: #4CAF50; -fx-text-fill: white; -fx-padding: 5 10;");
 
                 btnViewItems.setOnAction(e -> {
                     Transaction transaction = getTableView().getItems().get(getIndex());

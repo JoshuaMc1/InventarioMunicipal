@@ -9,6 +9,7 @@ Bienvenido a la documentación oficial del **Sistema de Inventario Municipal**.
 
 ### Base de Datos
 - **[DATABASE.md](DATABASE.md)** - Estructura de la base de datos, tablas, relaciones y migraciones
+- **[EVENTOS_AUTOMATICOS.md](EVENTOS_AUTOMATICOS.md)** - Eventos MySQL automáticos para préstamos vencidos
 
 ### Características
 - **[FEATURES.md](FEATURES.md)** - Lista completa de características y funcionalidades del sistema

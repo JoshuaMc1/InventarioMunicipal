@@ -277,13 +277,14 @@ public class TransactionRepository {
     }
 
     /**
-     * Busca préstamos vencidos (pendientes con fecha esperada pasada)
+     * Busca préstamos vencidos (con estado 'overdue' o 'pending' con fecha pasada)
      */
     public List<Transaction> findOverdueLoans() {
         return Transaction.where(
-            "type = ? AND loan_status = ? AND expected_return_date < CURDATE() AND status = ?",
+            "type = ? AND ((loan_status = ? AND expected_return_date < CURDATE()) OR loan_status = ?) AND status = ?",
             Transaction.TYPE_LOAN,
             Transaction.LOAN_STATUS_PENDING,
+            Transaction.LOAN_STATUS_OVERDUE,
             Transaction.STATUS_ACTIVE
         ).orderBy("expected_return_date ASC");
     }
