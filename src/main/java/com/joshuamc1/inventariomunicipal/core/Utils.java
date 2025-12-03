@@ -1,14 +1,17 @@
 package com.joshuamc1.inventariomunicipal.core;
 
-import javafx.scene.Node;
 import javafx.scene.control.Alert;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.mindrot.jbcrypt.BCrypt;
 
-import javax.swing.text.html.ImageView;
 import java.awt.*;
+import java.io.File;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -215,9 +218,69 @@ public class Utils {
         }
     }
 
-    public static void openDocument(String s) {
+    public static void openDocument(String relativePath) {
+        if (relativePath == null || relativePath.trim().isEmpty()) {
+            Logs.error(Utils.class, "openDocument: ruta vacía");
+            return;
+        }
+
         try {
-            Desktop.getDesktop().open(new java.io.File(s));
+            // Si el usuario pasó una ruta absoluta (ej. C:\docs\file.pdf o /usr/share/...), abrirla directamente
+            Path provided = Paths.get(relativePath);
+            if (provided.isAbsolute()) {
+                File absFile = provided.toFile();
+                if (absFile.exists()) {
+                    Desktop.getDesktop().open(absFile);
+                } else {
+                    Logs.error(Utils.class, "El archivo no existe: {}", absFile.getAbsolutePath());
+                }
+                return;
+            }
+
+            // Normalizar la ruta relativa: eliminar barras iniciales para evitar que Path la trate como absoluta
+            String rel = relativePath.replaceFirst("^[\\\\/]+", "");
+
+            // Obtener directorio base del ejecutable/jar o el working dir cuando se ejecuta desde IDE
+            Path exePath = Paths.get(Utils.class
+                    .getProtectionDomain()
+                    .getCodeSource()
+                    .getLocation()
+                    .toURI());
+
+            Path baseDir = exePath.toFile().isFile()
+                    ? exePath.getParent()
+                    : Paths.get(System.getProperty("user.dir"));
+
+            Path pdfPath = baseDir.resolve(rel).normalize();
+            File pdf = pdfPath.toFile();
+
+            // Primero intentar abrir desde el sistema de archivos (instalación)
+            if (pdf.exists()) {
+                Desktop.getDesktop().open(pdf);
+                return;
+            }
+
+            // Si no existe en disco, intentar cargar desde classpath (archivo empaquetado en el JAR)
+            String resourcePath = rel.startsWith("/") ? rel : "/" + rel;
+            InputStream is = Utils.class.getResourceAsStream(resourcePath);
+            if (is == null) {
+                // Intentar sin la barra inicial por si el recurso está en el paquete raíz
+                is = Utils.class.getResourceAsStream(rel);
+            }
+
+            if (is != null) {
+                // Copiar a un archivo temporal y abrirlo
+                Path tmp = Files.createTempFile("doc-", "-" + Paths.get(rel).getFileName().toString());
+                tmp.toFile().deleteOnExit();
+                Files.copy(is, tmp, StandardCopyOption.REPLACE_EXISTING);
+                is.close();
+                Desktop.getDesktop().open(tmp.toFile());
+                return;
+            }
+
+            // No se encontró en ninguno de los lugares
+            Logs.error(Utils.class, "El archivo no existe: {}", pdfPath.toAbsolutePath().toString());
+
         } catch (Exception e) {
             Logs.error(Utils.class, "No se pudo abrir el documento: {}", e.getMessage());
         }
