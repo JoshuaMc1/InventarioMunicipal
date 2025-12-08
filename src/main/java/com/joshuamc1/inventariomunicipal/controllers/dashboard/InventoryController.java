@@ -351,7 +351,15 @@ public class InventoryController {
         ButtonType createBtn = new ButtonType("Crear", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(createBtn, ButtonType.CANCEL);
 
+        // Declarar todos los campos primero
         TextField txtCode = new TextField();
+        TextField txtName = new TextField();
+        TextArea txtDesc = new TextArea();
+        ComboBox<Units> cbUnit = new ComboBox<>(FXCollections.observableArrayList(Units.values()));
+        TextField txtCurrentStock = new TextField();
+        TextField txtMinStock = new TextField();
+
+        // Configurar txtCode
         txtCode.setPromptText("Ingrese o escanee el código");
         // Generar código automáticamente al abrir el diálogo
         txtCode.setText(BarcodeGenerator.generateRandomCode());
@@ -359,22 +367,26 @@ public class InventoryController {
         btnGenerateCode.setTooltip(new Tooltip("Generar código aleatorio"));
         btnGenerateCode.setOnAction(e -> txtCode.setText(BarcodeGenerator.generateRandomCode()));
 
+        // Prevenir que Enter cierre el diálogo cuando se escanea un código
+        txtCode.setOnKeyPressed(event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ENTER) {
+                event.consume();
+                // Mover foco al siguiente campo
+                txtName.requestFocus();
+            }
+        });
+
         HBox hboxCode = new HBox(5, txtCode, btnGenerateCode);
         hboxCode.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
         txtCode.prefWidthProperty().bind(hboxCode.widthProperty().subtract(btnGenerateCode.widthProperty()).subtract(10));
 
-        TextField txtName = new TextField();
-        TextArea txtDesc = new TextArea();
-        ComboBox<Units> cbUnit = new ComboBox<>(FXCollections.observableArrayList(Units.values()));
+        // Configurar otros campos
         cbUnit.setValue(Units.UNIDAD);
-        TextField txtCurrentStock = new TextField();
-        TextField txtMinStock = new TextField();
+        txtDesc.setPrefRowCount(3);
 
         // Aplicar validadores numéricos
         txtCurrentStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());
         txtMinStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());
-
-        txtDesc.setPrefRowCount(3);
 
         // Aplicar estilos a los labels y campos de entrada
         txtCode.setStyle("-fx-font-size: 17;");
@@ -508,23 +520,35 @@ public class InventoryController {
         ButtonType saveBtn = new ButtonType("Guardar", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(saveBtn, ButtonType.CANCEL);
 
+        // Declarar todos los campos primero
         String currentCode = sel.getString("code");
         TextField txtCode = new TextField(currentCode != null ? currentCode : "");
-        txtCode.setPromptText("Ingrese o escanee el código");
-        Button btnGenerateCode = new Button("🎲");
-        btnGenerateCode.setTooltip(new Tooltip("Generar código aleatorio"));
-        btnGenerateCode.setOnAction(e -> txtCode.setText(BarcodeGenerator.generateRandomCode()));
-
-        HBox hboxCode = new HBox(5, txtCode, btnGenerateCode);
-        hboxCode.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        txtCode.prefWidthProperty().bind(hboxCode.widthProperty().subtract(btnGenerateCode.widthProperty()).subtract(10));
-
         TextField txtName = new TextField(sel.getString("name"));
         TextArea txtDesc = new TextArea(sel.getString("description"));
         ComboBox<Units> cbUnit = new ComboBox<>(FXCollections.observableArrayList(Units.values()));
         cbUnit.setValue(Units.fromDbValue(sel.getString("unit")));
         TextField txtCurrentStock = new TextField(String.valueOf(sel.getDouble("current_stock") == null ? 0.0 : sel.getDouble("current_stock")));
         TextField txtMinStock = new TextField(String.valueOf(sel.getDouble("minimum_stock")));
+
+        // Configurar txtCode
+        txtCode.setPromptText("Ingrese o escanee el código");
+        Button btnGenerateCode = new Button("🎲");
+        btnGenerateCode.setTooltip(new Tooltip("Generar código aleatorio"));
+        btnGenerateCode.setOnAction(e -> txtCode.setText(BarcodeGenerator.generateRandomCode()));
+
+        // Prevenir que Enter cierre el diálogo cuando se escanea un código
+        txtCode.setOnKeyPressed(event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ENTER) {
+                event.consume();
+                // Mover foco al siguiente campo
+                txtName.requestFocus();
+            }
+        });
+
+        HBox hboxCode = new HBox(5, txtCode, btnGenerateCode);
+        hboxCode.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        txtCode.prefWidthProperty().bind(hboxCode.widthProperty().subtract(btnGenerateCode.widthProperty()).subtract(10));
+
 
         // Aplicar validadores numéricos
         txtCurrentStock.setTextFormatter(com.joshuamc1.inventariomunicipal.utils.ValidationHelper.getDecimalFormatter());

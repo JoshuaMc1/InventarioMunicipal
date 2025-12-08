@@ -982,6 +982,16 @@ public class IncomesController {
         txtSearchProduct.setPromptText("Buscar producto por nombre, ID o código (soporta escáner)...");
         txtSearchProduct.setStyle("-fx-font-size: 17;");
 
+        // Prevenir que Enter active el botón predeterminado (excepto desde botones)
+        d.getDialogPane().addEventFilter(javafx.scene.input.KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == javafx.scene.input.KeyCode.ENTER &&
+                !(event.getTarget() instanceof javafx.scene.control.Button)) {
+                event.consume();
+            }
+        });
+        txtSearchProduct.setPromptText("Buscar producto por nombre, ID o código (soporta escáner)...");
+        txtSearchProduct.setStyle("-fx-font-size: 17;");
+
         // Búsqueda automática mientras escribe (debounce)
         PauseTransition productDebounce = new PauseTransition(Duration.millis(300));
         txtSearchProduct.textProperty().addListener((obs, old, val) -> {
@@ -1016,40 +1026,38 @@ public class IncomesController {
         txtQuantity.setTextFormatter(quantityFormatter);
 
         // Detectar Enter (lectores de códigos de barras envían Enter al final)
-        txtSearchProduct.setOnKeyPressed(event -> {
-            if (event.getCode() == javafx.scene.input.KeyCode.ENTER) {
-                String query = txtSearchProduct.getText().trim();
-                if (!query.isEmpty()) {
-                    // Buscar primero por código exacto (para escáneres)
-                    new Thread(() -> {
-                        Product exactMatch = productService.findByCode(query);
-                        if (exactMatch != null) {
-                            // Encontrado por código exacto
-                            Platform.runLater(() -> {
-                                masterProducts.setAll(List.of(exactMatch));
-                                cmbProduct.setValue(exactMatch);
+        // Usamos setOnAction en lugar de onKeyPressed para evitar propagación
+        txtSearchProduct.setOnAction(event -> {
+            String query = txtSearchProduct.getText().trim();
+            if (!query.isEmpty()) {
+                // Buscar primero por código exacto (para escáneres)
+                new Thread(() -> {
+                    Product exactMatch = productService.findByCode(query);
+                    if (exactMatch != null) {
+                        // Encontrado por código exacto
+                        Platform.runLater(() -> {
+                            masterProducts.setAll(List.of(exactMatch));
+                            cmbProduct.setValue(exactMatch);
+                            txtSearchProduct.clear();
+                            txtQuantity.requestFocus(); // Mover foco a cantidad
+                        });
+                    } else {
+                        // Buscar por nombre o ID
+                        List<Product> results = productService.searchProducts(query, 100);
+                        Platform.runLater(() -> {
+                            masterProducts.setAll(results);
+                            if (results.size() == 1) {
+                                // Solo un resultado, seleccionarlo automáticamente
+                                cmbProduct.setValue(results.get(0));
                                 txtSearchProduct.clear();
-                                txtQuantity.requestFocus(); // Mover foco a cantidad
-                            });
-                        } else {
-                            // Buscar por nombre o ID
-                            List<Product> results = productService.searchProducts(query, 100);
-                            Platform.runLater(() -> {
-                                masterProducts.setAll(results);
-                                if (results.size() == 1) {
-                                    // Solo un resultado, seleccionarlo automáticamente
-                                    cmbProduct.setValue(results.get(0));
-                                    txtSearchProduct.clear();
-                                    txtQuantity.requestFocus();
-                                } else if (!results.isEmpty()) {
-                                    // Múltiples resultados, abrir ComboBox para elegir
-                                    cmbProduct.show();
-                                }
-                            });
-                        }
-                    }).start();
-                }
-                event.consume(); // Prevenir que el Enter haga otra acción
+                                txtQuantity.requestFocus();
+                            } else if (!results.isEmpty()) {
+                                // Múltiples resultados, abrir ComboBox para elegir
+                                cmbProduct.show();
+                            }
+                        });
+                    }
+                }).start();
             }
         });
 
