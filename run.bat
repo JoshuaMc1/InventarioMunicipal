@@ -1,4 +1,5 @@
-::  Código original
-SET JAVA_HOME=%~dp0\jdk
+@echo off
+cd /d "%~dp0"
+SET JAVA_HOME=%~dp0jdk
 SET PATH=%JAVA_HOME%\bin;%PATH%
-start /B "" "%JAVA_HOME%\bin\javaw.exe" --module-path "%~dp0\javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -jar "%~dp0\InventarioMunicipal-1.0-SNAPSHOT.jar"
+start "" "%JAVA_HOME%\bin\javaw.exe" --module-path "%~dp0javafx-sdk\lib" --add-modules javafx.controls,javafx.fxml -jar "%~dp0InventarioMunicipal-1.0-SNAPSHOT.jar"
