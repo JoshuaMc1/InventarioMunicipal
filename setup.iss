@@ -67,31 +67,31 @@ Name: "mysql"; Description: "MySQL (herramienta de gestión de BD)"; Types: full
 ; Archivos a copiar
 [Files]
 ; Aplicación principal
-Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\target\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "D:\Java\InventarioMunicipal\target\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion; Components: core
 
 ; JDK 25 - usando ruta absoluta
-Source: "C:\Users\joshu\.jdks\openjdk-25.0.1\*"; DestDir: "{app}\jdk"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: jdk
+Source: "E:\sdks\Java\openjdk-25.0.1\*"; DestDir: "{app}\jdk"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: jdk
 
 ; JavaFX SDK - usando ruta absoluta
-Source: "C:\SDKs\openjfx-25.0.1_windows-x64_bin-sdk\javafx-sdk-25.0.1\*"; DestDir: "{app}\javafx-sdk"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: javafx
+Source: "E:\sdks\Java\javafx-sdk-25.0.1\*"; DestDir: "{app}\javafx-sdk"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: javafx
 
 ; Archivos de la aplicación
-Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\src\main\resources\images\favicon.ico"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\{#MyAppLauncher}"; DestDir: "{app}"; DestName: "{#MyAppLauncher}"; Flags: ignoreversion; Components: core
+Source: "D:\Java\InventarioMunicipal\src\main\resources\images\favicon.ico"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "D:\Java\InventarioMunicipal\{#MyAppLauncher}"; DestDir: "{app}"; DestName: "{#MyAppLauncher}"; Flags: ignoreversion; Components: core
 
 ; Archivos de documentación
-Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\README.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\docs\*"; DestDir: "{app}\docs"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: core
+Source: "D:\Java\InventarioMunicipal\README.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "D:\Java\InventarioMunicipal\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "D:\Java\InventarioMunicipal\docs\*"; DestDir: "{app}\docs"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: core
 
 ; GZIP (obligatorio para backups)
-Source: "D:\Sistema de Inventario\Instaladores\gzip-1.3.12-1\*"; DestDir: "{app}\gzip"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: gzip
+Source: "D:\Instaladores\gzip-1.3.12-1\*"; DestDir: "{app}\gzip"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: gzip
 
 ; Visual C++ Redistributable (necesario para MySQL)
-Source: "D:\Sistema de Inventario\Instaladores\VC_redist.x64.exe"; DestDir: "{app}\vcredist"; Flags: ignoreversion; Components: vcredist
+Source: "D:\Instaladores\VC_redist.x64.exe"; DestDir: "{app}\vcredist"; Flags: ignoreversion; Components: vcredist
 
 ; MySQL Workbench (opcional)
-Source: "D:\Sistema de Inventario\Instaladores\mysql-installer-community-8.0.msi"; DestDir: "{app}\mysql"; Flags: ignoreversion; Components: mysql
+Source: "D:\Instaladores\mysql-installer-community-8.0.msi"; DestDir: "{app}\mysql"; Flags: ignoreversion; Components: mysql
 
 ; Crear carpeta de logs se hará automáticamente
 

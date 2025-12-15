@@ -21,7 +21,7 @@ import java.util.Properties;
 public class MySQLConfigManager {
     private static final String CONFIG_FILE = "mysql.config";
     private static final String SALT = "InventarioMunicipal2025"; // Salt fijo para el cifrado
-    private static final String SECRET = "SecureInventoryKey"; // Clave para cifrado
+    private static final String SECRET = "7jq4b6PXmxk7Fmi1CYHhJt34NjZ9zCMh"; // Clave para cifrado
 
     private static final Path configPath;
     private static final Properties props = new Properties();

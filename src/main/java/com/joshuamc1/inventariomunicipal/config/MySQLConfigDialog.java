@@ -148,12 +148,28 @@ public class MySQLConfigDialog {
 
             new Thread(() -> {
                 boolean success = testConnection();
+                boolean hasExistingMigrations = success && hasMigrationsApplied();
+                
                 javafx.application.Platform.runLater(() -> {
                     if (success) {
-                        statusLabel.setText("✅ Conexión exitosa! Ahora puede ejecutar las migraciones.");
-                        statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
                         connectionTested = true;
-                        migrateButton.setDisable(false);
+                        
+                        if (hasExistingMigrations) {
+                            // Base de datos ya tiene migraciones aplicadas
+                            statusLabel.setText("✅ Conexión exitosa! La base de datos ya está configurada.\nPuede guardar la configuración directamente.");
+                            statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                            migrationsExecuted = true; // Marcar como si ya se hubieran ejecutado
+                            migrateButton.setDisable(true); // Deshabilitar botón de migraciones
+                            migrateButton.setText("Migraciones Ya Aplicadas");
+                            saveButton.setDisable(false); // Habilitar guardar directamente
+                            AppState.setMigrationsApplied(true);
+                        } else {
+                            // Base de datos vacía, necesita migraciones
+                            statusLabel.setText("✅ Conexión exitosa! La base de datos está vacía.\nDebe ejecutar las migraciones.");
+                            statusLabel.setStyle("-fx-text-fill: green; -fx-font-weight: bold;");
+                            migrateButton.setDisable(false);
+                            migrateButton.setText("Ejecutar Migraciones");
+                        }
                     } else {
                         statusLabel.setText("❌ Error de conexión. Verifique los datos e intente nuevamente.");
                         statusLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
@@ -202,8 +218,13 @@ public class MySQLConfigDialog {
 
         // Evento: Guardar configuración
         saveButton.setOnAction(e -> {
-            if (!connectionTested || !migrationsExecuted) {
-                Utils.showAlert("Aviso", "Debe probar la conexión y ejecutar las migraciones antes de continuar");
+            if (!connectionTested) {
+                Utils.showAlert("Aviso", "Debe probar la conexión antes de continuar");
+                return;
+            }
+            
+            if (!migrationsExecuted) {
+                Utils.showAlert("Aviso", "Debe ejecutar las migraciones antes de continuar");
                 return;
             }
 
@@ -257,6 +278,29 @@ public class MySQLConfigDialog {
             }
         } catch (Exception e) {
             Logs.error(MySQLConfigDialog.class, "Error probando conexión MySQL: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Verifica si la base de datos ya tiene migraciones aplicadas (tablas existentes).
+     */
+    private static boolean hasMigrationsApplied() {
+        String url = String.format("jdbc:mysql://%s:%s/%s?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC",
+                host, port, database);
+
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            try (Connection conn = DriverManager.getConnection(url, username, password)) {
+                var meta = conn.getMetaData();
+                var rs = meta.getTables(database, null, "users", new String[]{"TABLE"});
+                boolean tablesExist = rs.next();
+                Logs.info(MySQLConfigDialog.class, "Verificación de migraciones: tablas {} encontradas", 
+                    tablesExist ? "" : "NO");
+                return tablesExist;
+            }
+        } catch (Exception e) {
+            Logs.error(MySQLConfigDialog.class, "Error verificando migraciones: {}", e.getMessage());
             return false;
         }
     }
