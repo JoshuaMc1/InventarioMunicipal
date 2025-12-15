@@ -67,31 +67,31 @@ Name: "mysql"; Description: "MySQL (herramienta de gestión de BD)"; Types: full
 ; Archivos a copiar
 [Files]
 ; Aplicación principal
-Source: "D:\Java\InventarioMunicipal\target\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\target\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion; Components: core
 
 ; JDK 25 - usando ruta absoluta
-Source: "E:\sdks\Java\openjdk-25.0.1\*"; DestDir: "{app}\jdk"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: jdk
+Source: "C:\Users\joshu\.jdks\openjdk-25.0.1\*"; DestDir: "{app}\jdk"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: jdk
 
 ; JavaFX SDK - usando ruta absoluta
-Source: "E:\sdks\Java\javafx-sdk-25.0.1\*"; DestDir: "{app}\javafx-sdk"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: javafx
+Source: "C:\SDKs\openjfx-25.0.1_windows-x64_bin-sdk\javafx-sdk-25.0.1\*"; DestDir: "{app}\javafx-sdk"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: javafx
 
 ; Archivos de la aplicación
-Source: "D:\Java\InventarioMunicipal\src\main\resources\images\favicon.ico"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "D:\Java\InventarioMunicipal\{#MyAppLauncher}"; DestDir: "{app}"; DestName: "{#MyAppLauncher}"; Flags: ignoreversion; Components: core
+Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\src\main\resources\images\favicon.ico"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\{#MyAppLauncher}"; DestDir: "{app}"; DestName: "{#MyAppLauncher}"; Flags: ignoreversion; Components: core
 
 ; Archivos de documentación
-Source: "D:\Java\InventarioMunicipal\README.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "D:\Java\InventarioMunicipal\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
-Source: "D:\Java\InventarioMunicipal\docs\*"; DestDir: "{app}\docs"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: core
+Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\README.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion; Components: core
+Source: "C:\Users\joshu\IdeaProjects\InventarioMunicipal\docs\*"; DestDir: "{app}\docs"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: core
 
 ; GZIP (obligatorio para backups)
-Source: "D:\Instaladores\gzip-1.3.12-1\*"; DestDir: "{app}\gzip"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: gzip
+Source: "D:\Sistema de Inventario\Instaladores\gzip-1.3.12-1\*"; DestDir: "{app}\gzip"; Flags: recursesubdirs createallsubdirs ignoreversion; Components: gzip
 
 ; Visual C++ Redistributable (necesario para MySQL)
-Source: "D:\Instaladores\VC_redist.x64.exe"; DestDir: "{app}\vcredist"; Flags: ignoreversion; Components: vcredist
+Source: "D:\Sistema de Inventario\Instaladores\VC_redist.x64.exe"; DestDir: "{app}\vcredist"; Flags: ignoreversion; Components: vcredist
 
 ; MySQL Workbench (opcional)
-Source: "D:\Instaladores\mysql-installer-community-8.0.msi"; DestDir: "{app}\mysql"; Flags: ignoreversion; Components: mysql
+Source: "D:\Sistema de Inventario\Instaladores\mysql-installer-community-8.0.msi"; DestDir: "{app}\mysql"; Flags: ignoreversion; Components: mysql
 
 ; Crear carpeta de logs se hará automáticamente
 
@@ -121,8 +121,8 @@ Root: HKLM; Subkey: "Software\{#MyAppPublisher}\{#MyAppName}"; ValueType: string
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppLauncher}"; ValueType: string; ValueName: ""; ValueData: "{app}\{#MyAppLauncher}"; Flags: uninsdeletekey
 Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\App Paths\{#MyAppLauncher}"; ValueType: string; ValueName: "Path"; ValueData: "{app}"; Flags: uninsdeletekey
 
-; Agregar gzip al PATH del sistema
-Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\gzip\bin"; Check: NeedsAddPath('{app}\gzip\bin'); Flags: uninsdeletevalue
+; Agregar gzip al PATH del sistema (CORREGIDO - ya no borra el PATH)
+Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Control\Session Manager\Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app}\gzip\bin"; Check: NeedsAddPath('{app}\gzip\bin')
 
 ; ----------------------------------------------------------------
 ; Ejecutar al finalizar instalación
@@ -173,14 +173,31 @@ end;
 function NeedsAddPath(Param: string): Boolean;
 var
   OrigPath: string;
+  ParamExpanded: string;
 begin
+  // Leer el PATH actual del sistema
   if not RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', OrigPath) then
   begin
     Result := True;
     Exit;
   end;
-  // Buscar si la ruta ya existe en PATH
-  Result := Pos(';' + Param + ';', ';' + OrigPath + ';') = 0;
+  
+  // Expandir la ruta del parámetro
+  ParamExpanded := ExpandConstant(Param);
+  
+  // Normalizar las rutas para comparación (sin distinguir mayúsculas/minúsculas)
+  OrigPath := Uppercase(OrigPath);
+  ParamExpanded := Uppercase(ParamExpanded);
+  
+  // Buscar si la ruta ya existe en PATH (con diferentes formatos)
+  Result := (Pos(';' + ParamExpanded + ';', ';' + OrigPath + ';') = 0) and
+            (Pos(';' + ParamExpanded, ';' + OrigPath) = 0) and
+            (Pos(ParamExpanded + ';', OrigPath + ';') = 0);
+  
+  if Result then
+    Log('Agregando al PATH: ' + ParamExpanded)
+  else
+    Log('La ruta ya existe en PATH: ' + ParamExpanded);
 end;
 
 // Función para verificar requisitos antes de instalar MySQL
@@ -200,11 +217,17 @@ begin
 end;
 
 function InitializeSetup(): Boolean;
+var
+  OrigPath: string;
 begin
   Result := True;
   
-  // Verificar espacio en disco - removido por problemas de compatibilidad
-  // RequiredSpace := 500 * 1024 * 1024;
+  // Hacer backup del PATH antes de comenzar (precaución adicional)
+  if RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', OrigPath) then
+  begin
+    RegWriteStringValue(HKLM, 'Software\{#MyAppPublisher}\{#MyAppName}', 'PathBackup', OrigPath);
+    Log('Backup del PATH creado exitosamente');
+  end;
   
   // Verificar si hay una instalación previa
   if RegKeyExists(HKLM, 'Software\{#MyAppPublisher}\{#MyAppName}') then
@@ -235,5 +258,35 @@ begin
   if CurPageID = wpFinished then
   begin
     Log('Instalación finalizada exitosamente');
+  end;
+end;
+
+// Función para limpiar el PATH durante la desinstalación
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  OrigPath: string;
+  NewPath: string;
+  PathToRemove: string;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    PathToRemove := ExpandConstant('{app}\gzip\bin');
+    
+    // Leer el PATH actual
+    if RegQueryStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', OrigPath) then
+    begin
+      // Remover la ruta de gzip del PATH
+      NewPath := OrigPath;
+      StringChangeEx(NewPath, ';' + PathToRemove, '', True);
+      StringChangeEx(NewPath, PathToRemove + ';', '', True);
+      StringChangeEx(NewPath, PathToRemove, '', True);
+      
+      // Solo actualizar si hubo cambios
+      if NewPath <> OrigPath then
+      begin
+        RegWriteExpandStringValue(HKLM, 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment', 'Path', NewPath);
+        Log('PATH actualizado durante desinstalación');
+      end;
+    end;
   end;
 end;
