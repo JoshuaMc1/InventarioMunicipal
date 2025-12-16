@@ -1,5 +1,6 @@
 package com.joshuamc1.inventariomunicipal.services;
 
+import com.joshuamc1.inventariomunicipal.core.BarcodeGenerator;
 import com.joshuamc1.inventariomunicipal.core.DatabaseManager;
 import com.joshuamc1.inventariomunicipal.core.Logs;
 import com.joshuamc1.inventariomunicipal.core.Session;
@@ -85,7 +86,23 @@ public class ProductService {
         return DatabaseManager.callInConnection(repo::countCreatedLastMonth);
     }
 
-    public void save(Product product) {
+    public void save(@NotNull Product product) {
+        // Normalizar código antes de guardar
+        String code = product.getString("code");
+        if (code != null) {
+            code = code.trim();
+            if (code.isEmpty()) {
+                // Evitar guardar cadena vacía, dejar que el repositorio genere o mantener null
+                product.set("code", null);
+            } else if (!BarcodeGenerator.isValidCode(code)) {
+                // Si no es válido, no lo forzamos; lo registramos y lo dejamos como estaba (o null)
+                Logs.warn(getClass(), "Código de producto inválido: '{}' – se omitirá", code);
+                product.set("code", null);
+            } else {
+                product.set("code", code);
+            }
+        }
+
         DatabaseManager.runInConnection(() -> {
             repo.save(product);
         });

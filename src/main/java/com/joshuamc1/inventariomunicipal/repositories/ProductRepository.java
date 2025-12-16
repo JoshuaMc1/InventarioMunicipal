@@ -1,9 +1,11 @@
 package com.joshuamc1.inventariomunicipal.repositories;
 
+import com.joshuamc1.inventariomunicipal.core.BarcodeGenerator;
 import com.joshuamc1.inventariomunicipal.models.Product;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class ProductRepository {
 
@@ -102,8 +104,44 @@ public class ProductRepository {
         product.set("current_stock", currentStock);
         product.set("minimum_stock", minimumStock);
         product.set("status", Product.STATUS_ACTIVE); // Nuevo campo
+
+        // Generar código único por defecto si no se define desde la UI/servicio
+        String code = generateUniqueCode();
+        product.set("code", code);
+
         product.saveIt();
         return product;
+    }
+
+    /**
+     * Verifica si ya existe un producto (cualquier estado) con el código dado
+     */
+    private boolean codeExists(String code) {
+        if (code == null) return false;
+        Long c = Product.count("code = ?", code);
+        return c != null && c > 0;
+    }
+
+    /**
+     * Genera un código único intentando múltiples veces para evitar colisiones
+     */
+    private @NotNull String generateUniqueCode() {
+        // Intentos razonables para evitar bucle infinito en escenarios extremos
+        for (int i = 0; i < 25; i++) {
+            String candidate = BarcodeGenerator.generateRandomCode();
+            if (!codeExists(candidate)) {
+                return candidate;
+            }
+        }
+        // Fallback: anexar sufijo aleatorio corto si hubo muchas colisiones
+        for (int i = 0; i < 25; i++) {
+            String candidate = BarcodeGenerator.generateRandomCode() + "-" + ThreadLocalRandom.current().nextInt(100, 999);
+            if (!codeExists(candidate)) {
+                return candidate;
+            }
+        }
+        // Como último recurso, devolver un código aleatorio claro (la BD garantizará UNIQUE y lanzará error si colisiona)
+        return BarcodeGenerator.generateRandomCode();
     }
 
     /**

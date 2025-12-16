@@ -17,6 +17,8 @@ module com.joshuamc1.inventariomunicipal {
     requires io;
     requires kernel;
     requires layout;
+    requires org.apache.poi.ooxml;
+    requires org.apache.poi.poi;
 
     opens com.joshuamc1.inventariomunicipal.controllers to javafx.fxml;
     opens com.joshuamc1.inventariomunicipal.controllers.dashboard to javafx.fxml;

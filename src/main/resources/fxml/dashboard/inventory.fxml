@@ -41,6 +41,18 @@
                    <font>
                       <Font size="14.0" />
                    </font></Button>
+                    <!-- Agregar botón de importar inventario, visible solo para rol root desde el controlador -->
+                    <Button fx:id="btnImport" text="Importar">
+                        <font>
+                            <Font size="14.0" />
+                        </font>
+                    </Button>
+                    <!-- Nuevo botón Exportar, visible solo para roles admin/root desde el controlador -->
+                    <Button fx:id="btnExport" text="Exportar">
+                        <font>
+                            <Font size="14.0" />
+                        </font>
+                    </Button>
                 </HBox>
                 <HBox alignment="CENTER_LEFT" spacing="10">
                     <Label text="Buscar:">

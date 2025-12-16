@@ -26,8 +26,19 @@ import javafx.stage.FileChooser;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+
+// POI para exportar a Excel
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
 public class InventoryController {
     private final ProductService productService = new ProductService();
@@ -47,6 +58,8 @@ public class InventoryController {
     @FXML private Button btnNew;
     @FXML private Button btnEdit;
     @FXML private Button btnDelete;
+    @FXML private Button btnImport;
+    @FXML private Button btnExport;
     @FXML private TextField txtSearch;
     @FXML private Button btnClearSearch;
     // Controles de paginación
@@ -80,6 +93,22 @@ public class InventoryController {
         btnNew.setOnAction(e -> openCreateDialog());
         btnEdit.setOnAction(e -> openEditDialog());
         btnDelete.setOnAction(e -> deleteSelected());
+
+        // Botón Importar (solo visible si usuario root por permiso del sistema)
+        if (btnImport != null) {
+            boolean isRoot = com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "DESTRUCTIVE_OPERATIONS");
+            btnImport.setVisible(isRoot);
+            btnImport.setManaged(isRoot);
+            btnImport.setOnAction(e -> openImportDialog());
+        }
+
+        // Botón Exportar (solo ADMIN o ROOT)
+        if (btnExport != null) {
+            boolean canExport = PermissionHelper.isAdminOrRoot();
+            btnExport.setVisible(canExport);
+            btnExport.setManaged(canExport);
+            btnExport.setOnAction(e -> openExportDialog());
+        }
 
         // Búsqueda automática con debounce de 500ms
         javafx.animation.PauseTransition searchPause = new javafx.animation.PauseTransition(javafx.util.Duration.millis(500));
@@ -485,7 +514,7 @@ public class InventoryController {
                 Product product = productService.createProduct(name, desc, unit.getDbValue(), current, min);
                 // Asignar código si se proporcionó
                 if (!code.isEmpty()) {
-                    product.set("code", code);
+                    product.set("code", code.trim());
                     productService.save(product);
                 }
                 return product;
@@ -862,4 +891,211 @@ public class InventoryController {
             }
         }
     }
+
+    private void openImportDialog() {
+        // Validación adicional por permisos
+        if (!com.joshuamc1.inventariomunicipal.core.PermissionHelper.canAccess("SISTEMA", "DESTRUCTIVE_OPERATIONS")) {
+            Utils.showAlert("Permiso denegado", "Esta opción solo está disponible para el rol root.");
+            return;
+        }
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Seleccionar archivo de inventario");
+        chooser.getExtensionFilters().addAll(
+                new FileChooser.ExtensionFilter("CSV", "*.csv"),
+                new FileChooser.ExtensionFilter("Excel", "*.xlsx")
+        );
+        File file = chooser.showOpenDialog(tblProducts.getScene().getWindow());
+        if (file == null) return;
+
+        // Parseo básico y vista previa (placeholder)
+        List<Product> previewItems;
+        try {
+            previewItems = new com.joshuamc1.inventariomunicipal.services.InventoryImportService().parseFileForPreview(file);
+        } catch (Exception ex) {
+            Logs.error(getClass(), "Error al parsear archivo: {}", ex.getMessage());
+            Utils.showAlert("Error", "No se pudo leer el archivo seleccionado: " + ex.getMessage());
+            return;
+        }
+
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Vista previa de importación");
+        dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+        dialog.getDialogPane().setPrefWidth(650);
+        dialog.getDialogPane().setPrefHeight(400);
+        dialog.setResizable(true);
+
+        TableView<Product> previewTable = new TableView<>();
+        TableColumn<Product, String> pCode = new TableColumn<>("Código");
+        pCode.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("code")));
+        TableColumn<Product, String> pName = new TableColumn<>("Nombre");
+        pName.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("name")));
+        TableColumn<Product, String> pUnit = new TableColumn<>("Unidad");
+        pUnit.setCellValueFactory(c -> new SimpleStringProperty(c.getValue().getString("unit")));
+        TableColumn<Product, Double> pStock = new TableColumn<>("Stock");
+        pStock.setCellValueFactory(c -> new SimpleDoubleProperty(c.getValue().getDouble("current_stock") == null ? 0d : c.getValue().getDouble("current_stock")).asObject());
+        previewTable.getColumns().addAll(pCode, pName, pUnit, pStock);
+        previewTable.setItems(FXCollections.observableArrayList(previewItems));
+
+        dialog.getDialogPane().setContent(previewTable);
+        Optional<ButtonType> res = dialog.showAndWait();
+        if (res.isPresent() && res.get() == ButtonType.OK) {
+            // Ejecutar importación en background
+            Task<Void> task = new Task<>() {
+                @Override
+                protected Void call() {
+                    DatabaseConfig.openConnection();
+                    try {
+                        new com.joshuamc1.inventariomunicipal.services.InventoryImportService().importItems(previewItems);
+                        return null;
+                    } finally {
+                        DatabaseConfig.closeConnection();
+                    }
+                }
+            };
+            task.setOnSucceeded(ev -> {
+                Utils.showAlert("Éxito", "Inventario importado correctamente.");
+                loadProducts();
+            });
+            task.setOnFailed(ev -> {
+                Throwable t = task.getException();
+                Utils.showAlert("Error", "Falló la importación: " + (t == null ? "unknown" : t.getMessage()));
+            });
+            Thread th = new Thread(task, "inventory-import");
+            th.setDaemon(true);
+            th.start();
+        }
+    }
+
+    private void openExportDialog() {
+        // Validar rol admin/root por seguridad extra
+        if (!PermissionHelper.isAdminOrRoot()) {
+            PermissionHelper.showAccessDenied("INVENTARIO", "EXPORT");
+            return;
+        }
+
+        ChoiceDialog<String> dialog = new ChoiceDialog<>("CSV", FXCollections.observableArrayList("CSV", "Excel"));
+        dialog.setTitle("Exportar inventario");
+        dialog.setHeaderText("Seleccione el formato de exportación");
+        dialog.setContentText("Formato:");
+
+        Optional<String> choice = dialog.showAndWait();
+        if (choice.isEmpty()) return;
+        String format = choice.get();
+
+        if ("CSV".equalsIgnoreCase(format)) {
+            exportInventoryCsv();
+        } else {
+            exportInventoryExcel();
+        }
+    }
+
+    private String timestamp() {
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+    }
+
+    private void exportInventoryCsv() {
+        // Cargar datos activos
+        List<Product> products = productService.findAll();
+        if (products == null || products.isEmpty()) {
+            Utils.showAlert("Info", "No hay productos para exportar");
+            return;
+        }
+
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Exportar Inventario - CSV");
+        fc.setInitialFileName("inventario_" + timestamp() + ".csv");
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV", "*.csv"));
+        File out = fc.showSaveDialog(tblProducts.getScene().getWindow());
+        if (out == null) return;
+
+        // Columnas: code,name,description,unit,current_stock,minimum_stock,status
+        try (PrintWriter pw = new PrintWriter(out, StandardCharsets.UTF_8)) {
+            pw.println("code,name,description,unit,current_stock,minimum_stock,status");
+            for (Product p : products) {
+                String code = nullToEmpty(p.getString("code"));
+                String name = nullToEmpty(p.getString("name"));
+                String desc = nullToEmpty(p.getString("description"));
+                String unit = nullToEmpty(p.getString("unit")); // valor DB, el importador lo espera así
+                String current = String.valueOf(p.getDouble("current_stock") == null ? 0d : p.getDouble("current_stock"));
+                String min = String.valueOf(p.getDouble("minimum_stock") == null ? 0d : p.getDouble("minimum_stock"));
+                String status = nullToEmpty(p.getString("status"));
+
+                pw.println(String.join(",",
+                    quoteCsv(code),
+                    quoteCsv(name),
+                    quoteCsv(desc),
+                    quoteCsv(unit),
+                    quoteCsv(current),
+                    quoteCsv(min),
+                    quoteCsv(status)
+                ));
+            }
+        } catch (Exception ex) {
+            Logs.error(getClass(), "Error exportando inventario CSV", ex);
+            Utils.showAlert("Error", "No se pudo exportar CSV: " + ex.getMessage());
+            return;
+        }
+
+        Utils.showAlert("Éxito", "Inventario exportado a CSV correctamente");
+    }
+
+    private void exportInventoryExcel() {
+        // Cargar datos activos
+        List<Product> products = productService.findAll();
+        if (products == null || products.isEmpty()) {
+            Utils.showAlert("Info", "No hay productos para exportar");
+            return;
+        }
+
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Exportar Inventario - Excel");
+        fc.setInitialFileName("inventario_" + timestamp() + ".xlsx");
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Excel (*.xlsx)", "*.xlsx"));
+        File out = fc.showSaveDialog(tblProducts.getScene().getWindow());
+        if (out == null) return;
+
+        try (XSSFWorkbook wb = new XSSFWorkbook(); FileOutputStream fos = new FileOutputStream(out)) {
+            Sheet sheet = wb.createSheet("Inventario");
+            // Header
+            Row header = sheet.createRow(0);
+            String[] cols = {"code","name","description","unit","current_stock","minimum_stock","status"};
+            for (int i = 0; i < cols.length; i++) {
+                Cell cell = header.createCell(i);
+                cell.setCellValue(cols[i]);
+            }
+
+            int r = 1;
+            for (Product p : products) {
+                Row row = sheet.createRow(r++);
+                row.createCell(0).setCellValue(safe(p.getString("code")));
+                row.createCell(1).setCellValue(safe(p.getString("name")));
+                row.createCell(2).setCellValue(safe(p.getString("description")));
+                row.createCell(3).setCellValue(safe(p.getString("unit"))); // valor DB
+                row.createCell(4).setCellValue(p.getDouble("current_stock") == null ? 0d : p.getDouble("current_stock"));
+                row.createCell(5).setCellValue(p.getDouble("minimum_stock") == null ? 0d : p.getDouble("minimum_stock"));
+                row.createCell(6).setCellValue(safe(p.getString("status")));
+            }
+
+            for (int i = 0; i < cols.length; i++) sheet.autoSizeColumn(i);
+            wb.write(fos);
+        } catch (Exception ex) {
+            Logs.error(getClass(), "Error exportando inventario Excel", ex);
+            Utils.showAlert("Error", "No se pudo exportar Excel: " + ex.getMessage());
+            return;
+        }
+
+        Utils.showAlert("Éxito", "Inventario exportado a Excel correctamente");
+    }
+
+    private String quoteCsv(String s) {
+        if (s == null) return "";
+        String v = s;
+        boolean needQuotes = v.contains(",") || v.contains("\n") || v.contains("\r") || v.contains("\"") || v.contains(";");
+        v = v.replace("\"", "\"\"");
+        return needQuotes ? "\"" + v + "\"" : v;
+    }
+
+    private String nullToEmpty(String s) { return s == null ? "" : s; }
+    private String safe(String s) { return s == null ? "" : s; }
 }

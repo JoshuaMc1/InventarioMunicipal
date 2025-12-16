@@ -35,12 +35,12 @@ SetupIconFile=src\main\resources\images\favicon.ico
 UninstallDisplayIcon={app}\favicon.ico
 
 ; Configuración de compresión y seguridad
-Compression=lzma2/max
+Compression=lzma2/ultra64
 SolidCompression=yes
-WizardStyle=modern
+WizardStyle=modern polar includetitlebar
 PrivilegesRequired=admin
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 
 ; Requisitos mínimos
 MinVersion=10.0.17763
